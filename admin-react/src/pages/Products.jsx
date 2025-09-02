@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -24,6 +24,8 @@ import {
   CardActions,
   Tooltip,
   Fab,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
@@ -37,163 +39,102 @@ import {
   Visibility as ViewIcon,
   MoreVert as MoreVertIcon,
   Image as ImageIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
-import { useDropzone } from 'react-dropzone';
-
-const ProductDialog = ({ open, onClose, product, onSave }) => {
-  const [formData, setFormData] = useState(
-    product || {
-      name: '',
-      price: '',
-      category: '',
-      stock: '',
-      description: '',
-      image: null,
-    }
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
-    },
-    maxFiles: 1,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles.length > 0) {
-        const file = acceptedFiles[0];
-        const reader = new FileReader();
-        reader.onload = () => {
-          setFormData({ ...formData, image: reader.result });
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  });
-
-  const handleSubmit = () => {
-    onSave(formData);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        {product ? 'Edit Product' : 'Add New Product'}
-      </DialogTitle>
-      <DialogContent>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Product Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              margin="normal"
-            />
-            <TextField
-              fullWidth
-              label="Price"
-              type="number"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              margin="normal"
-              InputProps={{
-                startAdornment: <InputAdornment position="start">$</InputAdornment>,
-              }}
-            />
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Category</InputLabel>
-              <Select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                label="Category"
-              >
-                <MenuItem value="electronics">Electronics</MenuItem>
-                <MenuItem value="clothing">Clothing</MenuItem>
-                <MenuItem value="food">Food</MenuItem>
-                <MenuItem value="books">Books</MenuItem>
-                <MenuItem value="others">Others</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              fullWidth
-              label="Stock Quantity"
-              type="number"
-              value={formData.stock}
-              onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-              margin="normal"
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Box
-              {...getRootProps()}
-              sx={{
-                border: '2px dashed',
-                borderColor: isDragActive ? 'primary.main' : 'grey.300',
-                borderRadius: 2,
-                p: 3,
-                textAlign: 'center',
-                cursor: 'pointer',
-                bgcolor: isDragActive ? 'action.hover' : 'background.paper',
-                height: 200,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 2,
-              }}
-            >
-              <input {...getInputProps()} />
-              {formData.image ? (
-                <img
-                  src={formData.image}
-                  alt="Product"
-                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                />
-              ) : (
-                <>
-                  <ImageIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                  <Typography variant="body2" color="text.secondary">
-                    {isDragActive ? 'Drop the image here' : 'Drag & drop product image, or click to select'}
-                  </Typography>
-                </>
-              )}
-            </Box>
-            <TextField
-              fullWidth
-              label="Description"
-              multiline
-              rows={4}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              margin="normal"
-            />
-          </Grid>
-        </Grid>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSubmit} variant="contained">
-          {product ? 'Update' : 'Add'} Product
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
+import { supabase, AdminProductService, AdminCategoryService } from '../services/supabaseService';
+import DiagnosticPanel from '../components/DiagnosticPanel';
+import ProductForm from '../components/ProductForm';
 
 function Products() {
-  const [products, setProducts] = useState([
-    { id: 1, name: 'Wireless Headphones', price: 99.99, category: 'electronics', stock: 45, status: 'active', image: 'https://via.placeholder.com/150' },
-    { id: 2, name: 'Smart Watch', price: 249.99, category: 'electronics', stock: 32, status: 'active', image: 'https://via.placeholder.com/150' },
-    { id: 3, name: 'Leather Jacket', price: 189.99, category: 'clothing', stock: 15, status: 'active', image: 'https://via.placeholder.com/150' },
-    { id: 4, name: 'Organic Coffee', price: 24.99, category: 'food', stock: 120, status: 'active', image: 'https://via.placeholder.com/150' },
-    { id: 5, name: 'Programming Book', price: 45.99, category: 'books', stock: 67, status: 'low-stock', image: 'https://via.placeholder.com/150' },
-  ]);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const { enqueueSnackbar } = useSnackbar();
+
+  // Charger les données depuis Supabase
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('🔄 Loading products from Supabase...');
+      
+      // Charger les produits
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select(`
+          *,
+          category:categories(id, name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (productsError) {
+        console.error('❌ Products error:', productsError);
+        throw productsError;
+      }
+
+      // Charger les catégories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('display_order');
+
+      if (categoriesError) {
+        console.error('❌ Categories error:', categoriesError);
+        throw categoriesError;
+      }
+
+      console.log('✅ Products loaded:', productsData?.length || 0);
+      console.log('✅ Categories loaded:', categoriesData?.length || 0);
+      
+      // Transformer les données pour l'affichage
+      const transformedProducts = productsData?.map(p => ({
+        ...p,
+        stock: p.quantity,
+        status: p.quantity > 10 ? 'active' : p.quantity > 0 ? 'low-stock' : 'out-of-stock',
+        category: p.category?.name || 'Uncategorized',
+        image: p.main_image || p.images?.[0] || 'https://via.placeholder.com/150'
+      })) || [];
+      
+      setProducts(transformedProducts);
+      setCategories(categoriesData || []);
+    } catch (error) {
+      console.error('❌ Error loading data:', error);
+      setError(error.message);
+      enqueueSnackbar(`Erreur de connexion: ${error.message}`, { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Configurer la synchronisation temps réel
+  useEffect(() => {
+    loadData();
+
+    // Subscription temps réel
+    const channel = supabase
+      .channel('products-page-sync')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        (payload) => {
+          console.log('🔄 Real-time update:', payload);
+          loadData();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status);
+      });
+
+    return () => {
+      console.log('🔌 Cleaning up subscription...');
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleAddProduct = () => {
     setSelectedProduct(null);
@@ -205,25 +146,93 @@ function Products() {
     setDialogOpen(true);
   };
 
-  const handleDeleteProduct = (id) => {
-    setProducts(products.filter((p) => p.id !== id));
-    enqueueSnackbar('Product deleted successfully', { variant: 'success' });
+  const handleDeleteProduct = async (id) => {
+    try {
+      const result = await AdminProductService.delete(id);
+      if (result.success) {
+        setProducts(products.filter((p) => p.id !== id));
+        enqueueSnackbar('Produit supprimé avec succès', { variant: 'success' });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('❌ Delete error:', error);
+      enqueueSnackbar(`Erreur: ${error.message}`, { variant: 'error' });
+    }
   };
 
-  const handleSaveProduct = (productData) => {
-    if (selectedProduct) {
-      setProducts(products.map((p) => 
-        p.id === selectedProduct.id ? { ...p, ...productData } : p
-      ));
-      enqueueSnackbar('Product updated successfully', { variant: 'success' });
-    } else {
-      const newProduct = {
-        ...productData,
-        id: products.length + 1,
-        status: productData.stock > 10 ? 'active' : 'low-stock',
+  const handleSaveProduct = async (productData) => {
+    try {
+      console.log('💾 Saving product data:', productData);
+      
+      // Préparer les données pour Supabase avec les bons champs
+      const supabaseData = {
+        sku: productData.sku || `SKU-${Date.now()}`,
+        name: productData.name,
+        description: productData.description,
+        short_description: productData.short_description,
+        category_id: productData.category_id,
+        brand: productData.brand,
+        model: productData.model,
+        price: parseFloat(productData.price) || 0,
+        compare_at_price: productData.compare_at_price ? parseFloat(productData.compare_at_price) : null,
+        cost_price: productData.cost_price ? parseFloat(productData.cost_price) : null,
+        quantity: parseInt(productData.quantity) || 0,
+        low_stock_threshold: parseInt(productData.low_stock_threshold) || 10,
+        unit: productData.unit || 'pièce',
+        weight: productData.weight ? parseFloat(productData.weight) : null,
+        dimensions: productData.dimensions || {},
+        images: productData.images || [],
+        main_image: productData.main_image || productData.images?.[0],
+        specifications: productData.specifications || {},
+        tags: productData.tags 
+          ? (typeof productData.tags === 'string' 
+              ? productData.tags.split(',').map(t => t.trim()).filter(t => t)
+              : productData.tags)
+          : [],
+        barcode: productData.barcode,
+        is_featured: productData.is_featured || false,
+        is_active: productData.is_active !== false,
+        meta_title: productData.meta_title,
+        meta_description: productData.meta_description,
+        meta_keywords: productData.meta_keywords 
+          ? (typeof productData.meta_keywords === 'string' 
+              ? productData.meta_keywords.split(',').map(k => k.trim()).filter(k => k)
+              : productData.meta_keywords)
+          : []
       };
-      setProducts([...products, newProduct]);
-      enqueueSnackbar('Product added successfully', { variant: 'success' });
+
+      console.log('📤 Sending to Supabase:', supabaseData);
+
+      if (selectedProduct) {
+        // Mise à jour
+        const result = await AdminProductService.update(selectedProduct.id, supabaseData);
+        console.log('🔄 Update result:', result);
+        if (result.success) {
+          enqueueSnackbar('Produit mis à jour avec succès', { variant: 'success' });
+          await loadData();
+        } else {
+          throw new Error(result.error);
+        }
+      } else {
+        // Création
+        const result = await AdminProductService.create(supabaseData);
+        console.log('✨ Create result:', result);
+        if (result.success) {
+          enqueueSnackbar('Produit créé avec succès', { variant: 'success' });
+          await loadData();
+        } else {
+          throw new Error(result.error);
+        }
+      }
+      
+      // Fermer le dialog
+      setDialogOpen(false);
+      setSelectedProduct(null);
+      
+    } catch (error) {
+      console.error('❌ Save error:', error);
+      enqueueSnackbar(`Erreur: ${error.message}`, { variant: 'error' });
     }
   };
 
@@ -309,6 +318,14 @@ function Products() {
 
   return (
     <Box>
+      {/* Diagnostic Supabase */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <Typography variant="subtitle2">Erreur de connexion Supabase:</Typography>
+          <Typography variant="body2">{error}</Typography>
+        </Alert>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -324,6 +341,14 @@ function Products() {
             </Typography>
           </Box>
           <Box display="flex" gap={2}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={loadData}
+              disabled={loading}
+            >
+              Rafraîchir
+            </Button>
             <Button
               variant="outlined"
               startIcon={<UploadIcon />}
@@ -382,7 +407,28 @@ function Products() {
           </Box>
         </Box>
 
-        {viewMode === 'table' ? (
+        {loading ? (
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
+            <CircularProgress />
+          </Box>
+        ) : products.length === 0 ? (
+          <Box textAlign="center" py={10}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Aucun produit trouvé
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              Commencez par créer votre premier produit
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleAddProduct}
+              sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+            >
+              Créer un produit
+            </Button>
+          </Box>
+        ) : viewMode === 'table' ? (
           <DataGrid
             rows={filteredProducts}
             columns={columns}
@@ -461,10 +507,14 @@ function Products() {
         )}
       </Paper>
 
-      <ProductDialog
+      <ProductForm
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => {
+          setDialogOpen(false);
+          setSelectedProduct(null);
+        }}
         product={selectedProduct}
+        categories={categories}
         onSave={handleSaveProduct}
       />
 

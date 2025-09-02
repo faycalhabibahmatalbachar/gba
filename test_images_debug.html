@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Images Supabase</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .product { background: white; padding: 15px; margin: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .image-test { display: flex; gap: 20px; align-items: start; margin: 10px 0; }
+        .image-box { width: 200px; height: 200px; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; }
+        .image-box img { max-width: 100%; max-height: 100%; }
+        .info { flex: 1; }
+        .url { background: #f0f0f0; padding: 10px; margin: 10px 0; word-break: break-all; font-family: monospace; font-size: 12px; }
+        .status { padding: 5px 10px; border-radius: 4px; display: inline-block; margin: 5px 0; }
+        .success { background: #4caf50; color: white; }
+        .error { background: #f44336; color: white; }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug des Images Produits Supabase</h1>
+        <div id="loading">⏳ Chargement des produits...</div>
+        <div id="products"></div>
+        <h2>📝 Logs de Debug</h2>
+        <div id="logs" style="background: #000; color: #0f0; padding: 15px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto;"></div>
+    </div>
+
+    <script type="module">
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        
+        const logs = [];
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            logs.push(logEntry);
+            document.getElementById('logs').innerHTML = logs.join('<br>');
+            console.log(message);
+        }
+
+        function buildImageUrl(imagePath) {
+            if (!imagePath) return null;
+            
+            // Si l'URL est déjà complète
+            if (imagePath.startsWith('http')) {
+                return imagePath;
+            }
+            
+            // Si le chemin commence par products/
+            if (imagePath.startsWith('products/')) {
+                return `${SUPABASE_URL}/storage/v1/object/public/${imagePath}`;
+            }
+            
+            // Sinon, construire l'URL complète
+            return `${SUPABASE_URL}/storage/v1/object/public/products/${imagePath}`;
+        }
+
+        async function testImage(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
+                img.src = url;
+            });
+        }
+
+        async function loadProducts() {
+            try {
+                log('🚀 Début du chargement des produits...');
+                
+                // Récupérer les produits
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/products?is_active=eq.true&select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const products = await response.json();
+                log(`✅ ${products.length} produits récupérés`);
+                
+                document.getElementById('loading').style.display = 'none';
+                const container = document.getElementById('products');
+                
+                for (const product of products) {
+                    log(`\n📦 Traitement: ${product.name}`);
+                    log(`  ID: ${product.id}`);
+                    log(`  main_image (BD): ${product.main_image || 'NULL'}`);
+                    
+                    const productDiv = document.createElement('div');
+                    productDiv.className = 'product';
+                    
+                    // Tester différentes constructions d'URL
+                    const urlsToTest = [];
+                    
+                    if (product.main_image) {
+                        // URL telle quelle dans la BD
+                        urlsToTest.push({
+                            label: 'URL de la BD',
+                            url: product.main_image
+                        });
+                        
+                        // URL complète construite
+                        urlsToTest.push({
+                            label: 'URL construite',
+                            url: buildImageUrl(product.main_image)
+                        });
+                        
+                        // Si l'URL contient products/ mais n'est pas complète
+                        if (product.main_image.includes('products/') && !product.main_image.startsWith('http')) {
+                            const path = product.main_image.split('products/').pop();
+                            urlsToTest.push({
+                                label: 'URL avec path extrait',
+                                url: `${SUPABASE_URL}/storage/v1/object/public/products/${path}`
+                            });
+                        }
+                    }
+                    
+                    let html = `<h3>${product.name}</h3>`;
+                    html += `<p>Prix: ${product.price} FCFA</p>`;
+                    
+                    for (const testUrl of urlsToTest) {
+                        const isValid = await testImage(testUrl.url);
+                        log(`  Test ${testUrl.label}: ${isValid ? '✅ SUCCÈS' : '❌ ÉCHEC'}`);
+                        log(`    URL: ${testUrl.url}`);
+                        
+                        html += `
+                            <div class="image-test">
+                                <div class="image-box">
+                                    ${isValid ? `<img src="${testUrl.url}" alt="${product.name}">` : '❌ Erreur'}
+                                </div>
+                                <div class="info">
+                                    <strong>${testUrl.label}:</strong>
+                                    <span class="status ${isValid ? 'success' : 'error'}">
+                                        ${isValid ? '✅ Fonctionne' : '❌ Ne fonctionne pas'}
+                                    </span>
+                                    <div class="url">${testUrl.url}</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    productDiv.innerHTML = html;
+                    container.appendChild(productDiv);
+                }
+                
+                log('\n✅ Test terminé!');
+                
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+                document.getElementById('loading').innerHTML = `❌ Erreur: ${error.message}`;
+            }
+        }
+
+        // Lancer le test
+        loadProducts();
+    </script>
+</body>
+</html>

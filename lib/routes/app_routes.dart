@@ -1,25 +1,36 @@
-import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
-import '../screens/splash_screen.dart';
-import '../screens/login_screen.dart';
-import '../screens/register_screen.dart';
-import '../screens/home_screen.dart';
-import '../screens/categories_screen.dart';
-import '../screens/cart_screen.dart';
-import '../screens/orders_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/special_order_screen.dart';
-import '../screens/messaging_screen.dart';
-import '../screens/product_detail_screen.dart';
-import '../screens/checkout_screen.dart';
-import '../screens/language_selector_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../screens/auth/login_screen.dart';
+import '../screens/home_screen_premium.dart';
+import '../screens/product/product_detail_screen.dart';
 
 class AppRoutes {
-  static final GoRouter router = GoRouter(
+  static final router = GoRouter(
+    initialLocation: '/',
+    redirect: (context, state) {
+      final session = Supabase.instance.client.auth.currentSession;
+      final isLoggedIn = session != null;
+      final isAuthRoute = state.matchedLocation == '/login' || 
+                         state.matchedLocation == '/register';
+      
+      // If not logged in and trying to access protected routes
+      if (!isLoggedIn && !isAuthRoute) {
+        return '/login';
+      }
+      
+      // If logged in and trying to access auth routes
+      if (isLoggedIn && isAuthRoute) {
+        return '/home';
+      }
+      
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const SplashScreen(),
+        redirect: (context, state) => '/home',
       ),
       GoRoute(
         path: '/login',
@@ -27,49 +38,54 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
-      ),
-      GoRoute(
-        path: '/home',
-        builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: '/categories',
-        builder: (context, state) => const CategoriesScreen(),
-      ),
-      GoRoute(
-        path: '/cart',
-        builder: (context, state) => const CartScreen(),
-      ),
-      GoRoute(
-        path: '/orders',
-        builder: (context, state) => const OrdersScreen(),
-      ),
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: '/special-order',
-        builder: (context, state) => const SpecialOrderScreen(),
-      ),
-      GoRoute(
-        path: '/messaging',
-        builder: (context, state) => const MessagingScreen(),
-      ),
-      GoRoute(
-        path: '/product/:id',
-        builder: (context, state) => ProductDetailScreen(
-          productId: state.pathParameters['id']!,
+        builder: (context, state) => Scaffold(
+          body: Center(
+            child: Text('Register Screen - À implémenter'),
+          ),
         ),
       ),
       GoRoute(
-        path: '/checkout',
-        builder: (context, state) => const CheckoutScreen(),
+        path: '/home',
+        builder: (context, state) => const HomeScreenPremium(),
       ),
       GoRoute(
-        path: '/language',
-        builder: (context, state) => const LanguageSelectorScreen(),
+        path: '/categories',
+        builder: (context, state) => Scaffold(
+          body: Center(
+            child: Text('Categories Screen - À implémenter'),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/cart',
+        builder: (context, state) => Scaffold(
+          body: Center(
+            child: Text('Cart Screen - À implémenter'),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => Scaffold(
+          body: Center(
+            child: Text('Profile Screen - À implémenter'),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/product/:id',
+        builder: (context, state) {
+          final productId = state.pathParameters['id']!;
+          return ProductDetailScreen(productId: productId);
+        },
+      ),
+      GoRoute(
+        path: '/favorites',
+        builder: (context, state) => Scaffold(
+          body: Center(
+            child: Text('Favorites Screen - À implémenter'),
+          ),
+        ),
       ),
     ],
   );

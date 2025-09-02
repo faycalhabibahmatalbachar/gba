@@ -52,6 +52,16 @@ admin-react/dist/
 admin-react/build/
 admin-react/*.log
 
+# React Native Mobile
+gba-mobile/node_modules/
+gba-mobile/.expo/
+gba-mobile/.env
+gba-mobile/.env.local
+gba-mobile/android/.gradle/
+gba-mobile/android/.kotlin/
+gba-mobile/android/app/build/
+gba-mobile/android/build/
+
 # Environment files
 .env
 .env.local

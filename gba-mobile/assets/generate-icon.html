@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBA Store - Icon & Splash Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+        
+        .canvas-container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        canvas {
+            display: block;
+            margin-bottom: 15px;
+        }
+        
+        h2 {
+            color: white;
+            margin: 0 0 10px 0;
+            text-align: center;
+        }
+        
+        .instructions {
+            background: rgba(255,255,255,0.9);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+        }
+        
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <h2>GBA Store - Générateur d'icônes et splash screen</h2>
+    
+    <div class="instructions">
+        <h3>Instructions :</h3>
+        <ol>
+            <li>Cliquez droit sur chaque image ci-dessous</li>
+            <li>Sélectionnez "Enregistrer l'image sous..."</li>
+            <li>Enregistrez dans le dossier <code>gba-mobile/assets/</code> avec les noms indiqués</li>
+        </ol>
+    </div>
+    
+    <!-- Icon 512x512 -->
+    <div class="canvas-container">
+        <h3>icon.png (512x512)</h3>
+        <canvas id="icon" width="512" height="512"></canvas>
+        <button class="button" onclick="downloadCanvas('icon', 'icon.png')">Télécharger icon.png</button>
+    </div>
+    
+    <!-- Adaptive Icon 512x512 -->
+    <div class="canvas-container">
+        <h3>adaptive-icon.png (512x512)</h3>
+        <canvas id="adaptive" width="512" height="512"></canvas>
+        <button class="button" onclick="downloadCanvas('adaptive', 'adaptive-icon.png')">Télécharger adaptive-icon.png</button>
+    </div>
+    
+    <!-- Splash Screen 1242x2436 -->
+    <div class="canvas-container">
+        <h3>splash.png (1242x2436)</h3>
+        <canvas id="splash" width="1242" height="2436" style="max-width: 400px; height: auto;"></canvas>
+        <button class="button" onclick="downloadCanvas('splash', 'splash.png')">Télécharger splash.png</button>
+    </div>
+
+    <script>
+        // Fonction pour télécharger un canvas
+        function downloadCanvas(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Dessiner l'icône principale
+        function drawIcon() {
+            const canvas = document.getElementById('icon');
+            const ctx = canvas.getContext('2d');
+            
+            // Gradient de fond
+            const gradient = ctx.createLinearGradient(0, 0, 512, 512);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 512, 512);
+            
+            // Cercle blanc central
+            ctx.beginPath();
+            ctx.arc(256, 256, 150, 0, 2 * Math.PI);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            
+            // Texte GBA
+            ctx.font = 'bold 120px Arial';
+            ctx.fillStyle = '#667eea';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('GBA', 256, 240);
+            
+            // Sous-texte STORE
+            ctx.font = '40px Arial';
+            ctx.fillText('STORE', 256, 310);
+            
+            // Icône shopping cart
+            ctx.font = '60px Arial';
+            ctx.fillText('🛒', 256, 380);
+        }
+        
+        // Dessiner l'icône adaptive (Android)
+        function drawAdaptiveIcon() {
+            const canvas = document.getElementById('adaptive');
+            const ctx = canvas.getContext('2d');
+            
+            // Fond transparent
+            ctx.clearRect(0, 0, 512, 512);
+            
+            // Cercle avec gradient
+            const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 200);
+            gradient.addColorStop(0, '#764ba2');
+            gradient.addColorStop(1, '#667eea');
+            
+            ctx.beginPath();
+            ctx.arc(256, 256, 180, 0, 2 * Math.PI);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Bordure blanche
+            ctx.beginPath();
+            ctx.arc(256, 256, 180, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+            
+            // Texte GBA
+            ctx.font = 'bold 140px Arial';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('GBA', 256, 256);
+        }
+        
+        // Dessiner le splash screen
+        function drawSplash() {
+            const canvas = document.getElementById('splash');
+            const ctx = canvas.getContext('2d');
+            
+            // Gradient de fond
+            const gradient = ctx.createLinearGradient(0, 0, 0, 2436);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(0.5, '#764ba2');
+            gradient.addColorStop(1, '#667eea');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 1242, 2436);
+            
+            // Motif de cercles décoratifs
+            ctx.globalAlpha = 0.1;
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    Math.random() * 1242,
+                    Math.random() * 2436,
+                    Math.random() * 300 + 100,
+                    0,
+                    2 * Math.PI
+                );
+                ctx.fillStyle = 'white';
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            
+            // Logo central
+            ctx.beginPath();
+            ctx.arc(621, 1218, 250, 0, 2 * Math.PI);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            
+            // Ombre du logo
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 30;
+            ctx.shadowOffsetY = 10;
+            
+            // Texte GBA
+            ctx.font = 'bold 180px Arial';
+            ctx.fillStyle = '#667eea';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('GBA', 621, 1190);
+            
+            // Sous-texte STORE
+            ctx.font = '60px Arial';
+            ctx.fillText('STORE', 621, 1290);
+            
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+            
+            // Icône shopping
+            ctx.font = '100px Arial';
+            ctx.fillText('🛒', 621, 1400);
+            
+            // Tagline
+            ctx.font = '40px Arial';
+            ctx.fillStyle = 'white';
+            ctx.fillText('Votre boutique en ligne', 621, 1550);
+            ctx.fillText('de confiance', 621, 1610);
+            
+            // Loading dots
+            ctx.beginPath();
+            ctx.arc(561, 1750, 15, 0, 2 * Math.PI);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(621, 1750, 15, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(681, 1750, 15, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Version
+            ctx.font = '30px Arial';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillText('Version 1.0.0', 621, 2300);
+        }
+        
+        // Initialiser tous les canvas
+        drawIcon();
+        drawAdaptiveIcon();
+        drawSplash();
+    </script>
+</body>
+</html>

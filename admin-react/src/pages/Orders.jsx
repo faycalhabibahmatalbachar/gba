@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Box,
@@ -36,6 +36,8 @@ import {
   Collapse,
   Tabs,
   Tab,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
@@ -58,6 +60,7 @@ import {
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useSnackbar } from 'notistack';
+import { supabase } from '../config/supabase';
 
 const OrderDetailDialog = ({ open, onClose, order }) => {
   const [tabValue, setTabValue] = useState(0);
@@ -71,7 +74,7 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Order Details - {order.id}</Typography>
+          <span>Order Details - {order.id}</span>
           <Chip
             label={order.status}
             color={
@@ -251,7 +254,67 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
 };
 
 function Orders() {
-  const [orders, setOrders] = useState([
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Load orders from Supabase
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          user_profiles!orders_user_id_fkey(full_name, email, phone),
+          order_items(
+            id,
+            quantity,
+            price,
+            products(id, name, images)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Format orders for DataGrid
+      const formattedOrders = data?.map(order => ({
+        id: order.order_number || order.id,
+        customer: order.user_profiles?.full_name || 'Unknown Customer',
+        email: order.user_profiles?.email || '',
+        phone: order.user_profiles?.phone || '',
+        total: order.total_amount,
+        status: order.status,
+        date: order.created_at,
+        payment: order.payment_method || 'Card',
+        address: order.shipping_address ? 
+          `${order.shipping_address.street}, ${order.shipping_address.city}, ${order.shipping_address.state} ${order.shipping_address.zip}` : '',
+        items: order.order_items?.map(item => ({
+          name: item.products?.name || 'Product',
+          quantity: item.quantity,
+          price: item.price,
+          total: item.quantity * item.price
+        })) || [],
+        subtotal: order.subtotal || order.total_amount,
+        shipping: order.shipping_cost || 0,
+      })) || [];
+
+      setOrders(formattedOrders);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError(err.message);
+      enqueueSnackbar('Failed to load orders', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [mockOrders] = useState([
     { 
       id: '#ORD001', 
       customer: 'John Doe', 
@@ -334,11 +397,33 @@ function Orders() {
   const [expandedRows, setExpandedRows] = useState([]);
   const { enqueueSnackbar } = useSnackbar();
 
-  const handleStatusUpdate = (orderId, newStatus) => {
-    setOrders(orders.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ));
-    enqueueSnackbar(`Order ${orderId} status updated to ${newStatus}`, { variant: 'success' });
+  const handleStatusUpdate = async (orderId, newStatus) => {
+    try {
+      // Find the actual order ID (not order_number)
+      const order = orders.find(o => o.id === orderId);
+      const actualId = order?.id;
+      
+      // Update in Supabase
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('order_number', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(orders.map(order => 
+        order.id === orderId ? { ...order, status: newStatus } : order
+      ));
+      
+      enqueueSnackbar(`Order ${orderId} status updated to ${newStatus}`, { variant: 'success' });
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      enqueueSnackbar('Failed to update order status', { variant: 'error' });
+    }
   };
 
   const handleViewDetails = (order) => {
@@ -455,6 +540,25 @@ function Orders() {
     shipped: orders.filter(o => o.status === 'shipped').length,
     delivered: orders.filter(o => o.status === 'delivered').length,
   };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">
+          Error loading orders: {error}
+        </Alert>
+        <Button onClick={fetchOrders} sx={{ mt: 2 }}>Retry</Button>
+      </Box>
+    );
+  }
 
   return (
     <Box>

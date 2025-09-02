@@ -36,13 +36,14 @@ function Login() {
     setError('');
     
     if (!email || !password) {
-      setError('Please fill in all fields');
+      setError('Veuillez saisir votre email et mot de passe');
       return;
     }
-
-    const { error } = await signIn(email, password);
-    if (error) {
-      setError(error.message);
+    
+    try {
+      await signIn(email, password);
+    } catch (error) {
+      setError(error.message || 'Erreur de connexion');
     }
   };
 
@@ -63,7 +64,7 @@ function Login() {
           transition={{ duration: 0.5 }}
         >
           <Paper
-            elevation={24}
+            elevation={8}
             sx={{
               p: 4,
               borderRadius: 3,
@@ -205,7 +206,7 @@ function Login() {
             </Divider>
 
             <Typography variant="body2" align="center" color="text.secondary">
-              Use credentials: faycalhabibahmat@gmail.com
+              Utilisez vos identifiants ou créez un compte automatiquement
             </Typography>
           </Paper>
         </motion.div>
