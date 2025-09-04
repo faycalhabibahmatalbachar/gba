@@ -4,7 +4,7 @@ class CartService {
   final _supabase = Supabase.instance.client;
 
   // Ajouter au panier
-  Future<void> addToCart(String productId, int quantity) async {
+  Future<void> addToCart(String productId, int quantity, double price) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) throw Exception('Utilisateur non connecté');
 
@@ -21,14 +21,17 @@ class CartService {
         // Mettre à jour la quantité
         await _supabase
             .from('cart_items')
-            .update({'quantity': existing['quantity'] + quantity})
+            .update({
+              'quantity': existing['quantity'] + quantity,
+            })
             .eq('id', existing['id']);
       } else {
-        // Ajouter nouveau produit
+        // Ajouter nouveau produit avec le prix
         await _supabase.from('cart_items').insert({
           'user_id': userId,
           'product_id': productId,
           'quantity': quantity,
+          'price': price,
         });
       }
     } catch (e) {
@@ -63,7 +66,9 @@ class CartService {
       } else {
         await _supabase
             .from('cart_items')
-            .update({'quantity': quantity})
+            .update({
+              'quantity': quantity,
+            })
             .eq('id', cartItemId);
       }
     } catch (e) {

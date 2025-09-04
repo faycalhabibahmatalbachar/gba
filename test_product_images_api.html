@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Test API Produits</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+        pre { background: #000; padding: 15px; border: 1px solid #0f0; overflow: auto; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        button { background: #0f0; color: #000; padding: 10px 20px; border: none; cursor: pointer; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test Direct API Supabase</h1>
+    <button onclick="testAPI()">Tester API</button>
+    <button onclick="fixURLs()">Corriger URLs</button>
+    <div id="output"></div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
+        
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU1NTk0MzYsImV4cCI6MjA1MTEzNTQzNn0.xPOL54xPR5qXkcKWD-IXA7B1N3bFQGPXWNc05CMSTXY';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        window.testAPI = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<pre>Chargement...</pre>';
+            
+            try {
+                // 1. Récupérer les produits
+                const { data: products, error } = await supabase
+                    .from('products')
+                    .select('id, name, main_image, images')
+                    .limit(10);
+                
+                if (error) throw error;
+                
+                let html = '<pre class="success">';
+                html += '=== PRODUITS DANS LA BASE DE DONNÉES ===\n\n';
+                
+                products.forEach((p, i) => {
+                    html += `📦 Produit ${i+1}: ${p.name}\n`;
+                    html += `   ID: ${p.id}\n`;
+                    html += `   main_image: ${p.main_image || 'NULL/VIDE'}\n`;
+                    html += `   images: ${JSON.stringify(p.images || [])}\n`;
+                    html += '\n';
+                });
+                
+                // 2. Tester le storage bucket
+                html += '\n=== TEST STORAGE BUCKET ===\n';
+                const { data: files, error: storageError } = await supabase.storage
+                    .from('products')
+                    .list('', { limit: 10 });
+                
+                if (storageError) {
+                    html += `❌ Erreur storage: ${storageError.message}\n`;
+                } else {
+                    html += `✅ Fichiers dans le bucket "products":\n`;
+                    if (files && files.length > 0) {
+                        files.forEach(f => {
+                            html += `   - ${f.name}\n`;
+                        });
+                    } else {
+                        html += '   Aucun fichier trouvé\n';
+                    }
+                }
+                
+                html += '</pre>';
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<pre class="error">Erreur: ${error.message}</pre>`;
+            }
+        }
+        
+        window.fixURLs = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<pre>Correction en cours...</pre>';
+            
+            try {
+                // Récupérer les produits sans images
+                const { data: products, error } = await supabase
+                    .from('products')
+                    .select('id, name')
+                    .or('main_image.is.null,main_image.eq.')
+                    .limit(10);
+                
+                if (error) throw error;
+                
+                let html = '<pre class="success">';
+                html += `Found ${products.length} products without images\n\n`;
+                
+                // Ajouter des images de test
+                for (const product of products) {
+                    let imageUrl = '';
+                    
+                    // Utiliser des images Unsplash selon le nom du produit
+                    if (product.name.toLowerCase().includes('iphone')) {
+                        imageUrl = 'https://images.unsplash.com/photo-1591337676887-a217a6970a8a?w=500';
+                    } else if (product.name.toLowerCase().includes('samsung')) {
+                        imageUrl = 'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500';
+                    } else if (product.name.toLowerCase().includes('macbook')) {
+                        imageUrl = 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500';
+                    } else if (product.name.toLowerCase().includes('playstation')) {
+                        imageUrl = 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=500';
+                    } else if (product.name.toLowerCase().includes('airpods')) {
+                        imageUrl = 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500';
+                    } else {
+                        imageUrl = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500';
+                    }
+                    
+                    const { error: updateError } = await supabase
+                        .from('products')
+                        .update({ main_image: imageUrl })
+                        .eq('id', product.id);
+                    
+                    if (updateError) {
+                        html += `❌ Erreur mise à jour ${product.name}: ${updateError.message}\n`;
+                    } else {
+                        html += `✅ ${product.name} - Image ajoutée\n`;
+                    }
+                }
+                
+                html += '\n✨ Correction terminée! Rechargez Flutter avec "r"';
+                html += '</pre>';
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<pre class="error">Erreur: ${error.message}</pre>`;
+            }
+        }
+        
+        // Test au chargement
+        testAPI();
+    </script>
+</body>
+</html>

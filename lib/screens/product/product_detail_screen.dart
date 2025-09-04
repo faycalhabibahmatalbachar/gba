@@ -155,7 +155,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
   Future<void> _addToCart() async {
     try {
-      await _cartService.addToCart(widget.productId, quantity);
+      // Récupérer le prix du produit depuis l'état
+      final productPrice = product?['price'] ?? 0.0;
+      await _cartService.addToCart(widget.productId, quantity, productPrice.toDouble());
       
       // Rafraîchir le provider du panier
       ref.invalidate(cartItemCountProvider);
@@ -213,7 +215,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             SliverAppBar(
               expandedHeight: 350,
               pinned: true,
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
               leading: IconButton(
                 icon: Container(
                   padding: const EdgeInsets.all(8),

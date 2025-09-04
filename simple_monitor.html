@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📡 Monitor Simple - GBA</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .input-zone {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        #errorInput {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+        
+        #errorInput:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .output {
+            background: #1e1e1e;
+            color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            min-height: 400px;
+            font-family: 'Courier New', monospace;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+        
+        .error-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 5px;
+        }
+        
+        .timestamp {
+            color: #8b92a9;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .error-content {
+            color: #ff6b6b;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 255, 0, 0.9);
+            padding: 10px 20px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        #monitorData {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📡 Monitor Simple - Temps Réel</h1>
+            <p>Collez vos erreurs Flutter ci-dessous</p>
+        </div>
+        
+        <div class="input-zone">
+            <textarea id="errorInput" placeholder="Collez les erreurs Flutter ici..."></textarea>
+            <button class="btn" onclick="processError()">📤 Envoyer</button>
+            <button class="btn" onclick="clearAll()" style="background: #ff6b6b;">🗑️ Effacer</button>
+        </div>
+        
+        <div class="output" id="output">
+            <div style="color: #8b92a9; text-align: center; padding: 50px;">
+                En attente d'erreurs...
+            </div>
+        </div>
+    </div>
+    
+    <div class="status">🟢 ACTIF</div>
+    
+    <!-- Zone cachée pour stocker les données -->
+    <div id="monitorData"></div>
+    
+    <script>
+        let allErrors = [];
+        
+        // Charger les erreurs existantes
+        window.addEventListener('load', () => {
+            const saved = localStorage.getItem('simpleMonitorErrors');
+            if (saved) {
+                allErrors = JSON.parse(saved);
+                displayErrors();
+            }
+        });
+        
+        function processError() {
+            const input = document.getElementById('errorInput');
+            const text = input.value.trim();
+            
+            if (!text) return;
+            
+            const error = {
+                timestamp: new Date().toISOString(),
+                content: text,
+                id: Date.now()
+            };
+            
+            allErrors.unshift(error); // Ajouter au début
+            
+            // Limiter à 50 dernières erreurs
+            if (allErrors.length > 50) {
+                allErrors = allErrors.slice(0, 50);
+            }
+            
+            // Sauvegarder
+            localStorage.setItem('simpleMonitorErrors', JSON.stringify(allErrors));
+            
+            // Mettre à jour l'affichage
+            displayErrors();
+            
+            // Mettre à jour la zone cachée pour monitoring externe
+            document.getElementById('monitorData').textContent = JSON.stringify(allErrors);
+            document.getElementById('monitorData').setAttribute('data-update', Date.now());
+            
+            // Effacer le champ
+            input.value = '';
+            
+            // Flash visuel
+            input.style.borderColor = '#00ff00';
+            setTimeout(() => {
+                input.style.borderColor = '#ddd';
+            }, 500);
+        }
+        
+        function displayErrors() {
+            const output = document.getElementById('output');
+            
+            if (allErrors.length === 0) {
+                output.innerHTML = '<div style="color: #8b92a9; text-align: center; padding: 50px;">En attente d\'erreurs...</div>';
+                return;
+            }
+            
+            output.innerHTML = allErrors.map(err => `
+                <div class="error-item">
+                    <div class="timestamp">${new Date(err.timestamp).toLocaleString('fr-FR')}</div>
+                    <div class="error-content">${escapeHtml(err.content)}</div>
+                </div>
+            `).join('');
+        }
+        
+        function clearAll() {
+            if (confirm('Effacer toutes les erreurs ?')) {
+                allErrors = [];
+                localStorage.removeItem('simpleMonitorErrors');
+                displayErrors();
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Auto-refresh toutes les 2 secondes
+        setInterval(() => {
+            const saved = localStorage.getItem('simpleMonitorErrors');
+            if (saved) {
+                const newErrors = JSON.parse(saved);
+                if (JSON.stringify(newErrors) !== JSON.stringify(allErrors)) {
+                    allErrors = newErrors;
+                    displayErrors();
+                }
+            }
+        }, 2000);
+        
+        // Raccourci clavier Ctrl+Enter pour envoyer
+        document.getElementById('errorInput').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                processError();
+            }
+        });
+    </script>
+</body>
+</html>

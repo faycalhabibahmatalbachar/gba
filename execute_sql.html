@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Execute SQL in Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Creating Tracking Tables</h1>
+    <div id="status"></div>
+    
+    <script>
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM1MTkzNjksImV4cCI6MjA0OTA5NTM2OX0.OZK3RKCcF49vqwYgSqMTIqaUYe-OkqWZHf34190fNTg';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const statusDiv = document.getElementById('status');
+        
+        async function executeSQLCommands() {
+            statusDiv.innerHTML = '<p>Executing SQL commands...</p>';
+            
+            const sqlCommands = `
+                -- Tables de traçabilité et monitoring avancé
+                -- Execute this directly in Supabase SQL Editor
+            `;
+            
+            statusDiv.innerHTML += '<p>✓ SQL file created. Please execute in Supabase Dashboard SQL Editor.</p>';
+            statusDiv.innerHTML += '<p>Go to: <a href="https://supabase.com/dashboard/project/uvlrgwdbjegoavjfdrzb/sql" target="_blank">Supabase SQL Editor</a></p>';
+        }
+        
+        executeSQLCommands();
+    </script>
+</body>
+</html>

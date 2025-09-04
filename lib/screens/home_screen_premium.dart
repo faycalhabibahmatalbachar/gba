@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -7,6 +9,7 @@ import 'package:badges/badges.dart' as badges;
 import '../providers/cart_provider.dart';
 import '../providers/categories_provider.dart';
 import '../providers/products_provider.dart';
+import '../providers/favorites_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
 
 class HomeScreenPremium extends ConsumerStatefulWidget {
@@ -16,9 +19,44 @@ class HomeScreenPremium extends ConsumerStatefulWidget {
   ConsumerState<HomeScreenPremium> createState() => _HomeScreenPremiumState();
 }
 
-class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
+class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> 
+    with TickerProviderStateMixin {
   String? selectedCategoryId;
   int _currentIndex = 0;
+  late AnimationController _fabAnimationController;
+  late AnimationController _searchAnimationController;
+  final ScrollController _scrollController = ScrollController();
+  bool _showBackToTop = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _fabAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _searchAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _scrollController.addListener(() {
+      if (_scrollController.offset > 200 && !_showBackToTop) {
+        setState(() => _showBackToTop = true);
+        _fabAnimationController.forward();
+      } else if (_scrollController.offset <= 200 && _showBackToTop) {
+        setState(() => _showBackToTop = false);
+        _fabAnimationController.reverse();
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    _fabAnimationController.dispose();
+    _searchAnimationController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -27,82 +65,182 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
     final cartItems = ref.watch(cartProvider);
     
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: CustomScrollView(
+      backgroundColor: const Color(0xFFF5F7FA),
+      extendBody: true,
+      floatingActionButton: _showBackToTop
+          ? ScaleTransition(
+              scale: _fabAnimationController,
+              child: FloatingActionButton(
+                mini: true,
+                backgroundColor: const Color(0xFF667eea),
+                onPressed: () {
+                  _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                  );
+                },
+                child: const Icon(Icons.arrow_upward, color: Colors.white),
+              ),
+            )
+          : null,
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF667eea).withOpacity(0.05),
+                  const Color(0xFF764ba2).withOpacity(0.05),
+                ],
+              ),
+            ),
+          ),
+          CustomScrollView(
+            controller: _scrollController,
         slivers: [
-          // App Bar Premium
+          // Premium App Bar avec animation mesh gradient
           SliverAppBar(
-            expandedHeight: 120,
+            expandedHeight: 140,
             floating: true,
             pinned: true,
             elevation: 0,
-            backgroundColor: Colors.white,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                  ),
+            backgroundColor: Colors.transparent,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF667eea),
+                    const Color(0xFF764ba2),
+                    const Color(0xFFf093fb),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
-                child: SafeArea(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF667eea).withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: FlexibleSpaceBar(
+                background: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Column(
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'GBA Store',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
+                                ShaderMask(
+                                  blendMode: BlendMode.srcIn,
+                                  shaderCallback: (bounds) => const LinearGradient(
+                                    colors: [Colors.white, Colors.white70],
+                                  ).createShader(bounds),
+                                  child: const Text(
+                                    '✨ GBA Store',
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.5,
+                                    ),
                                   ),
                                 ),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'Découvrez nos produits premium',
+                                  'Découvrez l\'excellence',
                                   style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                               ],
                             ),
-                            // Cart Icon with Badge
-                            badges.Badge(
-                              position: badges.BadgePosition.topEnd(top: -5, end: -5),
-                              showBadge: cartItems.isNotEmpty,
-                              badgeContent: Text(
-                                '${cartItems.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                              ),
-                              badgeStyle: const badges.BadgeStyle(
-                                badgeColor: Color(0xFFFF6B6B),
-                              ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: IconButton(
-                                  icon: const FaIcon(
-                                    FontAwesomeIcons.cartShopping,
-                                    color: Colors.white,
-                                    size: 20,
+                            Row(
+                              children: [
+                                // Profile Avatar
+                                Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.white.withOpacity(0.8),
+                                        Colors.white.withOpacity(0.3),
+                                      ],
+                                    ),
+                                    shape: BoxShape.circle,
                                   ),
-                                  onPressed: () => context.go('/cart'),
+                                  child: CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: Colors.white.withOpacity(0.3),
+                                    child: const Icon(
+                                      FontAwesomeIcons.userLarge,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                // Cart avec badge animé
+                                badges.Badge(
+                                  position: badges.BadgePosition.topEnd(top: -8, end: -8),
+                                  showBadge: cartItems.isNotEmpty,
+                                  badgeAnimation: const badges.BadgeAnimation.scale(
+                                    animationDuration: Duration(milliseconds: 300),
+                                  ),
+                                  badgeContent: Text(
+                                    '${cartItems.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  badgeStyle: badges.BadgeStyle(
+                                    badgeColor: const Color(0xFFFF6B6B),
+                                    elevation: 0,
+                                    badgeGradient: const badges.BadgeGradient.linear(
+                                      colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+                                    ),
+                                  ),
+                                  child: Material(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(15),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(15),
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        context.go('/cart');
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(10),
+                                        child: const Icon(
+                                          FontAwesomeIcons.bagShopping,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -114,34 +252,72 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
             ),
           ),
           
-          // Barre de recherche
+          // Barre de recherche avec Glassmorphism
           SliverToBoxAdapter(
             child: Container(
               margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Rechercher un produit...',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  prefixIcon: Icon(
-                    FontAwesomeIcons.magnifyingGlass,
-                    color: Colors.grey.shade400,
-                    size: 18,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.9),
+                          Colors.white.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.5),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF667eea).withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      onTap: () => HapticFeedback.selectionClick(),
+                      decoration: InputDecoration(
+                        hintText: '🔍 Que recherchez-vous?',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 15,
+                        ),
+                        prefixIcon: Container(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            FontAwesomeIcons.magnifyingGlass,
+                            color: const Color(0xFF667eea),
+                            size: 20,
+                          ),
+                        ),
+                        suffixIcon: Container(
+                          margin: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            FontAwesomeIcons.sliders,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -197,9 +373,14 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
                                     selectedCategoryId = isSelected ? null : category.id;
                                   });
                                 },
-                                child: Container(
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOutBack,
                                   width: 90,
                                   margin: const EdgeInsets.only(right: 12),
+                                  transform: isSelected 
+                                      ? (Matrix4.identity()..scale(1.05))
+                                      : Matrix4.identity(),
                                   child: Column(
                                     children: [
                                       Container(
@@ -208,21 +389,31 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
                                         decoration: BoxDecoration(
                                           gradient: isSelected
                                               ? const LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
                                                   colors: [
                                                     Color(0xFF667eea),
-                                                    Color(0xFF764ba2)
+                                                    Color(0xFF764ba2),
+                                                    Color(0xFFf093fb),
                                                   ],
                                                 )
                                               : null,
                                           color: isSelected ? null : Colors.white,
                                           borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: isSelected 
+                                                ? Colors.white.withOpacity(0.3)
+                                                : Colors.transparent,
+                                            width: 2,
+                                          ),
                                           boxShadow: [
                                             BoxShadow(
                                               color: isSelected
-                                                  ? const Color(0xFF667eea).withOpacity(0.3)
-                                                  : Colors.black.withOpacity(0.08),
-                                              blurRadius: 12,
-                                              offset: const Offset(0, 4),
+                                                  ? const Color(0xFF667eea).withOpacity(0.4)
+                                                  : Colors.black.withOpacity(0.1),
+                                              blurRadius: isSelected ? 20 : 10,
+                                              offset: const Offset(0, 5),
+                                              spreadRadius: isSelected ? 2 : 0,
                                             ),
                                           ],
                                         ),
@@ -416,6 +607,8 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
             child: SizedBox(height: 80),
           ),
         ],
+          ),
+        ],
       ),
       bottomNavigationBar: const BottomNavBar(
         currentIndex: 0,
@@ -423,21 +616,48 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
     );
   }
   
+  
   Widget _buildProductCard(product) {
-    return GestureDetector(
-      onTap: () => context.go('/product/${product.id}'),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 300),
+      tween: Tween(begin: 0, end: 1),
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.9 + (0.1 * value),
+          child: Opacity(
+            opacity: value,
+            child: child,
+          ),
+        );
+      },
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          context.go('/product/${product.id}');
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0xFF667eea).withOpacity(0.1),
+              width: 1,
             ),
-          ],
-        ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF667eea).withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+                spreadRadius: -5,
+              ),
+              BoxShadow(
+                color: Colors.white,
+                blurRadius: 20,
+                offset: const Offset(-5, -5),
+                spreadRadius: -5,
+              ),
+            ],
+          ),
         child: Column(
           children: [
             AspectRatio(
@@ -447,30 +667,47 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
                   // Image produit avec debug
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.grey.shade50,
+                          Colors.grey.shade100,
+                        ],
+                      ),
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(12),
+                        top: Radius.circular(24),
                       ),
                     ),
                     child: Builder(
                       builder: (context) {
                         if (product.mainImage != null && product.mainImage!.isNotEmpty) {
-                          // Log de l'URL de l'image
-                          print('🖼️ Loading image: ${product.mainImage}');
+                          // Corriger le double "products/products" dans l'URL
+                          String imageUrl = product.mainImage!;
+                          if (imageUrl.contains('/products/products/')) {
+                            imageUrl = imageUrl.replaceAll('/products/products/', '/products/');
+                            print('🔧 URL corrigée de double products');
+                          }
+                          
+                          // Log de l'URL finale
+                          print('🗼️ Tentative de chargement image pour ${product.name}');
+                          print('🔗 URL finale: $imageUrl');
                           
                           return ClipRRect(
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(12),
                             ),
                             child: Image.network(
-                              product.mainImage!,
+                              imageUrl,
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,
                               errorBuilder: (context, error, stackTrace) {
-                                print('❌ Error loading image for ${product.name}');
-                                print('   URL: ${product.mainImage}');
-                                print('   Error: $error');
+                                print('❌ ERREUR chargement image pour ${product.name}');
+                                print('   🔗 URL tentée: $imageUrl');
+                                print('   ⚠️ Type erreur: ${error.runtimeType}');
+                                print('   📝 Message: $error');
+                                print('   🔍 Stack trace: ${stackTrace.toString().split('\n').take(3).join('\n')}');
                                 return Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -520,33 +757,83 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
                       },
                     ),
                   ),
-                // Bouton favori
+                // Badges et bouton favori
                 Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
+                  top: 12,
+                  left: 12,
+                  child: product.compareAtPrice != null && product.compareAtPrice! > product.price
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF6B6B).withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            '-${((1 - product.price / product.compareAtPrice!) * 100).toInt()}%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(50),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.9),
+                              Colors.white.withOpacity(0.7),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.5),
+                            width: 1.5,
+                          ),
                         ),
-                      ],
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        FontAwesomeIcons.heart,
-                        size: 16,
-                        color: Color(0xFF667eea),
+                        child: Consumer(
+                          builder: (context, ref, child) {
+                            final favorites = ref.watch(favoritesProvider);
+                            final isFavorite = favorites.any((p) => p.id == product.id);
+                            
+                            return IconButton(
+                              padding: EdgeInsets.zero,
+                              icon: Icon(
+                                isFavorite ? FontAwesomeIcons.solidHeart : FontAwesomeIcons.heart,
+                                size: 16,
+                                color: isFavorite 
+                                  ? const Color(0xFFFF6B6B)
+                                  : const Color(0xFFFF6B6B).withOpacity(0.8),
+                              ),
+                              onPressed: () async {
+                                HapticFeedback.lightImpact();
+                                // Toggle favorite avec le product_id (String)
+                                await ref.read(favoritesProvider.notifier).toggleFavorite(product.id);
+                              },
+                            );
+                          },
+                        ),
                       ),
-                      onPressed: () {
-                        // TODO: Toggle favorite
-                      },
                     ),
                   ),
                 ),
@@ -562,7 +849,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Nom et marque
-                  Expanded(
+                  Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -579,15 +866,17 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (product.brand != null)
-                          Text(
-                            product.brand!,
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.grey.shade500,
-                              height: 1.2,
+                          Flexible(
+                            child: Text(
+                              product.brand!,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Colors.grey.shade500,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                       ],
                     ),
@@ -608,36 +897,66 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            FontAwesomeIcons.cartPlus,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            ref.read(cartProvider.notifier).addItem(product.id, 1);
+                      Material(
+                        borderRadius: BorderRadius.circular(50),
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(50),
+                          onTap: () {
+                            HapticFeedback.mediumImpact();
+                            ref.read(cartProvider.notifier).addItem(product, 1);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('${product.name} ajouté au panier'),
-                                duration: const Duration(seconds: 2),
-                                backgroundColor: Colors.green,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                content: Row(
+                                  children: [
+                                    const Icon(FontAwesomeIcons.checkCircle, color: Colors.white, size: 20),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '${product.name} ajouté au panier',
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                duration: const Duration(seconds: 2),
+                                backgroundColor: const Color(0xFF4ECDC4),
+                                behavior: SnackBarBehavior.floating,
+                                margin: const EdgeInsets.all(20),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
                               ),
                             );
                           },
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFF667eea),
+                                  Color(0xFF764ba2),
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF667eea).withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              FontAwesomeIcons.plus,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -647,6 +966,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -417,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildProductImage(String imageUrl, String productName) {
     if (imageUrl.isEmpty) {
-      print('⚠️ Pas d\'image pour: $productName');
+      print('⚠️ No image for product: $productName');
       return Container(
         color: Colors.grey.shade100,
         child: const Center(
@@ -430,10 +430,14 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // L'URL est déjà complète dans la base de données
-    // Pour contourner les problèmes CORS, on utilise directement l'URL
-    final finalUrl = imageUrl;
-    print('🔗 Chargement image: $finalUrl');
+    // Corriger le double "products/products" dans l'URL
+    String finalUrl = imageUrl;
+    if (finalUrl.contains('/products/products/')) {
+      finalUrl = finalUrl.replaceAll('/products/products/', '/products/');
+      print('🔧 URL corrigée: $finalUrl');
+    }
+    
+    print('🔗 Tentative de chargement: $finalUrl pour $productName');
     
     return Container(
       decoration: BoxDecoration(
@@ -442,10 +446,25 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Image.network(
         finalUrl,
         fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            print('✅ Image chargée avec succès pour $productName');
+            return child;
+          }
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          );
+        },
         errorBuilder: (context, error, stackTrace) {
           print('❌ ERREUR IMAGE pour $productName');
-          print('❌ URL: $finalUrl');
-          print('❌ Erreur: $error');
+          print('❌ URL tentée: $finalUrl');
+          print('❌ Type erreur: ${error.runtimeType}');
+          print('❌ Message: $error');
           
           // Image de placeholder par défaut
           return Container(

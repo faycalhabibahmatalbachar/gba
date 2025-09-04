@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Vérification des Images Produits</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #333; }
+        .product { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; display: flex; align-items: center; gap: 20px; }
+        .product img { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; background: #eee; }
+        .product-info { flex: 1; }
+        .url-info { background: #f0f0f0; padding: 10px; border-radius: 4px; margin-top: 10px; word-break: break-all; font-size: 12px; }
+        .status { padding: 5px 10px; border-radius: 4px; font-size: 12px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnostic des Images Produits dans Supabase</h1>
+        <div id="status">Connexion en cours...</div>
+        <div id="products"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
+        
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU1NTk0MzYsImV4cCI6MjA1MTEzNTQzNn0.xPOL54xPR5qXkcKWD-IXA7B1N3bFQGPXWNc05CMSTXY';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        async function checkProducts() {
+            const statusDiv = document.getElementById('status');
+            const productsDiv = document.getElementById('products');
+            
+            try {
+                // Récupérer les produits
+                const { data: products, error } = await supabase
+                    .from('products')
+                    .select('id, name, main_image, images')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                
+                if (error) throw error;
+                
+                statusDiv.innerHTML = `<div class="status success">✅ ${products.length} produits trouvés</div>`;
+                
+                let html = '<h2>Analyse des URLs d\'images:</h2>';
+                
+                for (const product of products) {
+                    const hasMainImage = product.main_image && product.main_image.trim() !== '';
+                    const imageUrl = product.main_image || '';
+                    
+                    // Analyser le format de l'URL
+                    let urlAnalysis = '';
+                    let fixedUrl = '';
+                    let imageStatus = 'no-image';
+                    
+                    if (hasMainImage) {
+                        if (imageUrl.startsWith('http')) {
+                            urlAnalysis = 'URL complète';
+                            fixedUrl = imageUrl;
+                            imageStatus = 'ok';
+                        } else if (imageUrl.startsWith('products/')) {
+                            urlAnalysis = 'Chemin relatif avec products/';
+                            fixedUrl = `${SUPABASE_URL}/storage/v1/object/public/${imageUrl}`;
+                            imageStatus = 'needs-fix';
+                        } else {
+                            urlAnalysis = 'Chemin relatif sans products/';
+                            fixedUrl = `${SUPABASE_URL}/storage/v1/object/public/products/${imageUrl}`;
+                            imageStatus = 'needs-fix';
+                        }
+                    } else {
+                        urlAnalysis = 'Pas d\'image';
+                    }
+                    
+                    html += `
+                        <div class="product">
+                            <div>
+                                ${hasMainImage ? 
+                                    `<img src="${fixedUrl}" 
+                                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22>Erreur</text></svg>'"
+                                         onload="this.parentElement.querySelector('.img-status').textContent='✅ Image chargée'"
+                                    />
+                                    <div class="img-status" style="font-size: 10px; margin-top: 5px;">⏳ Chargement...</div>` : 
+                                    '<div style="width:100px;height:100px;background:#eee;display:flex;align-items:center;justify-content:center;border-radius:8px;">📦</div>'
+                                }
+                            </div>
+                            <div class="product-info">
+                                <h3>${product.name}</h3>
+                                <div class="status ${imageStatus === 'ok' ? 'success' : imageStatus === 'needs-fix' ? 'warning' : 'error'}">
+                                    ${urlAnalysis}
+                                </div>
+                                ${hasMainImage ? `
+                                    <div class="url-info">
+                                        <strong>URL stockée:</strong><br>
+                                        ${imageUrl}<br><br>
+                                        <strong>URL corrigée:</strong><br>
+                                        ${fixedUrl}
+                                    </div>
+                                ` : '<div class="url-info">Aucune URL d\'image</div>'}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                productsDiv.innerHTML = html;
+                
+                // Tester l'accès au bucket storage
+                const { data: bucketTest, error: bucketError } = await supabase.storage
+                    .from('products')
+                    .list('', { limit: 1 });
+                
+                if (!bucketError) {
+                    statusDiv.innerHTML += '<div class="status success">✅ Bucket "products" accessible</div>';
+                } else {
+                    statusDiv.innerHTML += `<div class="status error">❌ Erreur bucket: ${bucketError.message}</div>`;
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ Erreur: ${error.message}</div>`;
+                console.error('Erreur:', error);
+            }
+        }
+        
+        checkProducts();
+    </script>
+</body>
+</html>

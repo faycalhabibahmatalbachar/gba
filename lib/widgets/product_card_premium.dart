@@ -51,30 +51,31 @@ class PremiumProductCard extends ConsumerWidget {
             // Image Container avec badges
             Stack(
               children: [
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
+                AspectRatio(
+                  aspectRatio: 0.75,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.grey.shade100,
+                          Colors.grey.shade200,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                     ),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.grey.shade100,
-                        Colors.grey.shade200,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                    child: product.mainImage != null
-                        ? CachedNetworkImage(
-                            imageUrl: product.mainImage!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                      child: product.mainImage != null
+                          ? CachedNetworkImage(
+                              imageUrl: product.mainImage!,
+                              fit: BoxFit.contain,
+                              width: double.infinity,
                             placeholder: (context, url) => Container(
                               color: Colors.grey.shade100,
                               child: Center(
@@ -92,15 +93,16 @@ class PremiumProductCard extends ConsumerWidget {
                                 color: Colors.grey.shade400,
                               ),
                             ),
-                          )
-                        : Container(
-                            color: Colors.grey.shade100,
-                            child: Icon(
-                              Icons.shopping_bag_outlined,
-                              size: 50,
-                              color: Colors.grey.shade400,
+                            )
+                          : Container(
+                              color: Colors.grey.shade100,
+                              child: Icon(
+                                Icons.shopping_bag_outlined,
+                                size: 50,
+                                color: Colors.grey.shade400,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
                 
@@ -366,7 +368,7 @@ class PremiumProductCard extends ConsumerWidget {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () {
-                                  ref.read(cartProvider.notifier).addToCart(product.id);
+                                  ref.read(cartProvider.notifier).addItem(product, 1);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('${product.name} ajouté au panier'),
@@ -427,9 +429,9 @@ class PremiumProductGrid extends ConsumerWidget {
       physics: physics ?? const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.65,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        childAspectRatio: 0.55,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       padding: const EdgeInsets.all(16),
       itemCount: products.length,

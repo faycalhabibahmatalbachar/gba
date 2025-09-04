@@ -1,0 +1,353 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔴 Live Monitor - GBA</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .status {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .status.active { background: #4ade80; }
+        .status.error { background: #ef4444; animation: blink 0.5s infinite; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel h2 {
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+        
+        .console-output {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Cascadia Code', 'Courier New', monospace;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .error-line {
+            color: #ff6b6b;
+            background: rgba(255, 0, 0, 0.1);
+            padding: 2px 5px;
+            margin: 2px 0;
+            border-radius: 3px;
+        }
+        
+        .success-line {
+            color: #4ade80;
+            background: rgba(0, 255, 0, 0.1);
+            padding: 2px 5px;
+            margin: 2px 0;
+            border-radius: 3px;
+        }
+        
+        .warning-line {
+            color: #fbbf24;
+            background: rgba(255, 193, 7, 0.1);
+            padding: 2px 5px;
+            margin: 2px 0;
+            border-radius: 3px;
+        }
+        
+        .info-line {
+            color: #60a5fa;
+        }
+        
+        .timestamp {
+            color: #9ca3af;
+            font-size: 10px;
+            margin-right: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        
+        .input-area {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-area textarea {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            resize: none;
+            font-family: 'Cascadia Code', monospace;
+        }
+        
+        .input-area button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .input-area button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <span class="status active" id="status"></span>
+            Live Monitor - Application GBA
+        </h1>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="errorCount">0</div>
+                <div class="stat-label">Erreurs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="warningCount">0</div>
+                <div class="stat-label">Warnings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="successCount">0</div>
+                <div class="stat-label">Succès</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="uptime">00:00</div>
+                <div class="stat-label">Temps actif</div>
+            </div>
+        </div>
+        
+        <div class="monitor-grid">
+            <div class="panel">
+                <h2>📊 Console Flutter</h2>
+                <div class="console-output" id="flutterConsole"></div>
+                <div class="input-area">
+                    <textarea id="flutterInput" rows="3" placeholder="Collez les erreurs Flutter ici..."></textarea>
+                    <button onclick="addFlutterLog()">Ajouter</button>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>🔍 Analyse en temps réel</h2>
+                <div class="console-output" id="analysis"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let errorCount = 0;
+        let warningCount = 0;
+        let successCount = 0;
+        let startTime = Date.now();
+        
+        // Mise à jour du temps actif
+        setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            document.getElementById('uptime').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }, 1000);
+        
+        function getTimestamp() {
+            return new Date().toLocaleTimeString('fr-FR');
+        }
+        
+        function addLog(container, message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `${type}-line`;
+            line.innerHTML = `<span class="timestamp">[${getTimestamp()}]</span>${escapeHtml(message)}`;
+            container.appendChild(line);
+            container.scrollTop = container.scrollHeight;
+            
+            // Mise à jour des compteurs
+            if (type === 'error') {
+                errorCount++;
+                document.getElementById('errorCount').textContent = errorCount;
+                document.getElementById('status').className = 'status error';
+                setTimeout(() => {
+                    document.getElementById('status').className = 'status active';
+                }, 3000);
+            } else if (type === 'warning') {
+                warningCount++;
+                document.getElementById('warningCount').textContent = warningCount;
+            } else if (type === 'success') {
+                successCount++;
+                document.getElementById('successCount').textContent = successCount;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        function analyzeError(errorText) {
+            const analysis = document.getElementById('analysis');
+            
+            // Analyse du type d'erreur
+            if (errorText.includes('null value in column "price"')) {
+                addLog(analysis, '🔴 ERREUR DÉTECTÉE: Colonne "price" NULL', 'error');
+                addLog(analysis, '✅ SOLUTION: Le prix doit être passé lors de l\'ajout au panier', 'success');
+                addLog(analysis, '📝 Action: Vérifier que CartService.addToCart reçoit bien le prix', 'warning');
+            }
+            
+            if (errorText.includes('TypeError') && errorText.includes('String') && errorText.includes('Product')) {
+                addLog(analysis, '🔴 ERREUR DÉTECTÉE: Type incompatible String/Product', 'error');
+                addLog(analysis, '✅ SOLUTION: Passer l\'objet Product complet, pas juste l\'ID', 'success');
+            }
+            
+            if (errorText.includes('PostgrestException')) {
+                addLog(analysis, '🔴 ERREUR SUPABASE: Problème avec la base de données', 'error');
+                const match = errorText.match(/code: (\d+)/);
+                if (match) {
+                    addLog(analysis, `Code erreur PostgreSQL: ${match[1]}`, 'warning');
+                }
+            }
+            
+            if (errorText.includes('addToCart')) {
+                addLog(analysis, '📍 Contexte: Erreur lors de l\'ajout au panier', 'info');
+            }
+            
+            if (errorText.includes('400 (Bad Request)')) {
+                addLog(analysis, '🔴 Requête invalide vers Supabase (400)', 'error');
+                addLog(analysis, 'Vérifier les paramètres envoyés', 'warning');
+            }
+        }
+        
+        function addFlutterLog() {
+            const input = document.getElementById('flutterInput');
+            const text = input.value.trim();
+            
+            if (text) {
+                const flutterConsole = document.getElementById('flutterConsole');
+                
+                // Détection du type de log
+                let type = 'info';
+                if (text.includes('Error') || text.includes('Exception') || text.includes('400')) {
+                    type = 'error';
+                } else if (text.includes('Warning') || text.includes('TODO')) {
+                    type = 'warning';
+                } else if (text.includes('Success') || text.includes('✓')) {
+                    type = 'success';
+                }
+                
+                addLog(flutterConsole, text, type);
+                
+                // Analyse automatique
+                if (type === 'error') {
+                    analyzeError(text);
+                }
+                
+                // Clear input
+                input.value = '';
+            }
+        }
+        
+        // Écouter Ctrl+V pour capture rapide
+        document.getElementById('flutterInput').addEventListener('paste', (e) => {
+            setTimeout(() => {
+                if (e.target.value.includes('Error') || e.target.value.includes('Exception')) {
+                    addFlutterLog();
+                }
+            }, 100);
+        });
+        
+        // Message de bienvenue
+        const analysis = document.getElementById('analysis');
+        addLog(analysis, '✨ Système de monitoring démarré', 'success');
+        addLog(analysis, '👀 En attente des erreurs Flutter...', 'info');
+        addLog(analysis, '💡 Collez les erreurs dans le panneau de gauche', 'info');
+    </script>
+</body>
+</html>

@@ -5,6 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/home_screen_premium.dart';
 import '../screens/product/product_detail_screen.dart';
+import '../screens/favorites_screen_premium.dart';
+import '../screens/categories_screen_premium.dart';
+import '../screens/cart_screen_premium.dart';
+import '../screens/profile_screen_premium.dart';
 
 class AppRoutes {
   static final router = GoRouter(
@@ -50,27 +54,15 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/categories',
-        builder: (context, state) => Scaffold(
-          body: Center(
-            child: Text('Categories Screen - À implémenter'),
-          ),
-        ),
+        builder: (context, state) => const CategoriesScreenPremium(),
       ),
       GoRoute(
         path: '/cart',
-        builder: (context, state) => Scaffold(
-          body: Center(
-            child: Text('Cart Screen - À implémenter'),
-          ),
-        ),
+        builder: (context, state) => const CartScreenPremium(),
       ),
       GoRoute(
         path: '/profile',
-        builder: (context, state) => Scaffold(
-          body: Center(
-            child: Text('Profile Screen - À implémenter'),
-          ),
-        ),
+        builder: (context, state) => const ProfileScreenPremium(),
       ),
       GoRoute(
         path: '/product/:id',
@@ -81,11 +73,7 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/favorites',
-        builder: (context, state) => Scaffold(
-          body: Center(
-            child: Text('Favorites Screen - À implémenter'),
-          ),
-        ),
+        builder: (context, state) => const FavoritesScreenPremium(),
       ),
     ],
   );

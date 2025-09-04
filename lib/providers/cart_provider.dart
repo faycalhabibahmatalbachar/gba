@@ -36,7 +36,7 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
 
   Future<void> addItem(Product product, int quantity) async {
     try {
-      await _cartService.addToCart(product.id, quantity);
+      await _cartService.addToCart(product.id, quantity, product.price);
       await loadCart();
     } catch (e) {
       throw Exception('Erreur ajout au panier: $e');

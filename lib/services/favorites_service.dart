@@ -64,13 +64,41 @@ class FavoritesService {
     if (userId == null) return [];
 
     try {
-      final response = await _supabase
+      // D'abord récupérer les favoris
+      final favoritesResponse = await _supabase
           .from('favorites')
-          .select('*, products(*)')
+          .select('*')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
-
-      return List<Map<String, dynamic>>.from(response);
+      
+      if (favoritesResponse.isEmpty) return [];
+      
+      // Extraire les product_ids
+      final productIds = favoritesResponse
+          .map((f) => f['product_id'] as String)
+          .toList();
+      
+      // Récupérer les produits séparément
+      final productsResponse = await _supabase
+          .from('products')
+          .select('*')
+          .inFilter('id', productIds);
+      
+      // Créer une map pour accès rapide aux produits
+      final productsMap = Map<String, dynamic>.fromIterable(
+        productsResponse,
+        key: (p) => p['id'],
+        value: (p) => p,
+      );
+      
+      // Combiner les données
+      return favoritesResponse.map((favorite) {
+        final productId = favorite['product_id'];
+        return {
+          ...favorite,
+          'products': productsMap[productId],
+        };
+      }).toList();
     } catch (e) {
       print('Erreur récupération favoris: $e');
       return [];

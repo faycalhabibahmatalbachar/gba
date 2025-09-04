@@ -10,6 +10,10 @@ import Orders from './pages/Orders';
 import Users from './pages/Users';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Monitoring from './pages/Monitoring';
+import MonitoringCarts from './pages/MonitoringCarts';
+import MonitoringFavorites from './pages/MonitoringFavorites';
+import MonitoringProducts from './pages/MonitoringProducts';
 import Layout from './components/Layout';
 
 // Protected Route Component
@@ -53,6 +57,12 @@ function App() {
         <Route path="users" element={<Users />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/monitoring" element={<Monitoring />} />
+        <Route path="settings/security" element={<Settings />} />
+        <Route path="settings/notifications" element={<Settings />} />
+        <Route path="monitoring/carts" element={<MonitoringCarts />} />
+        <Route path="monitoring/favorites" element={<MonitoringFavorites />} />
+        <Route path="monitoring/products" element={<MonitoringProducts />} />
       </Route>
     </Routes>
   );

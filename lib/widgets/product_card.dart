@@ -239,7 +239,7 @@ class ProductCard extends ConsumerWidget {
                           onPressed: authState.user != null
                               ? () async {
                                   await ref.read(cartProvider.notifier)
-                                      .addToCart(product.id);
+                                      .addItem(product, 1);
                                   
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(

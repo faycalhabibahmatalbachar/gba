@@ -17,6 +17,11 @@ final featuredProductsProvider = FutureProvider<List<Product>>((ref) async {
   return await SupabaseService.getProducts(featuredOnly: true, limit: 10);
 });
 
+// Products by Category Provider
+final productsByCategoryProvider = FutureProvider.family<List<Product>, String>((ref, categoryId) async {
+  return await SupabaseService.getProducts(categoryId: categoryId);
+});
+
 class ProductsState {
   final List<Product> products;
   final bool isLoading;
@@ -69,6 +74,12 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
         categoryId: state.selectedCategoryId,
         searchQuery: state.searchQuery,
       );
+      
+      // Debug: afficher les produits reçus
+      print('📦 ProductsProvider: ${products.length} produits reçus');
+      for (var p in products.take(3)) {
+        print('  - ${p.name}: mainImage=${p.mainImage}');
+      }
       
       if (refresh) {
         state = state.copyWith(

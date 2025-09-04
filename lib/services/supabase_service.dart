@@ -43,21 +43,49 @@ class SupabaseService {
       
       return (response as List).map((json) {
         try {
-          // Ensure required fields are present
+          // Debug: print raw image URLs
+          if (json['main_image'] != null) {
+            print('📸 Raw image URL from DB: ${json['main_image']}');
+          }
+          if (json['images'] != null) {
+            print('📸 Images array from DB: ${json['images']}');
+          }
+          
+          // Validate required fields
           if (json['id'] == null || json['name'] == null || json['price'] == null) {
-            print('Skipping product with missing required fields: $json');
+            print('Missing required fields: id=${json['id']}, name=${json['name']}, price=${json['price']}');
             return null;
           }
           
-          // Handle category relationship
-          if (json['categories'] != null) {
-            json['categoryName'] = json['categories']['name'];
-          }
+          // Convertir snake_case en camelCase pour le modèle Product
+          final productJson = {
+            'id': json['id'],
+            'name': json['name'],
+            'slug': json['slug'] ?? json['name'].toString().toLowerCase().replaceAll(' ', '-'),
+            'description': json['description'],
+            'price': json['price'],
+            'compareAtPrice': json['compare_at_price'],
+            'sku': json['sku'],
+            'quantity': json['quantity'],
+            'trackQuantity': json['track_quantity'] ?? true,
+            'categoryId': json['category_id'],
+            'categoryName': json['categoryName'],
+            'brand': json['brand'],
+            'mainImage': json['main_image'],
+            'images': json['images'] ?? [],
+            'specifications': json['specifications'] ?? {},
+            'tags': json['tags'] ?? [],
+            'rating': json['rating'] ?? 0.0,
+            'reviewsCount': json['reviews_count'] ?? 0,
+            'isFeatured': json['is_featured'] ?? false,
+            'isActive': json['is_active'] ?? true,
+            'createdAt': json['created_at'],
+            'updatedAt': json['updated_at'],
+          };
           
-          // Ensure slug has a value (use name as fallback)
-          json['slug'] = json['slug'] ?? json['name'].toString().toLowerCase().replaceAll(' ', '-');
+          print('📦 Product JSON ready: ${productJson['name']}, mainImage=${productJson['mainImage']}');
           
-          return Product.fromJson(json);
+          return Product.fromJson(productJson);
         } catch (e) {
           print('Error parsing product: $e, json: $json');
           return null;
@@ -138,7 +166,7 @@ class SupabaseService {
     }
   }
   
-  static Future<void> addToCart(String productId, int quantity) async {
+  static Future<void> addToCart(String productId, int quantity, double price) async {
     if (!isAuthenticated) throw Exception('User not authenticated');
     
     try {
@@ -157,11 +185,12 @@ class SupabaseService {
             .update({'quantity': existing['quantity'] + quantity})
             .eq('id', existing['id']);
       } else {
-        // Insert new item
+        // Insert new item with price
         await client.from('cart_items').insert({
           'user_id': currentUser!.id,
           'product_id': productId,
           'quantity': quantity,
+          'price': price,
         });
       }
     } catch (e) {

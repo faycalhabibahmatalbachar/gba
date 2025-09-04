@@ -23,7 +23,7 @@ export const StorageService = {
       // Générer un nom unique
       const fileExt = file.name.split('.').pop();
       const fileName = `${productId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `products/${fileName}`;
+      const filePath = fileName; // Pas de préfixe 'products/' car le bucket s'appelle déjà 'products'
 
       // Upload vers Supabase Storage
       const { data, error } = await supabase.storage
@@ -39,6 +39,9 @@ export const StorageService = {
       const { data: { publicUrl } } = supabase.storage
         .from('products')
         .getPublicUrl(filePath);
+      
+      console.log('📸 URL générée:', publicUrl);
+      console.log('📂 Chemin fichier:', filePath);
 
       return {
         success: true,

@@ -61,6 +61,7 @@ gba-mobile/android/.gradle/
 gba-mobile/android/.kotlin/
 gba-mobile/android/app/build/
 gba-mobile/android/build/
+gba-mobile/android/gradle/*.zip
 
 # Environment files
 .env

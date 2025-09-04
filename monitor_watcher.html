@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Surveillance Automatique - GBA App</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 15px;
+        }
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin: 10px;
+        }
+        .indicator {
+            width: 12px;
+            height: 12px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .monitoring-data {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .auto-check {
+            color: #4caf50;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Surveillance Automatique Active</h1>
+        <div class="status">
+            <span class="indicator"></span>
+            <span>Écoute en temps réel</span>
+        </div>
+    </div>
+
+    <div class="auto-check">
+        ✅ Vérification automatique toutes les 3 secondes
+    </div>
+
+    <div id="currentErrors" class="monitoring-data">
+        En attente des erreurs...
+    </div>
+
+    <script>
+        // Surveiller le localStorage pour les erreurs
+        let lastCheck = null;
+        
+        function checkForErrors() {
+            const errors = JSON.parse(localStorage.getItem('gbaErrors') || '[]');
+            const monitorDiv = document.getElementById('currentErrors');
+            
+            if (errors.length > 0) {
+                // Afficher les dernières erreurs
+                const lastErrors = errors.slice(-5).reverse();
+                
+                let output = '📊 DERNIÈRES ERREURS DÉTECTÉES:\n';
+                output += '=====================================\n\n';
+                
+                lastErrors.forEach(error => {
+                    const time = new Date(error.timestamp).toLocaleString('fr-FR');
+                    output += `[${error.type.toUpperCase()}] ${time}\n`;
+                    output += `${error.content}\n`;
+                    output += '-------------------------------------\n\n';
+                });
+                
+                // Données structurées pour traitement automatique
+                const monitoringData = {
+                    lastUpdate: new Date().toISOString(),
+                    totalErrors: errors.length,
+                    recentErrors: lastErrors,
+                    requiresAttention: errors.some(e => e.type === 'error' && 
+                        new Date() - new Date(e.timestamp) < 300000) // Erreurs des 5 dernières minutes
+                };
+                
+                // Stocker pour lecture externe
+                window.monitoringData = monitoringData;
+                
+                monitorDiv.textContent = output;
+                
+                // Si nouvelle erreur critique
+                if (monitoringData.requiresAttention && JSON.stringify(errors) !== lastCheck) {
+                    console.log('🚨 NOUVELLE ERREUR CRITIQUE DÉTECTÉE!');
+                }
+                
+                lastCheck = JSON.stringify(errors);
+            } else {
+                monitorDiv.textContent = '✅ Aucune erreur en attente\n\nSystème opérationnel';
+            }
+        }
+        
+        // Vérifier toutes les 3 secondes
+        setInterval(checkForErrors, 3000);
+        
+        // Vérification initiale
+        checkForErrors();
+        
+        // Écouter les changements du localStorage
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'gbaErrors') {
+                checkForErrors();
+            }
+        });
+        
+        console.log('🤖 Surveillance automatique activée');
+    </script>
+</body>
+</html>

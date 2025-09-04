@@ -44,6 +44,7 @@ class AppLocalizations {
     'description': 'Description',
     'send': 'Send',
     'message': 'Message',
+    'cart_empty': 'Your cart is empty',
   };
 
   // Translations for French
@@ -78,6 +79,7 @@ class AppLocalizations {
     'description': 'Description',
     'send': 'Envoyer',
     'message': 'Message',
+    'cart_empty': 'Votre panier est vide',
   };
 
   // Translations for Arabic
@@ -98,6 +100,7 @@ class AppLocalizations {
     'email': 'البريد الإلكتروني',
     'password': 'كلمة المرور',
     'forgotPassword': 'هل نسيت كلمة المرور؟',
+    'cart_empty': 'سلة التسوق فارغة',
     'search': 'بحث',
     'popularProducts': 'المنتجات الشائعة',
     'addToCart': 'أضف إلى السلة',

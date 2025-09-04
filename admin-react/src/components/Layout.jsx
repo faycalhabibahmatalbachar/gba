@@ -37,6 +37,10 @@ import {
   ExpandMore,
   Category as CategoryIcon,
   LocalOffer as LocalOfferIcon,
+  MonitorHeart as MonitorIcon,
+  Favorite as FavoriteIcon,
+  ShoppingBasket as BasketIcon,
+  TrendingUp as TrendingIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -55,9 +59,29 @@ const menuItems = [
     ]
   },
   { title: 'Orders', path: '/orders', icon: <ShoppingCartIcon />, badge: 5 },
+  { 
+    title: 'Monitoring', 
+    path: '/monitoring', 
+    icon: <MonitorIcon />,
+    subItems: [
+      { title: 'Monitoring Paniers', path: '/monitoring/carts', icon: <BasketIcon /> },
+      { title: 'Monitoring Favoris', path: '/monitoring/favorites', icon: <FavoriteIcon /> },
+      { title: 'Monitoring Produits', path: '/monitoring/products', icon: <TrendingIcon /> },
+    ]
+  },
   { title: 'Users', path: '/users', icon: <PeopleIcon /> },
   { title: 'Analytics', path: '/analytics', icon: <AnalyticsIcon /> },
-  { title: 'Settings', path: '/settings', icon: <SettingsIcon /> },
+  { 
+    title: 'Settings', 
+    path: '/settings', 
+    icon: <SettingsIcon />,
+    subItems: [
+      { title: 'General', path: '/settings' },
+      { title: 'Monitoring', path: '/settings/monitoring' },
+      { title: 'Security', path: '/settings/security' },
+      { title: 'Notifications', path: '/settings/notifications' },
+    ]
+  },
 ];
 
 function Layout() {

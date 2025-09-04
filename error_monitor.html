@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Monitor d'Erreurs Flutter - GBA App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .input-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+            min-height: 150px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .error-list {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .error-item {
+            background: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+
+        .error-item.bug {
+            border-left-color: #ffc107;
+        }
+
+        .error-item.info {
+            border-left-color: #17a2b8;
+        }
+
+        .error-item.success {
+            border-left-color: #28a745;
+        }
+
+        .error-time {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .error-content {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .status.error { background: #dc3545; color: white; }
+        .status.bug { background: #ffc107; color: #333; }
+        .status.info { background: #17a2b8; color: white; }
+        .status.success { background: #28a745; color: white; }
+
+        .clear-btn {
+            background: #dc3545;
+            margin-top: 20px;
+        }
+
+        .monitoring-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #28a745;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        select {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            width: 200px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="monitoring-status">
+        <span class="status-indicator"></span>
+        <span>Monitoring actif</span>
+    </div>
+
+    <div class="container">
+        <h1>🔧 Monitor d'Erreurs - GBA Flutter App</h1>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="errorCount">0</div>
+                <div class="stat-label">Erreurs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="bugCount">0</div>
+                <div class="stat-label">Bugs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="infoCount">0</div>
+                <div class="stat-label">Infos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalCount">0</div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <label for="errorType">Type de message:</label>
+                <select id="errorType">
+                    <option value="error">❌ Erreur</option>
+                    <option value="bug">🐛 Bug</option>
+                    <option value="info">ℹ️ Information</option>
+                    <option value="success">✅ Succès</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="errorInput">Coller l'erreur ou le bug ici:</label>
+                <textarea 
+                    id="errorInput" 
+                    placeholder="Collez ici les erreurs Flutter, les messages de la console, ou décrivez le bug...
+Exemples:
+- Exception caught by widgets library
+- RenderFlex overflowed
+- Failed to load resource
+- Null check operator used on a null value
+- PostgrestException
+- Navigation issue"></textarea>
+            </div>
+            <button onclick="addError()">📝 Ajouter au monitoring</button>
+        </div>
+
+        <div class="error-list">
+            <h2>📋 Historique des erreurs</h2>
+            <div id="errorList">
+                <p style="color: #666; text-align: center; padding: 20px;">Aucune erreur enregistrée pour le moment.</p>
+            </div>
+            <button class="clear-btn" onclick="clearErrors()">🗑️ Effacer tout</button>
+        </div>
+    </div>
+
+    <!-- ZONE DE MONITORING AUTOMATIQUE - NE PAS MODIFIER -->
+    <div id="monitoringData" style="display:none;">
+        <!-- Les erreurs seront stockées ici en JSON pour lecture automatique -->
+    </div>
+
+    <script>
+        let errors = JSON.parse(localStorage.getItem('gbaErrors') || '[]');
+        let stats = {
+            error: 0,
+            bug: 0,
+            info: 0,
+            success: 0
+        };
+
+        function updateStats() {
+            stats = { error: 0, bug: 0, info: 0, success: 0 };
+            errors.forEach(e => stats[e.type]++);
+            
+            document.getElementById('errorCount').textContent = stats.error;
+            document.getElementById('bugCount').textContent = stats.bug;
+            document.getElementById('infoCount').textContent = stats.info;
+            document.getElementById('totalCount').textContent = errors.length;
+        }
+
+        function renderErrors() {
+            const list = document.getElementById('errorList');
+            
+            if (errors.length === 0) {
+                list.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">Aucune erreur enregistrée pour le moment.</p>';
+                return;
+            }
+
+            list.innerHTML = errors.map((error, index) => `
+                <div class="error-item ${error.type}">
+                    <div class="error-time">
+                        <span class="status ${error.type}">${getTypeLabel(error.type)}</span>
+                        ${new Date(error.timestamp).toLocaleString('fr-FR')}
+                    </div>
+                    <div class="error-content">${escapeHtml(error.content)}</div>
+                </div>
+            `).reverse().join('');
+
+            updateStats();
+            updateMonitoringData();
+        }
+
+        function getTypeLabel(type) {
+            const labels = {
+                error: '❌ ERREUR',
+                bug: '🐛 BUG',
+                info: 'ℹ️ INFO',
+                success: '✅ SUCCÈS'
+            };
+            return labels[type] || type.toUpperCase();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function addError() {
+            const errorText = document.getElementById('errorInput').value.trim();
+            const errorType = document.getElementById('errorType').value;
+            
+            if (!errorText) {
+                alert('Veuillez saisir une erreur');
+                return;
+            }
+            
+            const error = {
+                id: Date.now(),
+                content: errorText,
+                type: errorType,
+                timestamp: new Date().toLocaleString('fr-FR')
+            };
+            
+            errors.push(error);
+            saveErrors();
+            displayErrors();
+            updateStats();
+            
+            // Trigger un événement pour signaler une nouvelle erreur
+            window.dispatchEvent(new CustomEvent('newError', { detail: error }));
+            
+            // Stocker aussi dans un format accessible pour monitoring externe
+            const monitoringData = document.getElementById('monitoringData');
+            monitoringData.textContent = JSON.stringify(errors);
+            monitoringData.setAttribute('data-last-update', Date.now());
+            
+            document.getElementById('errorInput').value = '';
+            
+            // Animation de confirmation
+            const btn = event.target;
+            btn.style.transform = 'scale(0.95)';
+            setTimeout(() => btn.style.transform = '', 200);
+        }
+
+        function clearErrors() {
+            if (confirm('Êtes-vous sûr de vouloir effacer tout l\'historique ?')) {
+                errors = [];
+                localStorage.removeItem('gbaErrors');
+                renderErrors();
+            }
+        }
+
+        function updateMonitoringData() {
+            // Met à jour la zone cachée avec les dernières erreurs pour le monitoring automatique
+            const monitoringDiv = document.getElementById('monitoringData');
+            monitoringDiv.textContent = JSON.stringify({
+                errors: errors.slice(-10), // Les 10 dernières erreurs
+                lastUpdate: new Date().toISOString(),
+                stats: stats
+            });
+        }
+
+        // Raccourcis clavier
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                addError();
+            }
+        });
+
+        // Charger les erreurs au démarrage
+        renderErrors();
+
+        // Auto-save periodique
+        setInterval(() => {
+            localStorage.setItem('gbaErrors', JSON.stringify(errors));
+        }, 5000);
+
+        // Notification d'état
+        console.log('%c🔧 Error Monitor Ready', 'background: #667eea; color: white; padding: 5px 10px; border-radius: 5px;');
+        console.log('Collez vos erreurs Flutter dans le champ de texte et cliquez sur "Ajouter au monitoring"');
+    </script>
+</body>
+</html>
