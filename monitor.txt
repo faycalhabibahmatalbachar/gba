@@ -1,5 +1,1 @@
-﻿dans l'app admin dans la gestion des produits, faites de telle sorte la carte soit verticale et l'image ne soit pas couper
-et dans la gestion des utilisateurs ca affiche ce message : Chargement des données... pendeant long temps d'abord pour afficher les donnees, gerer
-faites de telle sorte que on peut voir les images du profile meme en cliquant l'icone voir, et gerer tout ce qui manque, et listes moi les fonctionnalites a controle dans l'app client les plus robuistes, et les fonctionnalites a les implementer, apres tout ca metter sur github
-
-apres tout rester sur ecoute de fichier monitor.txt
+﻿toujours repondre en francais, apres toutes les corrections pousser tout sur github, et dites moi quelles sont les fonctionnalites manquantes a ajouter dans l'app client et l'app admin peut le controle ultra-intelligent

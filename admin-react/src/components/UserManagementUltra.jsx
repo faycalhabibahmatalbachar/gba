@@ -222,7 +222,16 @@ const UserManagementUltra = () => {
         ...user,
         orders_count: ordersCounts[user.id] || 0,
         cart_count: cartCounts[user.id] || 0,
-        favorites_count: favoritesCounts[user.id] || 0
+        favorites_count: favoritesCounts[user.id] || 0,
+        // Préserver les champs importants
+        email: user.email,
+        phone: user.phone,
+        address: user.address,
+        date_of_birth: user.date_of_birth,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        avatar_url: user.avatar_url,
+        avatar_display: user.avatar_display
       }));
 
       console.log('✅ Utilisateurs enrichis avec statistiques');
@@ -788,13 +797,13 @@ const UserManagementUltra = () => {
                       <FaEnvelope /> {selectedUser.email}
                     </div>
                     <div className="info-row">
-                      <FaPhone /> {selectedUser.phone || 'Non renseigné'}
+                      <FaPhone /> {selectedUser?.phone || 'Non renseigné'}
                     </div>
                     <div className="info-row">
-                      <FaMapMarkerAlt /> {selectedUser.address || 'Non renseignée'}
+                      <FaMapMarkerAlt /> {selectedUser?.address || 'Non renseignée'}
                     </div>
                     <div className="info-row">
-                      <FaCalendar /> Né(e) le {selectedUser.date_of_birth || 'Non renseigné'}
+                      <FaCalendar /> Né(e) le {selectedUser?.date_of_birth ? new Date(selectedUser.date_of_birth).toLocaleDateString('fr-FR') : 'Non renseigné'}
                     </div>
                   </div>
                   
