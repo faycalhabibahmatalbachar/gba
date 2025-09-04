@@ -41,6 +41,7 @@ import {
   Favorite as FavoriteIcon,
   ShoppingBasket as BasketIcon,
   TrendingUp as TrendingIcon,
+  Message as MessageIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -48,6 +49,7 @@ const drawerWidth = 280;
 
 const menuItems = [
   { title: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
+  { title: 'Messages', path: '/messages', icon: <MessageIcon />, badge: 'new' },
   { 
     title: 'Products', 
     path: '/products', 

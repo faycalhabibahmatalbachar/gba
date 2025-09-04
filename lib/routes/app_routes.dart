@@ -9,6 +9,8 @@ import '../screens/favorites_screen_premium.dart';
 import '../screens/categories_screen_premium.dart';
 import '../screens/cart_screen_premium.dart';
 import '../screens/profile_screen_premium.dart';
+import '../screens/chat/chat_screen.dart';
+import '../screens/chat/conversations_list_screen.dart';
 
 class AppRoutes {
   static final router = GoRouter(
@@ -74,6 +76,21 @@ class AppRoutes {
       GoRoute(
         path: '/favorites',
         builder: (context, state) => const FavoritesScreenPremium(),
+      ),
+      GoRoute(
+        path: '/messages',
+        builder: (context, state) => const ConversationsListScreen(),
+      ),
+      GoRoute(
+        path: '/chat/:conversationId',
+        builder: (context, state) {
+          final conversationId = state.pathParameters['conversationId'];
+          return ChatScreen(conversationId: conversationId);
+        },
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) => const ChatScreen(),
       ),
     ],
   );

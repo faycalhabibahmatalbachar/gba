@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider;
+import 'dart:ui';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,7 @@ import '../providers/categories_provider.dart';
 import '../providers/products_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../services/messaging_service.dart';
 
 class HomeScreenPremium extends ConsumerStatefulWidget {
   const HomeScreenPremium({super.key});
@@ -25,8 +27,10 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
   int _currentIndex = 0;
   late AnimationController _fabAnimationController;
   late AnimationController _searchAnimationController;
+  late AnimationController _messageButtonController;
   final ScrollController _scrollController = ScrollController();
   bool _showBackToTop = false;
+  int _unreadMessages = 0;
   
   @override
   void initState() {
@@ -39,6 +43,11 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
+    _messageButtonController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    )..repeat(reverse: true);
+    _loadUnreadMessages();
     _scrollController.addListener(() {
       if (_scrollController.offset > 200 && !_showBackToTop) {
         setState(() => _showBackToTop = true);
@@ -50,10 +59,37 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
     });
   }
   
+  void _loadUnreadMessages() async {
+    try {
+      final messagingService = context.read<MessagingService>();
+      await messagingService.loadConversations();
+      
+      setState(() {
+        _unreadMessages = messagingService.conversations
+            .where((c) => c.unreadCount > 0)
+            .fold(0, (sum, c) => sum + c.unreadCount);
+      });
+      
+      // Écouter les changements
+      messagingService.addListener(() {
+        if (mounted) {
+          setState(() {
+            _unreadMessages = messagingService.conversations
+                .where((c) => c.unreadCount > 0)
+                .fold(0, (sum, c) => sum + c.unreadCount);
+          });
+        }
+      });
+    } catch (e) {
+      print('Erreur chargement messages: $e');
+    }
+  }
+  
   @override
   void dispose() {
     _fabAnimationController.dispose();
     _searchAnimationController.dispose();
+    _messageButtonController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -67,23 +103,113 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       extendBody: true,
-      floatingActionButton: _showBackToTop
-          ? ScaleTransition(
-              scale: _fabAnimationController,
-              child: FloatingActionButton(
-                mini: true,
-                backgroundColor: const Color(0xFF667eea),
-                onPressed: () {
-                  _scrollController.animateTo(
-                    0,
-                    duration: const Duration(milliseconds: 500),
-                    curve: Curves.easeOutCubic,
-                  );
-                },
-                child: const Icon(Icons.arrow_upward, color: Colors.white),
+      floatingActionButton: Stack(
+        children: [
+          if (_showBackToTop)
+            Positioned(
+              bottom: 80,
+              right: 16,
+              child: ScaleTransition(
+                scale: _fabAnimationController,
+                child: FloatingActionButton(
+                  mini: true,
+                  heroTag: 'backToTop',
+                  backgroundColor: const Color(0xFF667eea),
+                  onPressed: () {
+                    _scrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutCubic,
+                    );
+                  },
+                  child: const Icon(Icons.arrow_upward, color: Colors.white),
+                ),
               ),
-            )
-          : null,
+            ),
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: AnimatedBuilder(
+              animation: _messageButtonController,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _unreadMessages > 0 
+                      ? 1.0 + (_messageButtonController.value * 0.1)
+                      : 1.0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          Color(0xFF667eea),
+                          Color(0xFF764ba2),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFF667eea).withOpacity(0.4),
+                          blurRadius: _unreadMessages > 0 ? 20 : 12,
+                          spreadRadius: _unreadMessages > 0 ? 2 : 0,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: FloatingActionButton(
+                      heroTag: 'messages',
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        context.push('/messages');
+                      },
+                      child: Stack(
+                        children: [
+                          Icon(
+                            Icons.message,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                          if (_unreadMessages > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                ),
+                                constraints: BoxConstraints(
+                                  minWidth: 18,
+                                  minHeight: 18,
+                                ),
+                                child: Text(
+                                  _unreadMessages > 99 
+                                      ? '99+' 
+                                      : '$_unreadMessages',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           // Background gradient

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>🚨 FIX URGENT - Erreur last_updated</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff3838 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #ff3838;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+        .urgent-notice {
+            background: #ffebee;
+            border-left: 5px solid #ff3838;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .sql-box {
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .btn-urgent {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff3838 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        .btn-urgent:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255, 56, 56, 0.4);
+        }
+        .btn-test {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        #logs {
+            background: #1e1e1e;
+            color: #0ef;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 3px 0;
+        }
+        .center {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 CORRECTION URGENTE - Erreur last_updated</h1>
+        
+        <div class="urgent-notice">
+            <h3>⚠️ ATTENTION: Action immédiate requise!</h3>
+            <p>L'erreur <strong>"record 'new' has no field 'last_updated'"</strong> empêche l'ajout au panier.</p>
+            <p>Ce script va supprimer définitivement la colonne problématique et tous les triggers associés.</p>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="sql-box">-- SCRIPT DE CORRECTION URGENT
+-- Supprime la colonne last_updated et tous les triggers
+
+DROP TRIGGER IF EXISTS update_cart_items_updated_at ON cart_items CASCADE;
+DROP TRIGGER IF EXISTS cart_items_last_updated_trigger ON cart_items CASCADE;
+DROP TRIGGER IF EXISTS cart_items_timestamp_trigger ON cart_items CASCADE;
+
+DROP FUNCTION IF EXISTS update_cart_items_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS update_cart_items_last_updated() CASCADE;
+DROP FUNCTION IF EXISTS handle_cart_items_timestamp() CASCADE;
+
+ALTER TABLE cart_items DROP COLUMN IF EXISTS last_updated CASCADE;</div>
+
+        <div class="center">
+            <button class="btn-urgent" onclick="executeUrgentFix()">
+                🚀 EXÉCUTER LE FIX MAINTENANT
+            </button>
+            <button class="btn-test" onclick="testAddToCart()">
+                🧪 Tester l'ajout au panier
+            </button>
+        </div>
+
+        <div id="results" class="results" style="display: none;"></div>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI1NjU1MzgsImV4cCI6MjA0ODE0MTUzOH0.6ViPt2-gvMGnCKKzyIa0C6JRM4HQQloYLknpF0LNqX4';
+
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#4CAF50' : '#0ef';
+            logs.innerHTML += `<div class="log-entry" style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = 'status ' + type;
+            status.textContent = message;
+            addLog(message, type);
+        }
+
+        async function executeUrgentFix() {
+            showStatus('⏳ Exécution du fix urgent en cours...', 'info');
+            addLog('Début de l\'exécution du script SQL', 'info');
+            
+            // Méthode 1: Via l'API Supabase directement
+            try {
+                // Test de connexion
+                addLog('Test de connexion à Supabase...', 'info');
+                const testResponse = await fetch(`${SUPABASE_URL}/rest/v1/cart_items?select=id&limit=1`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                if (testResponse.ok) {
+                    addLog('✅ Connexion établie', 'success');
+                    
+                    showStatus('⚠️ IMPORTANT: Copiez le script SQL ci-dessus et exécutez-le dans l\'éditeur SQL de Supabase', 'info');
+                    
+                    const resultsDiv = document.getElementById('results');
+                    resultsDiv.style.display = 'block';
+                    resultsDiv.innerHTML = `
+                        <h3>📋 Instructions pour appliquer le fix:</h3>
+                        <ol>
+                            <li>Allez sur <a href="https://app.supabase.com/project/uvlrgwdbjegoavjfdrzb/editor" target="_blank">Supabase SQL Editor</a></li>
+                            <li>Copiez le script SQL affiché ci-dessus</li>
+                            <li>Collez-le dans l'éditeur</li>
+                            <li>Cliquez sur "Run" pour exécuter</li>
+                            <li>Revenez ici et testez l'ajout au panier</li>
+                        </ol>
+                        <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px;">
+                            <strong>Alternative:</strong> Si vous avez accès à pgAdmin ou psql, vous pouvez exécuter le script directement.
+                        </div>
+                    `;
+                    
+                    // Vérifier la structure actuelle
+                    await checkTableStructure();
+                } else {
+                    throw new Error('Impossible de se connecter à Supabase');
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur: ${error.message}`, 'error');
+                addLog(`Erreur détaillée: ${error.stack}`, 'error');
+            }
+        }
+
+        async function checkTableStructure() {
+            try {
+                addLog('Vérification de la structure de la table...', 'info');
+                
+                // Tenter une insertion test pour voir l'erreur
+                const testData = {
+                    user_id: 'test-' + Date.now(),
+                    product_id: 'test-product',
+                    quantity: 1,
+                    price: 10.00
+                };
+
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/cart_items`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                if (response.ok) {
+                    addLog('✅ La table semble fonctionner correctement!', 'success');
+                    showStatus('✅ Le problème semble résolu!', 'success');
+                } else {
+                    const errorText = await response.text();
+                    if (errorText.includes('last_updated')) {
+                        addLog('⚠️ Le problème last_updated persiste', 'error');
+                        addLog('Exécutez le script SQL dans Supabase', 'error');
+                    } else {
+                        addLog(`Autre erreur: ${errorText}`, 'info');
+                    }
+                }
+            } catch (error) {
+                addLog(`Erreur vérification: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAddToCart() {
+            showStatus('🧪 Test d\'ajout au panier en cours...', 'info');
+            addLog('Début du test d\'ajout au panier', 'info');
+            
+            try {
+                const testItem = {
+                    user_id: 'test-user-' + Date.now(),
+                    product_id: 'test-product-' + Date.now(),
+                    quantity: 1,
+                    price: 99.99,
+                    created_at: new Date().toISOString()
+                };
+
+                addLog(`Données de test: ${JSON.stringify(testItem)}`, 'info');
+
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/cart_items`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=representation'
+                    },
+                    body: JSON.stringify(testItem)
+                });
+
+                const responseText = await response.text();
+                addLog(`Réponse: ${response.status} - ${responseText}`, response.ok ? 'success' : 'error');
+
+                if (response.ok) {
+                    showStatus('✅ Test réussi! L\'ajout au panier fonctionne!', 'success');
+                    
+                    // Nettoyer
+                    try {
+                        const result = JSON.parse(responseText);
+                        if (result[0] && result[0].id) {
+                            await fetch(`${SUPABASE_URL}/rest/v1/cart_items?id=eq.${result[0].id}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'apikey': SUPABASE_KEY,
+                                    'Authorization': `Bearer ${SUPABASE_KEY}`
+                                }
+                            });
+                            addLog('Article test supprimé', 'info');
+                        }
+                    } catch (e) {
+                        // Ignore
+                    }
+                } else {
+                    if (responseText.includes('last_updated')) {
+                        showStatus('❌ L\'erreur last_updated persiste! Exécutez le script SQL d\'abord.', 'error');
+                    } else {
+                        showStatus(`❌ Erreur: ${responseText}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur test: ${error.message}`, 'error');
+                addLog(`Erreur détaillée: ${error.stack}`, 'error');
+            }
+        }
+
+        // Auto-test au chargement
+        window.onload = () => {
+            showStatus('🔧 Prêt pour corriger l\'erreur last_updated', 'info');
+            addLog('Page chargée - Prêt pour l\'exécution', 'info');
+        };
+    </script>
+</body>
+</html>

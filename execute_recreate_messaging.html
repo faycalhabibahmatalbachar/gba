@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recréer les Tables de Messagerie - Supabase</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .config-section {
+            background: #f7f9fc;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+        
+        .btn-info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .output-section {
+            background: #f0f4f8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 25px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .output-section h3 {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        #output {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .success {
+            color: #22c55e;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        
+        .info {
+            color: #3b82f6;
+        }
+        
+        .warning {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        
+        .steps {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .steps h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+        
+        .steps ol {
+            color: #856404;
+            margin-left: 20px;
+        }
+        
+        .steps li {
+            margin-bottom: 8px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Recréation des Tables de Messagerie</h1>
+        <p class="subtitle">Suppression et recréation complète des tables chat_conversations, chat_messages et message_attachments</p>
+        
+        <div class="steps">
+            <h3>⚠️ ATTENTION - Ce script va :</h3>
+            <ol>
+                <li>SUPPRIMER toutes les conversations existantes</li>
+                <li>SUPPRIMER tous les messages existants</li>
+                <li>SUPPRIMER toutes les pièces jointes existantes</li>
+                <li>Recréer les tables avec le schéma correct</li>
+                <li>Configurer les politiques RLS</li>
+                <li>Créer les index et triggers nécessaires</li>
+            </ol>
+        </div>
+        
+        <div class="config-section">
+            <div class="form-group">
+                <label for="supabaseUrl">URL Supabase</label>
+                <input type="text" id="supabaseUrl" placeholder="https://xxxxx.supabase.co" value="">
+            </div>
+            
+            <div class="form-group">
+                <label for="supabaseKey">Clé Service Role (avec droits admin)</label>
+                <input type="password" id="supabaseKey" placeholder="Votre clé service_role Supabase">
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-danger" onclick="executeRecreation()">
+                🗑️ RECRÉER LES TABLES
+            </button>
+            <button class="btn-info" onclick="checkTables()">
+                🔍 Vérifier les Tables
+            </button>
+        </div>
+        
+        <div class="output-section">
+            <h3>📊 Résultats</h3>
+            <div id="output">En attente d'exécution...</div>
+        </div>
+    </div>
+    
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+        
+        async function executeRecreation() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            
+            if (!url || !key) {
+                alert('Veuillez remplir tous les champs de configuration');
+                return;
+            }
+            
+            if (!confirm('⚠️ ATTENTION: Cette action va SUPPRIMER TOUTES les données de messagerie existantes. Êtes-vous sûr de vouloir continuer?')) {
+                return;
+            }
+            
+            clearOutput();
+            log('Démarrage de la recréation des tables...', 'info');
+            
+            const sqlScript = `
+-- ========================================
+-- SCRIPT DE RECRÉATION DES TABLES DE MESSAGERIE (CORRIGÉ)
+-- ========================================
+
+-- Supprimer les anciennes tables et leurs dépendances
+DROP TABLE IF EXISTS public.message_attachments CASCADE;
+DROP TABLE IF EXISTS public.chat_messages CASCADE;
+DROP TABLE IF EXISTS public.chat_conversations CASCADE;
+
+-- ========================================
+-- TABLE CHAT_CONVERSATIONS
+-- ========================================
+CREATE TABLE public.chat_conversations (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  admin_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  order_id TEXT DEFAULT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'closed', 'pending')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index pour améliorer les performances
+CREATE INDEX idx_conversations_user_id ON public.chat_conversations(user_id);
+CREATE INDEX idx_conversations_admin_id ON public.chat_conversations(admin_id);
+CREATE INDEX idx_conversations_status ON public.chat_conversations(status);
+CREATE INDEX idx_conversations_created_at ON public.chat_conversations(created_at DESC);
+
+-- ========================================
+-- TABLE CHAT_MESSAGES
+-- ========================================
+CREATE TABLE public.chat_messages (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  conversation_id UUID NOT NULL REFERENCES public.chat_conversations(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index pour améliorer les performances
+CREATE INDEX idx_messages_conversation_id ON public.chat_messages(conversation_id);
+CREATE INDEX idx_messages_sender_id ON public.chat_messages(sender_id);
+CREATE INDEX idx_messages_created_at ON public.chat_messages(created_at);
+CREATE INDEX idx_messages_is_read ON public.chat_messages(is_read);
+
+-- ========================================
+-- TABLE MESSAGE_ATTACHMENTS
+-- ========================================
+CREATE TABLE public.message_attachments (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  message_id UUID NOT NULL REFERENCES public.chat_messages(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  file_type TEXT,
+  file_size INTEGER,
+  file_url TEXT NOT NULL,
+  thumbnail_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index pour améliorer les performances
+CREATE INDEX idx_attachments_message_id ON public.message_attachments(message_id);
+
+-- ========================================
+-- TRIGGER POUR METTRE À JOUR updated_at
+-- ========================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_chat_conversations_updated_at
+  BEFORE UPDATE ON public.chat_conversations
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ========================================
+-- POLITIQUES RLS (Row Level Security)
+-- ========================================
+
+-- Activer RLS sur toutes les tables
+ALTER TABLE public.chat_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_attachments ENABLE ROW LEVEL SECURITY;
+
+-- Politiques pour chat_conversations
+CREATE POLICY "Users can view their own conversations"
+  ON public.chat_conversations FOR SELECT
+  USING (
+    auth.uid() = user_id OR 
+    auth.uid() = admin_id
+  );
+
+CREATE POLICY "Users can create conversations"
+  ON public.chat_conversations FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their conversations"
+  ON public.chat_conversations FOR UPDATE
+  USING (
+    auth.uid() = user_id OR 
+    auth.uid() = admin_id
+  );
+
+-- Politiques pour chat_messages
+CREATE POLICY "Users can view messages in their conversations"
+  ON public.chat_messages FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.chat_conversations
+      WHERE chat_conversations.id = chat_messages.conversation_id
+      AND (
+        chat_conversations.user_id = auth.uid() OR 
+        chat_conversations.admin_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Users can send messages in their conversations"
+  ON public.chat_messages FOR INSERT
+  WITH CHECK (
+    auth.uid() = sender_id AND
+    EXISTS (
+      SELECT 1 FROM public.chat_conversations
+      WHERE chat_conversations.id = conversation_id
+      AND (
+        chat_conversations.user_id = auth.uid() OR 
+        chat_conversations.admin_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Users can update their own messages"
+  ON public.chat_messages FOR UPDATE
+  USING (
+    auth.uid() = sender_id OR
+    EXISTS (
+      SELECT 1 FROM public.chat_conversations
+      WHERE chat_conversations.id = chat_messages.conversation_id
+      AND (
+        chat_conversations.user_id = auth.uid() OR 
+        chat_conversations.admin_id = auth.uid()
+      )
+    )
+  );
+
+-- Politiques pour message_attachments
+CREATE POLICY "Users can view attachments in their conversations"
+  ON public.message_attachments FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.chat_messages
+      JOIN public.chat_conversations ON chat_conversations.id = chat_messages.conversation_id
+      WHERE chat_messages.id = message_attachments.message_id
+      AND (
+        chat_conversations.user_id = auth.uid() OR 
+        chat_conversations.admin_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "Users can add attachments to their messages"
+  ON public.message_attachments FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.chat_messages
+      JOIN public.chat_conversations ON chat_conversations.id = chat_messages.conversation_id
+      WHERE chat_messages.id = message_id
+      AND chat_messages.sender_id = auth.uid()
+    )
+  );`;
+            
+            try {
+                // Exécuter le script SQL via l'API Supabase
+                const response = await fetch(`${url}/rest/v1/rpc/exec_sql`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': key,
+                        'Authorization': `Bearer ${key}`,
+                        'Prefer': 'return=representation'
+                    },
+                    body: JSON.stringify({ 
+                        query: sqlScript 
+                    })
+                });
+                
+                if (response.status === 404) {
+                    log('La fonction exec_sql n\'existe pas. Exécution directe...', 'warning');
+                    
+                    // Essayer d'exécuter directement
+                    const execResponse = await fetch(`${url}/rest/v1/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': key,
+                            'Authorization': `Bearer ${key}`
+                        },
+                        body: JSON.stringify({ 
+                            query: sqlScript 
+                        })
+                    });
+                    
+                    if (execResponse.ok) {
+                        log('✅ Script exécuté avec succès!', 'success');
+                    } else {
+                        log('❌ Erreur lors de l\'exécution du script', 'error');
+                        log('Veuillez exécuter le script manuellement dans l\'éditeur SQL de Supabase', 'warning');
+                        log('Le script a été copié dans le presse-papier', 'info');
+                        navigator.clipboard.writeText(sqlScript);
+                    }
+                } else if (response.ok) {
+                    log('✅ Tables recréées avec succès!', 'success');
+                    log('✅ Politiques RLS configurées', 'success');
+                    log('✅ Index créés', 'success');
+                    log('✅ Triggers configurés', 'success');
+                    
+                    // Vérifier les tables
+                    await checkTables();
+                } else {
+                    const error = await response.text();
+                    log(`❌ Erreur: ${error}`, 'error');
+                    log('Copiez le script SQL dans l\'éditeur Supabase pour l\'exécuter manuellement', 'warning');
+                    navigator.clipboard.writeText(sqlScript);
+                    log('📋 Script copié dans le presse-papier', 'info');
+                }
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+                log('Veuillez exécuter le script manuellement dans Supabase', 'warning');
+                navigator.clipboard.writeText(sqlScript);
+                log('📋 Script SQL copié dans le presse-papier', 'info');
+            }
+        }
+        
+        async function checkTables() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            
+            if (!url || !key) {
+                alert('Veuillez remplir tous les champs de configuration');
+                return;
+            }
+            
+            clearOutput();
+            log('Vérification des tables...', 'info');
+            
+            try {
+                // Vérifier chat_conversations
+                const convResponse = await fetch(`${url}/rest/v1/chat_conversations?select=count`, {
+                    method: 'HEAD',
+                    headers: {
+                        'apikey': key,
+                        'Authorization': `Bearer ${key}`,
+                        'Prefer': 'count=exact'
+                    }
+                });
+                
+                if (convResponse.ok) {
+                    const count = convResponse.headers.get('content-range');
+                    log(`✅ Table chat_conversations existe`, 'success');
+                } else {
+                    log('❌ Table chat_conversations n\'existe pas', 'error');
+                }
+                
+                // Vérifier chat_messages
+                const msgResponse = await fetch(`${url}/rest/v1/chat_messages?select=count`, {
+                    method: 'HEAD',
+                    headers: {
+                        'apikey': key,
+                        'Authorization': `Bearer ${key}`,
+                        'Prefer': 'count=exact'
+                    }
+                });
+                
+                if (msgResponse.ok) {
+                    log(`✅ Table chat_messages existe`, 'success');
+                } else {
+                    log('❌ Table chat_messages n\'existe pas', 'error');
+                }
+                
+                // Vérifier message_attachments
+                const attResponse = await fetch(`${url}/rest/v1/message_attachments?select=count`, {
+                    method: 'HEAD',
+                    headers: {
+                        'apikey': key,
+                        'Authorization': `Bearer ${key}`,
+                        'Prefer': 'count=exact'
+                    }
+                });
+                
+                if (attResponse.ok) {
+                    log(`✅ Table message_attachments existe`, 'success');
+                } else {
+                    log('❌ Table message_attachments n\'existe pas', 'error');
+                }
+                
+                log('Vérification terminée', 'info');
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
