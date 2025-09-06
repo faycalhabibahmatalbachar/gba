@@ -76,3 +76,8 @@ gba-mobile/android/gradle/*.zip
 # OS Files
 Thumbs.db
 desktop.ini
+
+# Gradle files
+*.zip
+gba-mobile/android/gradle/
+*.jar
