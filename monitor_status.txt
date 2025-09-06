@@ -1,0 +1,23 @@
+STATUS: ✅ RÉSOLU
+Date: 2025-09-04 19:50
+
+PROBLÈMES CORRIGÉS:
+1. ✅ App admin affiche maintenant les conversations (2 conversations visibles)
+2. ✅ Messages s'affichent correctement dans l'app admin  
+3. ✅ Envoi de messages depuis l'admin fonctionne
+4. ✅ Colonnes corrigées: user_id au lieu de customer_id
+5. ✅ Colonnes corrigées: message au lieu de content
+6. ✅ Ajout de sender_type calculé dynamiquement
+
+DONNÉES DE TEST EXISTANTES:
+- Conversation 1: 6bc9ca59-a2f8-4480-acb1-0a9f03a48969
+  Messages: "salut", "bonjour", "ok", "salut encore", "bien et vous ?"
+  + Message admin: "Bonjour, je suis l'admin. Comment puis-je vous aider?"
+  
+- Conversation 2: 06ae05a2-cae0-4f87-ab73-b616fd7e41f8  
+  (Vide pour le moment)
+
+PROCHAINES ÉTAPES RECOMMANDÉES:
+- Tester la réception en temps réel des messages côté Flutter
+- Vérifier que les messages admin apparaissent dans l'app client
+- Tester les notifications push

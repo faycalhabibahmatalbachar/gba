@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vérification des données Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #666;
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th {
+            background: #4CAF50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:hover {
+            background: #f9f9f9;
+        }
+        .success { color: #4CAF50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+        .info { color: #2196F3; font-weight: bold; }
+        .warning { color: #ff9800; font-weight: bold; }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border-left: 4px solid #4CAF50;
+        }
+        .status-active { color: #4CAF50; font-weight: bold; }
+        .status-inactive { color: #999; }
+        .timestamp { 
+            color: #666; 
+            font-size: 0.9em;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnostic Complet du Système de Chat</h1>
+        <p class="info">Analyse en temps réel des tables chat_conversations et chat_messages</p>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Conversations</div>
+                <div class="stat-value" id="totalConversations">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Messages</div>
+                <div class="stat-value" id="totalMessages">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Conversations Actives</div>
+                <div class="stat-value" id="activeConversations">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Messages Non Lus</div>
+                <div class="stat-value" id="unreadMessages">-</div>
+            </div>
+        </div>
+
+        <div id="loading" class="info">⏳ Connexion à Supabase...</div>
+        <div id="results"></div>
+        
+        <div style="margin-top: 20px;">
+            <button onclick="checkTables()">🔄 Actualiser</button>
+            <button onclick="checkRLS()">🔒 Vérifier RLS</button>
+            <button onclick="createTestConversation()">➕ Créer Conversation Test</button>
+            <button onclick="cleanupDuplicates()">🧹 Nettoyer Doublons</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            return new Date(dateString).toLocaleString('fr-FR');
+        }
+
+        async function checkTables() {
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            loading.innerHTML = '⏳ Analyse en cours...';
+            results.innerHTML = '';
+            
+            try {
+                // 1. Vérifier les conversations
+                console.log('📊 Récupération des conversations...');
+                const { data: conversations, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (convError) {
+                    results.innerHTML += `<div class="error">❌ Erreur conversations: ${convError.message}</div>`;
+                    console.error('Erreur conversations:', convError);
+                } else {
+                    results.innerHTML += `
+                        <h2>📬 Conversations (${conversations ? conversations.length : 0})</h2>
+                        ${conversations && conversations.length > 0 ? `
+                            <table>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>User ID</th>
+                                    <th>Admin ID</th>
+                                    <th>Status</th>
+                                    <th>Créée le</th>
+                                    <th>Mise à jour</th>
+                                </tr>
+                                ${conversations.map(conv => `
+                                    <tr>
+                                        <td style="font-size: 0.85em;">${conv.id.substring(0, 8)}...</td>
+                                        <td style="font-size: 0.85em;">${conv.user_id ? conv.user_id.substring(0, 8) + '...' : 'N/A'}</td>
+                                        <td style="font-size: 0.85em;">${conv.admin_id ? conv.admin_id.substring(0, 8) + '...' : '<span class="warning">Non assigné</span>'}</td>
+                                        <td class="status-${conv.status}">${conv.status}</td>
+                                        <td class="timestamp">${formatDate(conv.created_at)}</td>
+                                        <td class="timestamp">${formatDate(conv.updated_at)}</td>
+                                    </tr>
+                                `).join('')}
+                            </table>
+                        ` : '<p class="warning">⚠️ Aucune conversation trouvée</p>'}
+                    `;
+                    
+                    // Mettre à jour les stats
+                    document.getElementById('totalConversations').textContent = conversations ? conversations.length : 0;
+                    document.getElementById('activeConversations').textContent = conversations ? 
+                        conversations.filter(c => c.status === 'active').length : 0;
+                }
+
+                // 2. Vérifier les messages
+                console.log('💬 Récupération des messages...');
+                const { data: messages, error: msgError } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+
+                if (msgError) {
+                    results.innerHTML += `<div class="error">❌ Erreur messages: ${msgError.message}</div>`;
+                    console.error('Erreur messages:', msgError);
+                } else {
+                    results.innerHTML += `
+                        <h2>💬 Messages récents (${messages ? messages.length : 0})</h2>
+                        ${messages && messages.length > 0 ? `
+                            <table>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Conversation</th>
+                                    <th>Sender</th>
+                                    <th>Message</th>
+                                    <th>Lu</th>
+                                    <th>Date</th>
+                                </tr>
+                                ${messages.map(msg => `
+                                    <tr>
+                                        <td style="font-size: 0.85em;">${msg.id.substring(0, 8)}...</td>
+                                        <td style="font-size: 0.85em;">${msg.conversation_id.substring(0, 8)}...</td>
+                                        <td style="font-size: 0.85em;">${msg.sender_id ? msg.sender_id.substring(0, 8) + '...' : 'N/A'}</td>
+                                        <td>${msg.message ? msg.message.substring(0, 50) + (msg.message.length > 50 ? '...' : '') : 'N/A'}</td>
+                                        <td>${msg.is_read ? '✅' : '❌'}</td>
+                                        <td class="timestamp">${formatDate(msg.created_at)}</td>
+                                    </tr>
+                                `).join('')}
+                            </table>
+                        ` : '<p class="warning">⚠️ Aucun message trouvé</p>'}
+                    `;
+                    
+                    // Mettre à jour les stats
+                    document.getElementById('totalMessages').textContent = messages ? messages.length : 0;
+                    document.getElementById('unreadMessages').textContent = messages ? 
+                        messages.filter(m => !m.is_read).length : 0;
+                }
+
+                // 3. Vérifier la conversation spécifique mentionnée dans les logs
+                const specificConvId = '72af4572-fd32-4056-a2c0-13e34dc451e2';
+                console.log(`🔍 Recherche conversation spécifique: ${specificConvId}`);
+                
+                const { data: specificConv, error: specificError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .eq('id', specificConvId)
+                    .single();
+
+                if (specificError) {
+                    results.innerHTML += `<div class="warning">⚠️ Conversation ${specificConvId} non trouvée</div>`;
+                } else if (specificConv) {
+                    results.innerHTML += `
+                        <h2>🎯 Conversation spécifique des logs</h2>
+                        <pre>${JSON.stringify(specificConv, null, 2)}</pre>
+                    `;
+                    
+                    // Récupérer ses messages
+                    const { data: specificMessages } = await supabase
+                        .from('chat_messages')
+                        .select('*')
+                        .eq('conversation_id', specificConvId)
+                        .order('created_at', { ascending: true });
+                    
+                    if (specificMessages && specificMessages.length > 0) {
+                        results.innerHTML += `
+                            <h3>Messages de cette conversation:</h3>
+                            <pre>${JSON.stringify(specificMessages, null, 2)}</pre>
+                        `;
+                    }
+                }
+
+                loading.innerHTML = '<span class="success">✅ Analyse terminée</span>';
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                results.innerHTML = `<div class="error">❌ Erreur: ${error.message}</div>`;
+                loading.innerHTML = '<span class="error">❌ Erreur lors de l\'analyse</span>';
+            }
+        }
+
+        async function checkRLS() {
+            const results = document.getElementById('results');
+            results.innerHTML += '<h2>🔒 Test des politiques RLS</h2>';
+            
+            try {
+                // Test sans authentification
+                const { data: publicConv, error: publicError } = await supabase
+                    .from('chat_conversations')
+                    .select('count');
+                
+                results.innerHTML += `<p>Accès public aux conversations: ${publicError ? '❌ Bloqué' : '✅ Autorisé'}</p>`;
+                
+                const { data: publicMsg, error: msgError } = await supabase
+                    .from('chat_messages')
+                    .select('count');
+                
+                results.innerHTML += `<p>Accès public aux messages: ${msgError ? '❌ Bloqué' : '✅ Autorisé'}</p>`;
+                
+            } catch (error) {
+                results.innerHTML += `<div class="error">Erreur RLS: ${error.message}</div>`;
+            }
+        }
+
+        async function createTestConversation() {
+            const results = document.getElementById('results');
+            try {
+                const testUserId = '60074c92-45c8-4ccb-a03c-466528d3dd43'; // User ID des logs
+                
+                const { data, error } = await supabase
+                    .from('chat_conversations')
+                    .insert({
+                        user_id: testUserId,
+                        status: 'active'
+                    })
+                    .select()
+                    .single();
+                
+                if (error) {
+                    results.innerHTML += `<div class="error">❌ Erreur création: ${error.message}</div>`;
+                } else {
+                    results.innerHTML += `<div class="success">✅ Conversation test créée: ${data.id}</div>`;
+                    setTimeout(checkTables, 1000);
+                }
+            } catch (error) {
+                results.innerHTML += `<div class="error">❌ Erreur: ${error.message}</div>`;
+            }
+        }
+
+        async function cleanupDuplicates() {
+            const results = document.getElementById('results');
+            try {
+                // Récupérer toutes les conversations
+                const { data: conversations } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .order('created_at', { ascending: true });
+                
+                if (conversations && conversations.length > 0) {
+                    // Grouper par user_id
+                    const grouped = {};
+                    conversations.forEach(conv => {
+                        if (!grouped[conv.user_id]) {
+                            grouped[conv.user_id] = [];
+                        }
+                        grouped[conv.user_id].push(conv);
+                    });
+                    
+                    let duplicates = [];
+                    Object.values(grouped).forEach(group => {
+                        if (group.length > 1) {
+                            // Garder la plus récente, supprimer les autres
+                            duplicates = duplicates.concat(group.slice(0, -1).map(c => c.id));
+                        }
+                    });
+                    
+                    if (duplicates.length > 0) {
+                        results.innerHTML += `<div class="info">🧹 ${duplicates.length} doublons trouvés</div>`;
+                    } else {
+                        results.innerHTML += `<div class="success">✅ Aucun doublon trouvé</div>`;
+                    }
+                } else {
+                    results.innerHTML += `<div class="warning">⚠️ Aucune conversation à vérifier</div>`;
+                }
+            } catch (error) {
+                results.innerHTML += `<div class="error">❌ Erreur: ${error.message}</div>`;
+            }
+        }
+
+        // Charger automatiquement au démarrage
+        window.addEventListener('DOMContentLoaded', () => {
+            checkTables();
+        });
+    </script>
+</body>
+</html>

@@ -1,9 +1,54 @@
 /* Admin Chat Dashboard Styles */
 .admin-chat-dashboard {
-  height: 100vh;
+  height: calc(100vh - 64px);
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f5f5f5;
+}
+
+/* Status de connexion */
+.connection-status {
+  padding: 8px 16px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.status-connected {
+  color: #4caf50;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-connecting {
+  color: #ff9800;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-error {
+  color: #f44336;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-error button {
+  padding: 4px 8px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.status-error button:hover {
+  background: #d32f2f;
 }
 
 /* Header Section */

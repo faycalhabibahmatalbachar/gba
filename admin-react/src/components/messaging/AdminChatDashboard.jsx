@@ -69,35 +69,49 @@ const AdminChatDashboard = () => {
   const loadConversations = async () => {
     try {
       console.log('📥 Loading conversations...');
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          *,
-          participants:conversation_participants(
-            user_id,
-            role,
-            last_read_at
-          ),
-          messages(
-            id,
-            content,
-            sender_id,
-            sender_type,
-            created_at,
-            is_read
-          )
-        `)
-        .order('last_message_at', { ascending: false });
-
-      if (error) throw error;
-
-      console.log(`✅ Loaded ${data?.length || 0} conversations`);
-      setConversations(data || []);
       
-      // Calculer les non-lus
-      const unread = data?.reduce((acc, conv) => {
+      // Récupérer d'abord les conversations
+      const { data: conversationsData, error: convError } = await supabase
+        .from('chat_conversations')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (convError) {
+        console.error('❌ Error loading conversations:', convError);
+        throw convError;
+      }
+
+      console.log(`✅ Loaded ${conversationsData?.length || 0} conversations`);
+
+      // Pour chaque conversation, récupérer les messages
+      const conversationsWithMessages = await Promise.all(
+        (conversationsData || []).map(async (conv) => {
+          const { data: messagesData, error: msgError } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('conversation_id', conv.id)
+            .order('created_at', { ascending: false })
+            .limit(10); // Limiter aux 10 derniers messages
+
+          if (msgError) {
+            console.error(`❌ Error loading messages for conversation ${conv.id}:`, msgError);
+            return { ...conv, messages: [] };
+          }
+
+          return {
+            ...conv,
+            messages: messagesData || [],
+            last_message_at: messagesData?.[0]?.created_at || conv.created_at
+          };
+        })
+      );
+
+      setConversations(conversationsWithMessages);
+      
+      // Calculer les non-lus (messages du client = ceux où sender_id === user_id)
+      const unread = conversationsWithMessages.reduce((acc, conv) => {
         const unreadMessages = conv.messages?.filter(m => 
-          m.sender_type === 'customer' && !m.is_read
+          m.sender_id === conv.user_id && !m.is_read
         ).length || 0;
         return acc + unreadMessages;
       }, 0) || 0;
@@ -114,18 +128,22 @@ const AdminChatDashboard = () => {
     try {
       console.log(`📨 Loading messages for conversation: ${conversationId}`);
       const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          attachments:message_attachments(*)
-        `)
+        .from('chat_messages')
+        .select('*')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-
+      
+      // Ajouter sender_type basé sur sender_id
+      const messagesWithType = (data || []).map(msg => ({
+        ...msg,
+        sender_type: msg.sender_id === selectedConversation?.user_id ? 'customer' : 'admin',
+        content: msg.message // Mapper message vers content pour compatibilité
+      }));
+      
       console.log(`✅ Loaded ${data?.length || 0} messages`);
-      setMessages(data || []);
+      setMessages(messagesWithType);
       
       // Marquer comme lus
       await markAsRead(conversationId);
@@ -138,18 +156,9 @@ const AdminChatDashboard = () => {
   };
 
   const loadQuickResponses = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('quick_responses')
-        .select('*')
-        .order('usage_count', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setQuickResponses(data || []);
-    } catch (error) {
-      console.error('❌ Error loading quick responses:', error);
-    }
+    // Table quick_responses n'existe pas encore
+    // TODO: Créer la table quick_responses
+    setQuickResponses([]);
   };
 
   const setupRealtimeSubscriptions = () => {
@@ -157,10 +166,12 @@ const AdminChatDashboard = () => {
 
     // Écouter les nouvelles conversations
     supabase
-      .channel('conversations')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'conversations' },
-        (payload) => {
+      .channel('conversations-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_conversations'
+      }, (payload) => {
           console.log('📣 Conversation change:', payload);
           loadConversations();
         }
@@ -169,21 +180,27 @@ const AdminChatDashboard = () => {
 
     // Écouter les nouveaux messages
     supabase
-      .channel('messages')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
+      .channel('messages-changes')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages'
+      }, async (payload) => {
           console.log('💬 New message:', payload);
           const newMsg = payload.new;
           
           // Ajouter au messages si c'est la conversation active
           if (selectedConversation?.id === newMsg.conversation_id) {
-            setMessages(prev => [...prev, newMsg]);
+            setMessages(prev => [...prev, {
+              ...newMsg,
+              sender_type: newMsg.sender_id === selectedConversation?.user_id ? 'customer' : 'admin',
+              content: newMsg.message // Mapper message vers content pour compatibilité
+            }]);
             scrollToBottom();
           }
           
           // Notification sonore pour les messages clients
-          if (newMsg.sender_type === 'customer') {
+          if (newMsg.sender_id === selectedConversation?.user_id) {
             playNotificationSound();
             showDesktopNotification(newMsg);
           }
@@ -222,30 +239,34 @@ const AdminChatDashboard = () => {
     console.log(`📤 Sending message to conversation: ${selectedConversation.id}`);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const messageData = {
+        conversation_id: selectedConversation.id,
+        sender_id: 'admin-' + Date.now(), // ID temporaire admin
+        message: newMessage,
+        is_read: false,
+        created_at: new Date().toISOString()
+      };
+
       const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: selectedConversation.id,
-          sender_id: user.id,
-          sender_type: 'admin',
-          content: newMessage.trim(),
-          message_type: 'text'
-        })
+        .from('chat_messages')
+        .insert(messageData)
         .select()
         .single();
 
       if (error) throw error;
 
       console.log('✅ Message sent successfully');
-      setMessages(prev => [...prev, data]);
+      setMessages(prev => [...prev, {
+        ...data,
+        sender_type: 'admin',
+        content: data.message // Mapper message vers content pour compatibilité
+      }]);
       setNewMessage('');
       
-      // Mettre à jour last_message_at de la conversation
+      // Mettre à jour updated_at de la conversation
       await supabase
-        .from('conversations')
-        .update({ last_message_at: new Date().toISOString() })
+        .from('chat_conversations')
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', selectedConversation.id);
 
       scrollToBottom();
@@ -259,20 +280,12 @@ const AdminChatDashboard = () => {
 
   const markAsRead = async (conversationId) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       await supabase
-        .from('messages')
+        .from('chat_messages')
         .update({ is_read: true })
         .eq('conversation_id', conversationId)
-        .eq('sender_type', 'customer');
-
-      await supabase
-        .from('conversation_participants')
-        .update({ last_read_at: new Date().toISOString() })
-        .eq('conversation_id', conversationId)
-        .eq('user_id', user.id);
-
+        .eq('is_read', false);
+      
       console.log('✅ Messages marked as read');
     } catch (error) {
       console.error('❌ Error marking as read:', error);
@@ -282,7 +295,7 @@ const AdminChatDashboard = () => {
   const changeConversationStatus = async (conversationId, status) => {
     try {
       const { error } = await supabase
-        .from('conversations')
+        .from('chat_conversations')
         .update({ status })
         .eq('id', conversationId);
 
@@ -298,7 +311,7 @@ const AdminChatDashboard = () => {
   const changePriority = async (conversationId, priority) => {
     try {
       const { error } = await supabase
-        .from('conversations')
+        .from('chat_conversations')
         .update({ priority })
         .eq('id', conversationId);
 
@@ -315,18 +328,14 @@ const AdminChatDashboard = () => {
     setNewMessage(response.content);
     setShowQuickResponses(false);
     
-    // Incrémenter le compteur d'utilisation
-    supabase
-      .from('quick_responses')
-      .update({ usage_count: response.usage_count + 1 })
-      .eq('id', response.id)
-      .then(() => console.log('✅ Quick response usage updated'));
+    // Table quick_responses n'existe pas encore
+    // TODO: Incrémenter le compteur quand la table sera créée
   };
 
   const calculateStats = async () => {
     try {
       const { data: convData } = await supabase
-        .from('conversations')
+        .from('chat_conversations')
         .select('status');
       
       const total = convData?.length || 0;
@@ -365,7 +374,7 @@ const AdminChatDashboard = () => {
 
   const filteredConversations = conversations.filter(conv => {
     const matchesSearch = conv.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conv.customer_id?.includes(searchTerm);
+                         conv.user_id?.includes(searchTerm);
     const matchesStatus = filterStatus === 'all' || conv.status === filterStatus;
     const matchesPriority = filterPriority === 'all' || conv.priority === filterPriority;
     
@@ -470,8 +479,8 @@ const AdminChatDashboard = () => {
                 >
                   <div className="conversation-header">
                     <div className="conversation-info">
-                      <h4>{conv.subject}</h4>
-                      <p className="customer-id">Client: {conv.customer_id?.substring(0, 8)}...</p>
+                      <h4>{conv.subject || 'Nouvelle conversation'}</h4>
+                      <p className="customer-id">Client: {conv.user_id?.substring(0, 8)}...</p>
                     </div>
                     <div className="conversation-meta">
                       <span className="time">
@@ -480,9 +489,9 @@ const AdminChatDashboard = () => {
                           locale: fr
                         })}
                       </span>
-                      {conv.messages?.filter(m => m.sender_type === 'customer' && !m.is_read).length > 0 && (
+                      {conv.messages?.filter(m => m.sender_id === conv.user_id && !m.is_read).length > 0 && (
                         <span className="unread-badge">
-                          {conv.messages.filter(m => m.sender_type === 'customer' && !m.is_read).length}
+                          {conv.messages.filter(m => m.sender_id === conv.user_id && !m.is_read).length}
                         </span>
                       )}
                     </div>
@@ -516,9 +525,9 @@ const AdminChatDashboard = () => {
             <>
               <div className="chat-main-header">
                 <div className="chat-info">
-                  <h2>{selectedConversation.subject}</h2>
+                  <h2>{selectedConversation.subject || 'Conversation'}</h2>
                   <p>
-                    Client ID: {selectedConversation.customer_id} 
+                    Client ID: {selectedConversation.user_id} 
                     {selectedConversation.order_id && ` • Commande: #${selectedConversation.order_id}`}
                   </p>
                 </div>

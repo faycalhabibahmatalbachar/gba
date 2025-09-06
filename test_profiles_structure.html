@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Structure Table Profiles</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Test Structure Table Profiles</h1>
+    <div id="output"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://vtyyjqirhqudxcmzvpkn.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0eXlqcWlyaHF1ZHhjbXp2cGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5MDQwODAsImV4cCI6MjA1MDQ4MDA4MH0.C5-TaVKtCM_ifFslR2K_0furB-263j7UuGY6QVH0Ays';
+        
+        const { createClient } = supabase;
+        const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const output = document.getElementById('output');
+
+        function log(message, isError = false) {
+            const p = document.createElement('p');
+            p.style.color = isError ? 'red' : 'black';
+            p.textContent = message;
+            output.appendChild(p);
+            console.log(message);
+        }
+
+        async function testProfiles() {
+            try {
+                // 1. S'authentifier
+                log('🔐 Authentification...');
+                const { data: authData, error: authError } = await client.auth.signInWithPassword({
+                    email: 'habibahmat@gmail.com',
+                    password: '77353230'
+                });
+                
+                if (authError) {
+                    log(`❌ Erreur auth: ${authError.message}`, true);
+                    return;
+                }
+                
+                log(`✅ Connecté: ${authData.user.id}`);
+
+                // 2. Test direct avec select()
+                log('\n📊 Test 1: Select simple...');
+                const { data: data1, error: error1 } = await client
+                    .from('profiles')
+                    .select()
+                    .eq('id', authData.user.id);
+                
+                if (error1) {
+                    log(`❌ Erreur select: ${error1.message}`, true);
+                } else {
+                    log(`Type de réponse: ${typeof data1}`);
+                    log(`Données: ${JSON.stringify(data1, null, 2)}`);
+                }
+
+                // 3. Test avec maybeSingle()
+                log('\n📊 Test 2: maybeSingle()...');
+                const { data: data2, error: error2 } = await client
+                    .from('profiles')
+                    .select()
+                    .eq('id', authData.user.id)
+                    .maybeSingle();
+                
+                if (error2) {
+                    log(`❌ Erreur maybeSingle: ${error2.message}`, true);
+                } else {
+                    log(`Type de réponse: ${typeof data2}`);
+                    log(`Données: ${JSON.stringify(data2, null, 2)}`);
+                }
+
+                // 4. Test avec single()
+                log('\n📊 Test 3: single()...');
+                const { data: data3, error: error3 } = await client
+                    .from('profiles')
+                    .select()
+                    .eq('id', authData.user.id)
+                    .single();
+                
+                if (error3) {
+                    log(`❌ Erreur single: ${error3.message}`, true);
+                } else {
+                    log(`Type de réponse: ${typeof data3}`);
+                    log(`Données: ${JSON.stringify(data3, null, 2)}`);
+                }
+
+                // 5. Vérifier la structure de la table
+                log('\n📋 Test 4: Structure de la table...');
+                const { data: allProfiles, error: allError } = await client
+                    .from('profiles')
+                    .select()
+                    .limit(1);
+                
+                if (allError) {
+                    log(`❌ Erreur structure: ${allError.message}`, true);
+                } else {
+                    log(`Exemple de profil:`);
+                    log(JSON.stringify(allProfiles[0], null, 2));
+                    if (allProfiles[0]) {
+                        log(`\nColonnes disponibles: ${Object.keys(allProfiles[0]).join(', ')}`);
+                    }
+                }
+
+            } catch (error) {
+                log(`❌ Erreur générale: ${error.message}`, true);
+            }
+        }
+
+        // Lancer le test
+        testProfiles();
+    </script>
+</body>
+</html>

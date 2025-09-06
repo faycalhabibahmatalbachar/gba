@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Liste Profils Clients</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2d3748;
+            border-bottom: 2px solid #4a5568;
+            padding-bottom: 10px;
+        }
+        .btn {
+            background: #4a5568;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background: #2d3748;
+        }
+        #output {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background: #4a5568;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        .success {
+            color: #22543d;
+            background: #c6f6d5;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #742a2a;
+            background: #fed7d7;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #2c5282;
+            background: #bee3f8;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test Liste des Profils Clients</h1>
+        
+        <p>Cette page teste la récupération des profils clients depuis Supabase.</p>
+        
+        <div>
+            <button class="btn" onclick="loadAllProfiles()">Charger tous les profils</button>
+            <button class="btn" onclick="loadClientProfiles()">Charger profils clients uniquement</button>
+            <button class="btn" onclick="checkAdminProfile()">Vérifier profil admin</button>
+        </div>
+        
+        <div id="output"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        
+        const supabaseUrl = 'https://kquasbipcbqcvwdejtbh.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxdWFzYmlwY2JxY3Z3ZGVqdGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzE0ODAyNTksImV4cCI6MjA0NzA1NjI1OX0.1GW-kvoGe3eCpX7lkkkBTqx-7GYAhBJvlr8ktEf5dko';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        const ADMIN_ID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+        
+        function log(message, type = 'info', isHtml = false) {
+            const output = document.getElementById('output');
+            if (isHtml) {
+                output.innerHTML = message;
+            } else {
+                const div = document.createElement('div');
+                div.className = type;
+                div.textContent = message;
+                output.appendChild(div);
+            }
+        }
+        
+        window.loadAllProfiles = async function() {
+            log('Chargement de tous les profils...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log(`Erreur: ${error.message}`, 'error');
+                    return;
+                }
+                
+                if (!data || data.length === 0) {
+                    log('Aucun profil trouvé', 'info');
+                    return;
+                }
+                
+                log(`✅ ${data.length} profils trouvés`, 'success');
+                
+                let html = '<table>';
+                html += '<tr><th>Avatar</th><th>ID</th><th>Nom</th><th>Email</th><th>Rôle</th><th>Créé le</th></tr>';
+                
+                data.forEach(profile => {
+                    const avatarHtml = profile.avatar_url 
+                        ? `<img src="${profile.avatar_url}" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${profile.first_name || 'U'}&background=4a5568&color=fff'" />` 
+                        : `<div style="width:40px;height:40px;border-radius:50%;background:#4a5568;color:white;display:flex;align-items:center;justify-content:center;">${(profile.first_name || 'U')[0]}</div>`;
+                    
+                    html += `<tr>
+                        <td>${avatarHtml}</td>
+                        <td>${profile.id}</td>
+                        <td>${profile.first_name || ''} ${profile.last_name || ''}</td>
+                        <td>${profile.email || 'N/A'}</td>
+                        <td>${profile.role || 'user'}</td>
+                        <td>${new Date(profile.created_at).toLocaleString('fr-FR')}</td>
+                    </tr>`;
+                });
+                
+                html += '</table>';
+                log(html, 'info', true);
+                
+            } catch (err) {
+                log(`Erreur inattendue: ${err.message}`, 'error');
+            }
+        };
+        
+        window.loadClientProfiles = async function() {
+            log('Chargement des profils clients uniquement...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .neq('id', ADMIN_ID)
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    log(`Erreur: ${error.message}`, 'error');
+                    return;
+                }
+                
+                if (!data || data.length === 0) {
+                    log('Aucun profil client trouvé', 'info');
+                    return;
+                }
+                
+                log(`✅ ${data.length} profils clients trouvés`, 'success');
+                
+                // Vérifier aussi les conversations
+                const { data: conversations, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('*');
+                
+                if (!convError && conversations) {
+                    log(`📧 ${conversations.length} conversations existantes`, 'info');
+                }
+                
+                let html = '<h3>Profils Clients :</h3>';
+                html += '<table>';
+                html += '<tr><th>Avatar</th><th>Nom</th><th>Email</th><th>Téléphone</th><th>Status</th></tr>';
+                
+                data.forEach(profile => {
+                    const avatarHtml = profile.avatar_url 
+                        ? `<img src="${profile.avatar_url}" class="avatar" />` 
+                        : `<div style="width:40px;height:40px;border-radius:50%;background:#4a5568;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;">${(profile.first_name || 'U')[0]}</div>`;
+                    
+                    html += `<tr>
+                        <td>${avatarHtml}</td>
+                        <td>${profile.first_name || 'Client'} ${profile.last_name || ''}</td>
+                        <td>${profile.email || 'N/A'}</td>
+                        <td>${profile.phone || 'N/A'}</td>
+                        <td>${profile.status || 'active'}</td>
+                    </tr>`;
+                });
+                
+                html += '</table>';
+                log(html, 'info', true);
+                
+            } catch (err) {
+                log(`Erreur inattendue: ${err.message}`, 'error');
+            }
+        };
+        
+        window.checkAdminProfile = async function() {
+            log('Vérification du profil admin...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', ADMIN_ID)
+                    .single();
+                
+                if (error && error.code === 'PGRST116') {
+                    log('❌ Le profil admin n\'existe pas!', 'error');
+                    log('Créez le profil admin avec create_admin_profile.html', 'info');
+                    return;
+                }
+                
+                if (error) {
+                    log(`Erreur: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log('✅ Profil admin trouvé:', 'success');
+                log(`Nom: ${data.first_name} ${data.last_name}`, 'info');
+                log(`Email: ${data.email}`, 'info');
+                log(`ID: ${data.id}`, 'info');
+                
+            } catch (err) {
+                log(`Erreur inattendue: ${err.message}`, 'error');
+            }
+        };
+        
+        // Test automatique au chargement
+        window.addEventListener('load', () => {
+            loadClientProfiles();
+        });
+    </script>
+</body>
+</html>

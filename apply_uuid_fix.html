@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Application Fix UUID Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .status-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-left: 4px solid #667eea;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border-left-color: #28a745;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left-color: #dc3545;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left-color: #ffc107;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .info-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #6c757d;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            font-size: 14px;
+            color: #212529;
+            font-family: monospace;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Correction UUID Admin - Messagerie</h1>
+        
+        <div class="status-card" id="mainStatus">
+            <h3>📊 Statut du Système</h3>
+            <p>Page prête. Cliquez sur "Appliquer la correction" pour résoudre l'erreur UUID.</p>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">UUID Admin (Nouveau)</div>
+                <div class="info-value">a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">UUID User Test</div>
+                <div class="info-value">f47ac10b-58cc-4372-a567-0e02b2c3d479</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Ancien ID (Invalide)</div>
+                <div class="info-value" style="text-decoration: line-through; color: #dc3545;">admin-001</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Status</div>
+                <div class="info-value" id="statusValue">Non appliqué</div>
+            </div>
+        </div>
+
+        <div style="margin: 30px 0;">
+            <button class="btn" onclick="applyFix()">
+                🚀 Appliquer la correction
+            </button>
+            <button class="btn btn-success" onclick="testMessage()">
+                ✉️ Tester l'envoi de message
+            </button>
+        </div>
+
+        <div id="results"></div>
+
+        <div class="status-card warning" style="margin-top: 40px;">
+            <h4>📝 Script SQL à exécuter dans Supabase</h4>
+            <p>Si la correction automatique ne fonctionne pas, copiez ce SQL et exécutez-le manuellement dans Supabase SQL Editor :</p>
+            <div class="code-block" id="sqlCode">
+-- Mettre à jour les IDs non-UUID vers des UUIDs valides
+UPDATE chat_messages 
+SET sender_id = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d'
+WHERE sender_id = 'admin-001';
+
+UPDATE chat_conversations
+SET admin_id = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d'
+WHERE admin_id = 'admin-001';
+
+-- Créer une conversation test
+INSERT INTO chat_conversations (
+    user_id, admin_id, status, created_at, updated_at
+) VALUES (
+    'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
+    'active', NOW(), NOW()
+) ON CONFLICT DO NOTHING;
+            </div>
+            <button class="btn" onclick="copySQL()" style="margin-top: 10px;">
+                📋 Copier le SQL
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const ADMIN_UUID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+        const USER_UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('mainStatus');
+            statusDiv.className = `status-card ${type}`;
+            statusDiv.innerHTML = `<h3>📊 Statut du Système</h3><p>${message}</p>`;
+        }
+
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `status-card ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function applyFix() {
+            document.getElementById('results').innerHTML = '';
+            updateStatus('Application de la correction en cours... <span class="spinner"></span>');
+            document.getElementById('statusValue').textContent = 'En cours...';
+
+            try {
+                // Étape 1: Créer ou récupérer une conversation
+                let conversation;
+                const { data: existingConv } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('*')
+                    .eq('admin_id', ADMIN_UUID)
+                    .limit(1)
+                    .single();
+
+                if (existingConv) {
+                    conversation = existingConv;
+                    addResult('✅ Conversation existante trouvée', 'success');
+                } else {
+                    // Créer une nouvelle conversation
+                    const { data: newConv, error: convError } = await supabaseClient
+                        .from('chat_conversations')
+                        .insert([{
+                            user_id: USER_UUID,
+                            admin_id: ADMIN_UUID,
+                            status: 'active',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        }])
+                        .select()
+                        .single();
+
+                    if (convError) {
+                        throw convError;
+                    }
+                    conversation = newConv;
+                    addResult('✅ Nouvelle conversation créée', 'success');
+                }
+
+                // Étape 2: Envoyer un message test
+                const testMessage = `Test UUID - ${new Date().toLocaleString('fr-FR')}`;
+                const { data: message, error: msgError } = await supabaseClient
+                    .from('chat_messages')
+                    .insert([{
+                        conversation_id: conversation.id,
+                        sender_id: ADMIN_UUID,
+                        message: testMessage,
+                        is_read: false,
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (msgError) {
+                    throw msgError;
+                }
+
+                addResult(`✅ Message test envoyé avec succès!<br>ID: ${message.id}`, 'success');
+                document.getElementById('statusValue').textContent = '✅ Appliqué';
+                updateStatus('🎉 Correction appliquée avec succès! Le système de messagerie fonctionne.', 'success');
+
+                // Afficher les détails
+                addResult(`
+                    <h4>📊 Détails de la correction</h4>
+                    <ul>
+                        <li>Conversation ID: ${conversation.id}</li>
+                        <li>Admin UUID: ${ADMIN_UUID}</li>
+                        <li>User UUID: ${USER_UUID}</li>
+                        <li>Message envoyé: "${testMessage}"</li>
+                        <li>Status: Actif</li>
+                    </ul>
+                `, 'success');
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('statusValue').textContent = '❌ Erreur';
+                updateStatus(`❌ Erreur: ${error.message}`, 'error');
+                
+                addResult(`
+                    <h4>⚠️ Erreur détectée</h4>
+                    <p>${error.message}</p>
+                    <p>Veuillez exécuter le script SQL manuellement dans Supabase.</p>
+                `, 'error');
+            }
+        }
+
+        async function testMessage() {
+            updateStatus('Test d\'envoi de message... <span class="spinner"></span>');
+            
+            try {
+                // Récupérer une conversation existante
+                const { data: conv } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('*')
+                    .limit(1)
+                    .single();
+
+                if (!conv) {
+                    throw new Error('Aucune conversation trouvée. Appliquez d\'abord la correction.');
+                }
+
+                // Envoyer un message
+                const { data: message, error } = await supabaseClient
+                    .from('chat_messages')
+                    .insert([{
+                        conversation_id: conv.id,
+                        sender_id: ADMIN_UUID,
+                        message: `Test message - ${new Date().toLocaleTimeString('fr-FR')}`,
+                        is_read: false,
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                updateStatus('✅ Message envoyé avec succès!', 'success');
+                addResult(`
+                    <h4>✉️ Message test envoyé</h4>
+                    <p>ID: ${message.id}</p>
+                    <p>Conversation: ${conv.id}</p>
+                    <p>Timestamp: ${new Date(message.created_at).toLocaleString('fr-FR')}</p>
+                `, 'success');
+
+            } catch (error) {
+                updateStatus(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        function copySQL() {
+            const sqlCode = document.getElementById('sqlCode').textContent;
+            navigator.clipboard.writeText(sqlCode).then(() => {
+                alert('✅ SQL copié dans le presse-papiers!');
+            });
+        }
+
+        // Test de connexion au chargement
+        window.onload = async function() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('count')
+                    .limit(1);
+                
+                if (!error) {
+                    updateStatus('✅ Connexion à Supabase établie. Prêt pour la correction.', 'success');
+                }
+            } catch (e) {
+                updateStatus('⚠️ Problème de connexion à Supabase', 'warning');
+            }
+        }
+    </script>
+</body>
+</html>

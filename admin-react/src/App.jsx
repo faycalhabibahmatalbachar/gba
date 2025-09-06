@@ -15,7 +15,7 @@ import MonitoringCarts from './pages/MonitoringCarts';
 import MonitoringFavorites from './pages/MonitoringFavorites';
 import MonitoringProducts from './pages/MonitoringProducts';
 import Layout from './components/Layout';
-import AdminChatDashboard from './components/messaging/AdminChatDashboard';
+import SimpleAdminChat from './components/messaging/SimpleAdminChat';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -64,7 +64,7 @@ function App() {
         <Route path="monitoring/carts" element={<MonitoringCarts />} />
         <Route path="monitoring/favorites" element={<MonitoringFavorites />} />
         <Route path="monitoring/products" element={<MonitoringProducts />} />
-        <Route path="messages" element={<AdminChatDashboard />} />
+        <Route path="messages" element={<SimpleAdminChat />} />
       </Route>
     </Routes>
   );

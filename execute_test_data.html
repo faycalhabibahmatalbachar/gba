@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Créer des données de test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #45a049; }
+        .btn.danger { background: #f44336; }
+        .btn.danger:hover { background: #da190b; }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .conversation {
+            background: #fff;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #4CAF50;
+            border-radius: 4px;
+        }
+        .message {
+            background: #f9f9f9;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .admin { background: #e3f2fd; }
+        .customer { background: #fff3e0; }
+    </style>
+</head>
+<body>
+    <h1>Créer des données de test pour la messagerie</h1>
+    
+    <div>
+        <button class="btn" onclick="createTestData()">Créer des données de test</button>
+        <button class="btn" onclick="viewConversations()">Voir les conversations</button>
+        <button class="btn danger" onclick="clearAllData()">Effacer toutes les données</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        const { createClient } = supabase;
+        const supabaseUrl = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        const client = createClient(supabaseUrl, supabaseKey);
+        
+        function generateId() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        
+        async function createTestData() {
+            const result = document.getElementById('result');
+            result.innerHTML = '<p>Création des données de test en cours...</p>';
+            
+            try {
+                const adminId = generateId();
+                const customerId1 = generateId();
+                const customerId2 = generateId();
+                const customerId3 = generateId();
+                
+                // Créer plusieurs conversations
+                const conversations = [
+                    {
+                        customer_id: customerId1,
+                        subject: 'Question sur ma commande',
+                        status: 'active',
+                        priority: 'normal',
+                        last_message_at: new Date().toISOString()
+                    },
+                    {
+                        customer_id: customerId2,
+                        subject: 'Problème technique sur l\'application',
+                        status: 'active',
+                        priority: 'high',
+                        last_message_at: new Date().toISOString()
+                    },
+                    {
+                        customer_id: customerId3,
+                        subject: 'Demande de remboursement',
+                        status: 'resolved',
+                        priority: 'normal',
+                        last_message_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+                    }
+                ];
+                
+                let createdConversations = [];
+                
+                for (const conv of conversations) {
+                    const { data, error } = await client
+                        .from('chat_conversations')
+                        .insert(conv)
+                        .select()
+                        .single();
+                    
+                    if (error) {
+                        console.error('Erreur création conversation:', error);
+                        continue;
+                    }
+                    
+                    createdConversations.push(data);
+                }
+                
+                // Créer des messages pour chaque conversation
+                const messagesData = [
+                    // Conversation 1
+                    {
+                        conversation_id: createdConversations[0]?.id,
+                        sender_id: customerId1,
+                        sender_type: 'customer',
+                        message: 'Bonjour, j\'aimerais savoir où en est ma commande ?',
+                        is_read: true
+                    },
+                    {
+                        conversation_id: createdConversations[0]?.id,
+                        sender_id: adminId,
+                        sender_type: 'admin',
+                        message: 'Bonjour ! Je vais vérifier cela pour vous immédiatement.',
+                        is_read: true
+                    },
+                    {
+                        conversation_id: createdConversations[0]?.id,
+                        sender_id: customerId1,
+                        sender_type: 'customer',
+                        message: 'Merci beaucoup pour votre aide !',
+                        is_read: false
+                    },
+                    {
+                        conversation_id: createdConversations[0]?.id,
+                        sender_id: adminId,
+                        sender_type: 'admin',
+                        message: 'Votre commande a été expédiée ce matin. Vous devriez la recevoir dans 2-3 jours.',
+                        is_read: false
+                    },
+                    
+                    // Conversation 2
+                    {
+                        conversation_id: createdConversations[1]?.id,
+                        sender_id: customerId2,
+                        sender_type: 'customer',
+                        message: 'Je n\'arrive pas à me connecter à l\'application',
+                        is_read: true
+                    },
+                    {
+                        conversation_id: createdConversations[1]?.id,
+                        sender_id: adminId,
+                        sender_type: 'admin',
+                        message: 'Pouvez-vous me dire quel message d\'erreur vous recevez ?',
+                        is_read: true
+                    },
+                    {
+                        conversation_id: createdConversations[1]?.id,
+                        sender_id: customerId2,
+                        sender_type: 'customer',
+                        message: 'Il dit "Identifiants incorrects" mais je suis sûr de mon mot de passe',
+                        is_read: false
+                    },
+                    
+                    // Conversation 3
+                    {
+                        conversation_id: createdConversations[2]?.id,
+                        sender_id: customerId3,
+                        sender_type: 'customer',
+                        message: 'J\'aimerais être remboursé pour ma dernière commande',
+                        is_read: true
+                    },
+                    {
+                        conversation_id: createdConversations[2]?.id,
+                        sender_id: adminId,
+                        sender_type: 'admin',
+                        message: 'Le remboursement a été effectué. Vous devriez le recevoir dans 3-5 jours ouvrables.',
+                        is_read: true
+                    }
+                ];
+                
+                // Insérer les messages
+                for (const msg of messagesData) {
+                    if (msg.conversation_id) {
+                        const { error } = await client
+                            .from('chat_messages')
+                            .insert(msg);
+                        
+                        if (error) {
+                            console.error('Erreur création message:', error);
+                        }
+                    }
+                }
+                
+                result.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Données de test créées avec succès !</h3>
+                        <p>${createdConversations.length} conversations créées</p>
+                        <p>${messagesData.filter(m => m.conversation_id).length} messages créés</p>
+                    </div>
+                `;
+                
+                // Afficher les conversations créées
+                setTimeout(() => viewConversations(), 1000);
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">Erreur : ${error.message}</div>`;
+                console.error('Erreur:', error);
+            }
+        }
+        
+        async function viewConversations() {
+            const result = document.getElementById('result');
+            result.innerHTML = '<p>Chargement des conversations...</p>';
+            
+            try {
+                // Récupérer les conversations avec leurs messages
+                const { data: conversations, error } = await client
+                    .from('chat_conversations')
+                    .select(`
+                        *,
+                        messages:chat_messages(*)
+                    `)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                if (!conversations || conversations.length === 0) {
+                    result.innerHTML = '<p>Aucune conversation trouvée</p>';
+                    return;
+                }
+                
+                let html = `<h3>📬 ${conversations.length} Conversations</h3>`;
+                
+                for (const conv of conversations) {
+                    const messageCount = conv.messages ? conv.messages.length : 0;
+                    const statusColor = conv.status === 'active' ? 'green' : 'gray';
+                    const priorityEmoji = conv.priority === 'high' ? '🔴' : '⚪';
+                    
+                    html += `
+                        <div class="conversation">
+                            <strong>${priorityEmoji} ${conv.subject}</strong>
+                            <br>
+                            <small>
+                                Status: <span style="color: ${statusColor}">${conv.status}</span> | 
+                                Messages: ${messageCount} |
+                                Créé: ${new Date(conv.created_at).toLocaleDateString()}
+                            </small>
+                            <div style="margin-top: 10px;">
+                    `;
+                    
+                    if (conv.messages) {
+                        for (const msg of conv.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))) {
+                            const msgClass = msg.sender_type === 'admin' ? 'admin' : 'customer';
+                            html += `
+                                <div class="message ${msgClass}">
+                                    <strong>${msg.sender_type === 'admin' ? '👨‍💼 Admin' : '👤 Client'}:</strong>
+                                    ${msg.message}
+                                    <br>
+                                    <small>${new Date(msg.created_at).toLocaleString()}</small>
+                                </div>
+                            `;
+                        }
+                    }
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                result.innerHTML = html;
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">Erreur : ${error.message}</div>`;
+                console.error('Erreur:', error);
+            }
+        }
+        
+        async function clearAllData() {
+            if (!confirm('Êtes-vous sûr de vouloir effacer toutes les données de test ?')) {
+                return;
+            }
+            
+            const result = document.getElementById('result');
+            result.innerHTML = '<p>Suppression des données...</p>';
+            
+            try {
+                // Supprimer d'abord les messages
+                await client.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                
+                // Puis les conversations
+                await client.from('chat_conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                
+                result.innerHTML = '<div class="success">✅ Toutes les données ont été supprimées</div>';
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">Erreur : ${error.message}</div>`;
+                console.error('Erreur:', error);
+            }
+        }
+    </script>
+</body>
+</html>

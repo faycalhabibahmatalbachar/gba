@@ -251,11 +251,27 @@ class SupabaseService {
           .from('profiles')
           .select()
           .eq('id', currentUser!.id)
-          .single();
+          .maybeSingle();
+      
+      // Debug log
+      print('Profile response type: ${response.runtimeType}');
+      print('Profile response: $response');
+      
+      if (response == null) {
+        print('No profile found for user ${currentUser!.id}');
+        return null;
+      }
+      
+      // Ensure response is a Map
+      if (response is! Map<String, dynamic>) {
+        print('Unexpected response type: ${response.runtimeType}');
+        return null;
+      }
       
       return UserProfile.fromJson(response);
     } catch (e) {
       print('Error fetching user profile: $e');
+      print('Stack trace: ${StackTrace.current}');
       return null;
     }
   }

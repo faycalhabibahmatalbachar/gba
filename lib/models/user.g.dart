@@ -9,29 +9,48 @@ part of 'user.dart';
 _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
     _$UserProfileImpl(
       id: json['id'] as String,
-      fullName: json['fullName'] as String?,
       email: json['email'] as String?,
+      firstName: json['first_name'] as String?,
+      lastName: json['last_name'] as String?,
       phone: json['phone'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
-      address: json['address'] as Map<String, dynamic>? ?? const {},
-      preferences: json['preferences'] as Map<String, dynamic>? ?? const {},
-      createdAt: json['createdAt'] == null
+      bio: json['bio'] as String?,
+      address: json['address'] as String?,
+      city: json['city'] as String?,
+      postalCode: json['postal_code'] as String?,
+      country: json['country'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      loyaltyPoints: (json['loyalty_points'] as num?)?.toInt() ?? 0,
+      isPremium: json['is_premium'] as bool? ?? false,
+      notificationPreferences:
+          json['notification_preferences'] as Map<String, dynamic>?,
+      memberSince: json['member_since'] == null
           ? null
-          : DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] == null
+          : DateTime.parse(json['member_since'] as String),
+      createdAt: json['created_at'] == null
           ? null
-          : DateTime.parse(json['updatedAt'] as String),
+          : DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] == null
+          ? null
+          : DateTime.parse(json['updated_at'] as String),
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'fullName': instance.fullName,
       'email': instance.email,
+      'first_name': instance.firstName,
+      'last_name': instance.lastName,
       'phone': instance.phone,
-      'avatarUrl': instance.avatarUrl,
+      'bio': instance.bio,
       'address': instance.address,
-      'preferences': instance.preferences,
-      'createdAt': instance.createdAt?.toIso8601String(),
-      'updatedAt': instance.updatedAt?.toIso8601String(),
+      'city': instance.city,
+      'postal_code': instance.postalCode,
+      'country': instance.country,
+      'avatar_url': instance.avatarUrl,
+      'loyalty_points': instance.loyaltyPoints,
+      'is_premium': instance.isPremium,
+      'notification_preferences': instance.notificationPreferences,
+      'member_since': instance.memberSince?.toIso8601String(),
+      'created_at': instance.createdAt?.toIso8601String(),
+      'updated_at': instance.updatedAt?.toIso8601String(),
     };

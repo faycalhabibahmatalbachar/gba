@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/animated_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/auth/login_screen.dart';
@@ -11,18 +12,42 @@ import '../screens/cart_screen_premium.dart';
 import '../screens/profile_screen_premium.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/chat/conversations_list_screen.dart';
+import '../screens/chat/admin_chat_screen.dart';
+import '../screens/bloc_screen.dart';
 
 class AppRoutes {
   static final router = GoRouter(
     initialLocation: '/',
-    redirect: (context, state) {
-      final session = Supabase.instance.client.auth.currentSession;
+    redirect: (context, state) async {
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
       final isLoggedIn = session != null;
       final isAuthRoute = state.matchedLocation == '/login' || 
                          state.matchedLocation == '/register';
+      final isBlockedRoute = state.matchedLocation == '/blocked';
+      
+      // Si connecté, vérifier si l'utilisateur est bloqué
+      if (isLoggedIn && !isBlockedRoute) {
+        try {
+          final userId = supabase.auth.currentUser?.id;
+          if (userId != null) {
+            final response = await supabase
+                .from('profiles')
+                .select('is_blocked')
+                .eq('id', userId)
+                .single();
+            
+            if (response['is_blocked'] == true) {
+              return '/blocked';
+            }
+          }
+        } catch (e) {
+          print('Erreur vérification blocage: $e');
+        }
+      }
       
       // If not logged in and trying to access protected routes
-      if (!isLoggedIn && !isAuthRoute) {
+      if (!isLoggedIn && !isAuthRoute && !isBlockedRoute) {
         return '/login';
       }
       
@@ -52,45 +77,335 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/home',
-        builder: (context, state) => const HomeScreenPremium(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const HomeScreenPremium(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOutCubic,
+              ),
+              child: ScaleTransition(
+                scale: Tween<double>(
+                  begin: 0.95,
+                  end: 1.0,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutBack,
+                )),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/categories',
-        builder: (context, state) => const CategoriesScreenPremium(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const CategoriesScreenPremium(),
+          transitionDuration: const Duration(milliseconds: 600),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutQuart,
+              )),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: const Interval(0.0, 0.5),
+                ),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/cart',
-        builder: (context, state) => const CartScreenPremium(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const CartScreenPremium(),
+          transitionDuration: const Duration(milliseconds: 500),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, 1.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeIn,
+                ),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/profile',
-        builder: (context, state) => const ProfileScreenPremium(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const ProfileScreenPremium(),
+          transitionDuration: const Duration(milliseconds: 900),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // Animation Parallax + Zoom spectaculaire
+            final curvedAnimation = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutExpo,
+            );
+            
+            // Effet de zoom explosif
+            final zoomAnimation = Tween<double>(
+              begin: 0.0,
+              end: 1.0,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: const Interval(0.0, 0.7, curve: Curves.elasticOut),
+            ));
+            
+            // Effet parallax sur la page précédente
+            return Stack(
+              children: [
+                // Page précédente avec effet parallax
+                if (secondaryAnimation.status != AnimationStatus.dismissed)
+                  AnimatedBuilder(
+                    animation: secondaryAnimation,
+                    builder: (context, _) {
+                      return Transform(
+                        transform: Matrix4.identity()
+                          ..setEntry(3, 2, 0.002)
+                          ..translate(
+                            -MediaQuery.of(context).size.width * 0.3 * secondaryAnimation.value,
+                            0.0,
+                            -100 * secondaryAnimation.value,
+                          )
+                          ..scale(1.0 - (0.2 * secondaryAnimation.value)),
+                        child: Container(
+                          color: Colors.black.withOpacity(0.5 * secondaryAnimation.value),
+                        ),
+                      );
+                    },
+                  ),
+                // Nouvelle page avec effet zoom explosif
+                Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.002)
+                    ..scale(zoomAnimation.value)
+                    ..rotateZ(0.05 * (1 - animation.value)),
+                  child: FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: animation,
+                      curve: const Interval(0.3, 1.0),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3 * animation.value),
+                            blurRadius: 30 * animation.value,
+                            spreadRadius: 10 * animation.value,
+                          ),
+                        ],
+                      ),
+                      child: child,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/product/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final productId = state.pathParameters['id']!;
-          return ProductDetailScreen(productId: productId);
+          return CustomTransitionPage(
+            child: ProductDetailScreen(productId: productId),
+            transitionDuration: const Duration(milliseconds: 600),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0);
+              const end = Offset.zero;
+              const curve = Curves.easeOutQuart;
+              
+              var tween = Tween(begin: begin, end: end).chain(
+                CurveTween(curve: curve),
+              );
+              
+              return SlideTransition(
+                position: animation.drive(tween),
+                child: FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: animation,
+                    curve: const Interval(0.2, 1.0),
+                  ),
+                  child: child,
+                ),
+              );
+            },
+          );
         },
       ),
       GoRoute(
         path: '/favorites',
-        builder: (context, state) => const FavoritesScreenPremium(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const FavoritesScreenPremium(),
+          transitionDuration: const Duration(milliseconds: 500),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(-1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeIn,
+                ),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/messages',
-        builder: (context, state) => const ConversationsListScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const ConversationsListScreen(),
+          transitionDuration: const Duration(milliseconds: 600),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, -1.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutQuart,
+              )),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: const Interval(0.3, 1.0),
+                ),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/chat/:conversationId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final conversationId = state.pathParameters['conversationId'];
-          return ChatScreen(conversationId: conversationId);
+          return CustomTransitionPage(
+            child: ChatScreen(conversationId: conversationId),
+            transitionDuration: const Duration(milliseconds: 500),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                )),
+                child: FadeTransition(
+                  opacity: animation,
+                  child: child,
+                ),
+              );
+            },
+          );
         },
       ),
       GoRoute(
         path: '/chat',
-        builder: (context, state) => const ChatScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const ChatScreen(),
+          transitionDuration: const Duration(milliseconds: 500),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+            );
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/admin-chat',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const AdminChatScreen(),
+          transitionDuration: const Duration(milliseconds: 800),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return Transform(
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.002)
+                ..rotateX(-animation.value * 0.2),
+              alignment: Alignment.topCenter,
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                ),
+                child: ScaleTransition(
+                  scale: Tween<double>(
+                    begin: 0.9,
+                    end: 1.0,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutBack,
+                  )),
+                  child: child,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/blocked',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const BlocScreen(),
+          transitionDuration: const Duration(milliseconds: 1200),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeIn,
+              ),
+              child: ScaleTransition(
+                scale: Tween<double>(
+                  begin: 1.5,
+                  end: 1.0,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                )),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
     ],
   );

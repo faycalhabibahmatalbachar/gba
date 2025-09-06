@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../providers/favorites_provider.dart';
 import '../models/product.dart';
 import '../localization/app_localizations.dart';
-import '../screens/product_detail_screen_premium.dart';
 import '../widgets/bottom_nav_bar.dart';
+import 'product/product_detail_screen.dart';
 
 class FavoritesScreenPremium extends ConsumerStatefulWidget {
   const FavoritesScreenPremium({super.key});
@@ -19,6 +20,15 @@ class FavoritesScreenPremium extends ConsumerStatefulWidget {
 
 class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     with TickerProviderStateMixin {
+  
+  String _getCorrectImageUrl(String url) {
+    // Correction des URLs avec double /products/
+    if (url.contains('/products/products/')) {
+      url = url.replaceAll('/products/products/', '/products/');
+    }
+    // L'URL est déjà complète, pas besoin de modifier
+    return url;
+  }
   late AnimationController _fadeController;
   late AnimationController _scaleController;
   late AnimationController _heartBeatController;
@@ -604,71 +614,42 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                     child: Builder(
                       builder: (context) {
+                        // Debug logging
+                        print('🔍 Checking image for product: ${product.name}');
+                        print('   mainImage value: ${product.mainImage}');
+                        print('   mainImage is null: ${product.mainImage == null}');
+                        print('   mainImage is empty: ${product.mainImage?.isEmpty ?? true}');
+                        
                         if (product.mainImage != null && product.mainImage!.isNotEmpty) {
-                          // Corriger le double "products/products" dans l'URL
-                          String imageUrl = product.mainImage!;
-                          if (imageUrl.contains('/products/products/')) {
-                            imageUrl = imageUrl.replaceAll('/products/products/', '/products/');
-                            print('🔧 URL corrigée de double products');
-                          }
+                          final imageUrl = _getCorrectImageUrl(product.mainImage!);
+                          print('   ✅ Using image URL: $imageUrl');
                           
-                          // Log de l'URL finale
-                          print('🖼️ Tentative de chargement image pour ${product.name}');
-                          print('🔗 URL finale: $imageUrl');
-                          
-                          return Image.network(
-                            imageUrl,
+                          return CachedNetworkImage(
+                            imageUrl: imageUrl,
                             width: double.infinity,
                             height: 140,
                             fit: BoxFit.cover,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) {
-                                return child;
-                              }
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  strokeWidth: 2,
-                                  color: const Color(0xFF667eea),
+                            placeholder: (context, url) => Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              height: 140,
+                              color: Colors.grey.shade200,
+                              child: Center(
+                                child: Icon(
+                                  FontAwesomeIcons.boxOpen,
+                                  color: Colors.grey[400],
+                                  size: 40,
                                 ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              print('❌ ERREUR chargement image pour ${product.name}');
-                              print('   🔗 URL tentée: $imageUrl');
-                              print('   ⚠️ Type erreur: ${error.runtimeType}');
-                              print('   📝 Message: $error');
-                              return Container(
-                                height: 140,
-                                color: Colors.grey.shade200,
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        FontAwesomeIcons.image,
-                                        color: Colors.grey[400],
-                                        size: 30,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Image non disponible',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey.shade500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
+                              ),
+                            ),
                           );
                         } else {
                           print('⚠️ Pas d\'image pour le produit: ${product.name}');
+                          print('   mainImage raw value: "${product.mainImage}"');
                           return Container(
                             height: 140,
                             color: Colors.grey.shade200,
@@ -715,7 +696,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
                           ),
                         const SizedBox(height: 4),
                         Text(
-                          '€${product.price.toStringAsFixed(2)}',
+                          '${(product.price * 655.957).toStringAsFixed(0)} FCFA',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -787,17 +768,21 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: product.mainImage != null
-                      ? Image.network(
-                          product.mainImage!,
+                      ? CachedNetworkImage(
+                          imageUrl: _getCorrectImageUrl(product.mainImage!),
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Center(
-                              child: Icon(
-                                FontAwesomeIcons.boxOpen,
-                                color: Colors.grey[400],
-                              ),
-                            );
-                          },
+                          placeholder: (context, url) => Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Center(
+                            child: Icon(
+                              FontAwesomeIcons.boxOpen,
+                              color: Colors.grey[400],
+                            ),
+                          ),
                         )
                       : Center(
                           child: Icon(
@@ -832,7 +817,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '€${product.price.toStringAsFixed(2)}',
+                      '${(product.price * 655.957).toStringAsFixed(0)} FCFA',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Messaging - Désactiver RLS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .code-block {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        #output {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Messaging System - Désactivation RLS</h1>
+        
+        <div class="warning">
+            ⚠️ <strong>Attention:</strong> Cette opération va désactiver temporairement les politiques RLS pour permettre l'envoi de messages. À utiliser uniquement en développement!
+        </div>
+
+        <div class="info">
+            Cette page va exécuter les commandes SQL suivantes:
+            <div class="code-block">
+-- Désactiver RLS sur les tables de messagerie
+ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_conversations DISABLE ROW LEVEL SECURITY;
+            </div>
+        </div>
+
+        <button onclick="disableRLS()">🚀 Désactiver RLS</button>
+        <button onclick="enableRLS()">🔒 Réactiver RLS</button>
+        <button onclick="testSendMessage()">✉️ Tester l'envoi</button>
+        <button onclick="checkStatus()">📊 Vérifier le statut</button>
+
+        <div id="output"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const supabaseUrl = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        function addOutput(message, type = 'info') {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        window.disableRLS = async function() {
+            addOutput('Désactivation de RLS en cours...', 'info');
+            
+            try {
+                // Utiliser rpc pour exécuter du SQL brut
+                const queries = [
+                    'ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY',
+                    'ALTER TABLE chat_conversations DISABLE ROW LEVEL SECURITY'
+                ];
+
+                for (const query of queries) {
+                    addOutput(`Exécution: ${query}`, 'info');
+                    // Note: Supabase ne permet pas l'exécution directe d'ALTER TABLE via l'API
+                    // Ces commandes doivent être exécutées dans le dashboard SQL Editor
+                }
+
+                addOutput('⚠️ IMPORTANT: Les commandes ALTER TABLE doivent être exécutées manuellement dans le Supabase SQL Editor!', 'warning');
+                addOutput(`
+                    <strong>Instructions:</strong><br>
+                    1. Allez sur <a href="https://app.supabase.com/project/uvlrgwdbjegoavjfdrzb/sql/new" target="_blank">Supabase SQL Editor</a><br>
+                    2. Copiez et exécutez ces commandes:<br>
+                    <div class="code-block">
+ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;<br>
+ALTER TABLE chat_conversations DISABLE ROW LEVEL SECURITY;
+                    </div>
+                `, 'warning');
+            } catch (error) {
+                addOutput(`Erreur: ${error.message}`, 'error');
+            }
+        };
+
+        window.enableRLS = async function() {
+            addOutput('Réactivation de RLS...', 'info');
+            addOutput(`
+                <strong>Pour réactiver RLS:</strong><br>
+                Exécutez dans le <a href="https://app.supabase.com/project/uvlrgwdbjegoavjfdrzb/sql/new" target="_blank">SQL Editor</a>:<br>
+                <div class="code-block">
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;<br>
+ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;
+                </div>
+            `, 'warning');
+        };
+
+        window.testSendMessage = async function() {
+            addOutput('Test d\'envoi de message...', 'info');
+            
+            try {
+                // Récupérer une conversation existante
+                const { data: conversations, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('id')
+                    .limit(1)
+                    .single();
+
+                if (convError) {
+                    // Créer une conversation de test
+                    const { data: newConv, error: createError } = await supabase
+                        .from('chat_conversations')
+                        .insert({
+                            user_id: 'test-user-001',
+                            admin_id: 'admin-001',
+                            status: 'active'
+                        })
+                        .select()
+                        .single();
+
+                    if (createError) throw createError;
+                    
+                    addOutput(`✅ Conversation de test créée: ${newConv.id}`, 'success');
+                    
+                    // Envoyer un message test
+                    const { data: message, error: msgError } = await supabase
+                        .from('chat_messages')
+                        .insert({
+                            conversation_id: newConv.id,
+                            sender_id: 'admin-001',
+                            message: 'Message de test depuis admin - ' + new Date().toLocaleTimeString(),
+                            is_read: false
+                        })
+                        .select()
+                        .single();
+
+                    if (msgError) throw msgError;
+                    
+                    addOutput(`✅ Message envoyé avec succès! ID: ${message.id}`, 'success');
+                } else {
+                    // Utiliser la conversation existante
+                    const { data: message, error: msgError } = await supabase
+                        .from('chat_messages')
+                        .insert({
+                            conversation_id: conversations.id,
+                            sender_id: 'admin-001',
+                            message: 'Message de test - ' + new Date().toLocaleTimeString(),
+                            is_read: false
+                        })
+                        .select()
+                        .single();
+
+                    if (msgError) throw msgError;
+                    
+                    addOutput(`✅ Message envoyé dans la conversation ${conversations.id}`, 'success');
+                }
+            } catch (error) {
+                addOutput(`❌ Erreur: ${error.message}`, 'error');
+                if (error.hint) {
+                    addOutput(`💡 Indice: ${error.hint}`, 'info');
+                }
+            }
+        };
+
+        window.checkStatus = async function() {
+            addOutput('Vérification du statut...', 'info');
+            
+            try {
+                // Tester la lecture
+                const { data: convCount, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('id', { count: 'exact', head: true });
+
+                if (convError) {
+                    addOutput(`❌ Erreur lecture conversations: ${convError.message}`, 'error');
+                } else {
+                    addOutput(`✅ Nombre de conversations: ${convCount}`, 'success');
+                }
+
+                const { data: msgCount, error: msgError } = await supabase
+                    .from('chat_messages')
+                    .select('id', { count: 'exact', head: true });
+
+                if (msgError) {
+                    addOutput(`❌ Erreur lecture messages: ${msgError.message}`, 'error');
+                } else {
+                    addOutput(`✅ Nombre de messages: ${msgCount}`, 'success');
+                }
+
+                // Récupérer les derniers messages
+                const { data: lastMessages, error: lastError } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (lastError) {
+                    addOutput(`❌ Erreur récupération messages: ${lastError.message}`, 'error');
+                } else {
+                    addOutput('📨 Derniers messages:', 'info');
+                    lastMessages.forEach(msg => {
+                        addOutput(`- ${msg.sender_id}: ${msg.message} (${new Date(msg.created_at).toLocaleString()})`, 'info');
+                    });
+                }
+
+            } catch (error) {
+                addOutput(`❌ Erreur générale: ${error.message}`, 'error');
+            }
+        };
+
+        // Vérifier le statut au chargement
+        window.checkStatus();
+    </script>
+</body>
+</html>

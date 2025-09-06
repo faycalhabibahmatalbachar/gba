@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'dart:math' as math;
-import '../models/cart_item.dart';
 import '../providers/cart_provider.dart';
+import '../models/cart_item.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/bottom_nav_bar.dart';
 
@@ -30,6 +28,15 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
   late Animation<double> _scaleAnimation;
   final Map<String, AnimationController> _deleteAnimations = {};
   bool _isProcessingCheckout = false;
+
+  String _getCorrectImageUrl(String url) {
+    // Correction des URLs avec double /products/
+    if (url.contains('/products/products/')) {
+      return url.replaceAll('/products/products/', '/products/');
+    }
+    // L'URL est déjà complète depuis la DB
+    return url;
+  }
 
   @override
   void initState() {
@@ -256,7 +263,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
             ),
             const SizedBox(height: 32),
             _buildGlassmorphicButton(
-              onPressed: () => context.go('/home'),
+              onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
               icon: FontAwesomeIcons.arrowLeft,
               label: 'Continuer vos achats',
             ),
@@ -312,7 +319,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
-                          '€${total.toStringAsFixed(2)}',
+                          '${(total * 655.957).toStringAsFixed(0)} FCFA',
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -468,38 +475,37 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: item.product?.mainImage != null
-                                ? CachedNetworkImage(
-                                    imageUrl: item.product!.mainImage!,
+                            child: Builder(
+                              builder: (context) {
+                                print('🔍 Cart - Checking image for: ${item.product?.name}');
+                                print('   mainImage: ${item.product?.mainImage}');
+                                print('   is null: ${item.product?.mainImage == null}');
+                                print('   is empty: ${item.product?.mainImage?.isEmpty ?? true}');
+                                
+                                if (item.product?.mainImage != null && item.product!.mainImage!.isNotEmpty) {
+                                  return CachedNetworkImage(
+                                    imageUrl: _getCorrectImageUrl(item.product!.mainImage!),
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => Icon(
-                                      FontAwesomeIcons.spinner,
+                                    placeholder: (context, url) => Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) => Icon(
+                                      FontAwesomeIcons.boxOpen,
                                       color: Colors.grey[400],
                                     ),
-                                    errorWidget: (context, url, error) {
-                                      // Correction automatique des URLs avec double products
-                                      String correctedUrl = url;
-                                      if (url.contains('/products/products/')) {
-                                        correctedUrl = url.replaceAll('/products/products/', '/products/');
-                                        return CachedNetworkImage(
-                                          imageUrl: correctedUrl,
-                                          fit: BoxFit.cover,
-                                          errorWidget: (context, url2, error2) => Icon(
-                                            FontAwesomeIcons.boxOpen,
-                                            color: Colors.grey[400],
-                                          ),
-                                        );
-                                      }
-                                      return Icon(
-                                        FontAwesomeIcons.boxOpen,
-                                        color: Colors.grey[400],
-                                      );
-                                    },
-                                  )
-                                : Icon(
+                                  );
+                                } else {
+                                  print('⚠️ No image for cart item: ${item.product?.name}');
+                                  return Icon(
                                     FontAwesomeIcons.boxOpen,
                                     color: Colors.grey[400],
-                                  ),
+                                  );
+                                }
+                              },
+                            ),
                           ),
                         ),
                       ),
@@ -530,7 +536,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                             Wrap(
                               children: [
                                 Text(
-                                  '€${item.product?.price.toStringAsFixed(2) ?? '0.00'}',
+                                  '${((item.product?.price ?? 0) * 655.957).toStringAsFixed(0)} FCFA',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -656,36 +662,6 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
         top: false,
         child: Column(
           children: [
-            // Promo code input
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(FontAwesomeIcons.ticket, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Code promo',
-                        hintStyle: TextStyle(color: Colors.grey[500]),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                    },
-                    child: const Text('Appliquer'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
             // Total row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -704,17 +680,10 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        const Text(
-                          '€',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                         Text(
-                          total.toStringAsFixed(2),
+                          '${(total * 655.957).toStringAsFixed(0)} FCFA',
                           style: const TextStyle(
-                            fontSize: 28,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

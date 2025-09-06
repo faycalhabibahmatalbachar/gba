@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Groupement par Utilisateur</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+
+        #status, #results {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            min-height: 60px;
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #status {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            color: #0369a1;
+        }
+
+        #results {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #495057;
+        }
+
+        .success {
+            background: #d4edda !important;
+            border-color: #c3e6cb !important;
+            color: #155724 !important;
+        }
+
+        .error {
+            background: #f8d7da !important;
+            border-color: #f5c6cb !important;
+            color: #721c24 !important;
+        }
+
+        .warning {
+            background: #fff3cd !important;
+            border-color: #ffeaa7 !important;
+            color: #856404 !important;
+        }
+
+        .user-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .user-card h4 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .user-card p {
+            color: #666;
+            font-size: 14px;
+            margin: 2px 0;
+        }
+
+        .conversation-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗨️ Test Groupement Messages par Utilisateur</h1>
+        <p class="subtitle">Configuration et test du nouveau système de messagerie groupé par utilisateur</p>
+
+        <div class="section">
+            <div id="status">Prêt à commencer les tests...</div>
+        </div>
+
+        <div class="action-buttons">
+            <button onclick="createTestUser()">
+                1. Créer Utilisateur Test
+            </button>
+            <button onclick="createMultipleConversations()">
+                2. Créer Conversations Multiples
+            </button>
+            <button onclick="addTestMessages()">
+                3. Ajouter Messages Test
+            </button>
+            <button onclick="viewUserData()">
+                4. Voir Données Utilisateur
+            </button>
+            <button onclick="testRealtimeUpdates()">
+                5. Tester Temps Réel
+            </button>
+            <button onclick="clearAllData()">
+                ⚠️ Nettoyer Données
+            </button>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Résultats</div>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Configuration Supabase
+        const supabaseUrl = 'https://ptnhqmonekdwymqbnpcc.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0bmhxbW9uZWtkd3ltcWJucGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzE2NTA5NTksImV4cCI6MjA0NzIyNjk1OX0.7z1jB5B3Hm_8inFEE0AFr5ZKPkQOs2gFvTFtJhYvQAc';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // UUID de l'utilisateur test
+        const TEST_USER_ID = '60074c92-45c8-4ccb-a03c-466528d3dd43';
+        const ADMIN_ID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = type;
+        }
+
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString('fr-FR');
+            const entry = document.createElement('div');
+            entry.className = `conversation-item ${type}`;
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            results.appendChild(entry);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function createTestUser() {
+            updateStatus('Création de l\'utilisateur test...', 'info');
+
+            try {
+                // Vérifier si l'utilisateur existe déjà
+                const { data: existingUser, error: checkError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', TEST_USER_ID)
+                    .single();
+
+                if (existingUser) {
+                    updateStatus('L\'utilisateur existe déjà', 'warning');
+                    addResult(`Utilisateur trouvé: ${existingUser.first_name} ${existingUser.last_name}`, 'warning');
+                    return;
+                }
+
+                // Créer l'utilisateur dans la table profiles
+                const { data: newProfile, error: profileError } = await supabase
+                    .from('profiles')
+                    .insert([{
+                        id: TEST_USER_ID,
+                        email: 'test.user@example.com',
+                        first_name: 'Jean',
+                        last_name: 'Dupont',
+                        phone: '+33 6 12 34 56 78',
+                        role: 'customer',
+                        avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jean',
+                        last_updated: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (profileError) throw profileError;
+
+                updateStatus('Utilisateur créé avec succès!', 'success');
+                addResult(`Utilisateur créé: ${newProfile.first_name} ${newProfile.last_name} (${TEST_USER_ID})`, 'success');
+
+            } catch (error) {
+                updateStatus(`Erreur: ${error.message}`, 'error');
+                addResult(`Erreur création utilisateur: ${error.message}`, 'error');
+            }
+        }
+
+        async function createMultipleConversations() {
+            updateStatus('Création de conversations multiples...', 'info');
+
+            try {
+                // Créer 3 conversations avec différents statuts
+                const conversations = [
+                    {
+                        user_id: TEST_USER_ID,
+                        admin_id: ADMIN_ID,
+                        status: 'active',
+                        order_id: 'ORD-2024-001',
+                        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                        updated_at: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+                    },
+                    {
+                        user_id: TEST_USER_ID,
+                        admin_id: ADMIN_ID,
+                        status: 'pending',
+                        order_id: 'ORD-2024-002',
+                        created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                        updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+                    },
+                    {
+                        user_id: TEST_USER_ID,
+                        admin_id: ADMIN_ID,
+                        status: 'resolved',
+                        order_id: null,
+                        created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+                        updated_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+                    }
+                ];
+
+                const { data, error } = await supabase
+                    .from('chat_conversations')
+                    .insert(conversations)
+                    .select();
+
+                if (error) throw error;
+
+                updateStatus(`${data.length} conversations créées!`, 'success');
+                data.forEach(conv => {
+                    addResult(`Conversation créée: ${conv.id} - Statut: ${conv.status}`, 'success');
+                });
+
+                return data;
+
+            } catch (error) {
+                updateStatus(`Erreur: ${error.message}`, 'error');
+                addResult(`Erreur création conversations: ${error.message}`, 'error');
+            }
+        }
+
+        async function addTestMessages() {
+            updateStatus('Ajout de messages test...', 'info');
+
+            try {
+                // Récupérer les conversations existantes
+                const { data: conversations, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .eq('user_id', TEST_USER_ID);
+
+                if (convError) throw convError;
+                if (!conversations || conversations.length === 0) {
+                    throw new Error('Aucune conversation trouvée. Créez d\'abord des conversations.');
+                }
+
+                // Créer des messages pour chaque conversation
+                const messages = [];
+                conversations.forEach(conv => {
+                    // Messages de l'utilisateur
+                    messages.push({
+                        conversation_id: conv.id,
+                        sender_id: TEST_USER_ID,
+                        message: 'Bonjour, j\'ai une question concernant ma commande.',
+                        is_read: true,
+                        created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString()
+                    });
+
+                    // Réponse de l'admin
+                    messages.push({
+                        conversation_id: conv.id,
+                        sender_id: ADMIN_ID,
+                        message: 'Bonjour ! Je suis là pour vous aider. Quelle est votre question ?',
+                        is_read: true,
+                        created_at: new Date(Date.now() - 55 * 60 * 1000).toISOString()
+                    });
+
+                    // Message récent de l'utilisateur
+                    messages.push({
+                        conversation_id: conv.id,
+                        sender_id: TEST_USER_ID,
+                        message: 'Quand sera livrée ma commande ?',
+                        is_read: false,
+                        created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+                    });
+                });
+
+                const { data, error } = await supabase
+                    .from('chat_messages')
+                    .insert(messages)
+                    .select();
+
+                if (error) throw error;
+
+                updateStatus(`${data.length} messages créés!`, 'success');
+                addResult(`Messages ajoutés dans ${conversations.length} conversations`, 'success');
+
+            } catch (error) {
+                updateStatus(`Erreur: ${error.message}`, 'error');
+                addResult(`Erreur ajout messages: ${error.message}`, 'error');
+            }
+        }
+
+        async function viewUserData() {
+            updateStatus('Chargement des données utilisateur...', 'info');
+
+            try {
+                // Récupérer le profil utilisateur
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', TEST_USER_ID)
+                    .single();
+
+                if (profileError) throw profileError;
+
+                // Récupérer les conversations
+                const { data: conversations, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .eq('user_id', TEST_USER_ID)
+                    .order('updated_at', { ascending: false });
+
+                if (convError) throw convError;
+
+                // Récupérer le dernier message
+                const { data: lastMessage, error: msgError } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .eq('sender_id', TEST_USER_ID)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (msgError) throw msgError;
+
+                updateStatus('Données chargées avec succès!', 'success');
+
+                // Afficher les résultats
+                addResult(`<strong>Profil Utilisateur:</strong>`, 'info');
+                addResult(`- Nom: ${profile.first_name} ${profile.last_name}`, 'info');
+                addResult(`- Email: ${profile.email}`, 'info');
+                addResult(`- Téléphone: ${profile.phone || 'Non défini'}`, 'info');
+                
+                addResult(`<strong>Conversations (${conversations.length}):</strong>`, 'info');
+                conversations.forEach(conv => {
+                    const status = conv.status || 'Non défini';
+                    const order = conv.order_id || 'Général';
+                    addResult(`- ${status.toUpperCase()} | Commande: ${order}`, 'info');
+                });
+
+                if (lastMessage && lastMessage.length > 0) {
+                    addResult(`<strong>Dernier message:</strong> "${lastMessage[0].message}"`, 'info');
+                }
+
+            } catch (error) {
+                updateStatus(`Erreur: ${error.message}`, 'error');
+                addResult(`Erreur chargement données: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRealtimeUpdates() {
+            updateStatus('Configuration des mises à jour temps réel...', 'info');
+
+            try {
+                // S'abonner aux changements de messages
+                const channel = supabase
+                    .channel('test-messages')
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'chat_messages',
+                        filter: `sender_id=eq.${TEST_USER_ID}`
+                    }, (payload) => {
+                        addResult(`⚡ Événement temps réel: ${payload.eventType} - Message ID: ${payload.new?.id || payload.old?.id}`, 'warning');
+                    })
+                    .subscribe();
+
+                updateStatus('Écoute temps réel activée! Envoyez un message pour tester.', 'success');
+                addResult('Surveillance des messages en temps réel activée', 'success');
+
+                // Créer un message test après 2 secondes
+                setTimeout(async () => {
+                    const { data: conversations } = await supabase
+                        .from('chat_conversations')
+                        .select('id')
+                        .eq('user_id', TEST_USER_ID)
+                        .limit(1);
+
+                    if (conversations && conversations.length > 0) {
+                        const { data, error } = await supabase
+                            .from('chat_messages')
+                            .insert({
+                                conversation_id: conversations[0].id,
+                                sender_id: TEST_USER_ID,
+                                message: 'Message test temps réel - ' + new Date().toLocaleTimeString('fr-FR'),
+                                is_read: false,
+                                created_at: new Date().toISOString()
+                            })
+                            .select();
+
+                        if (!error) {
+                            addResult('Message test envoyé pour déclencher l\'événement temps réel', 'success');
+                        }
+                    }
+                }, 2000);
+
+            } catch (error) {
+                updateStatus(`Erreur: ${error.message}`, 'error');
+                addResult(`Erreur configuration temps réel: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearAllData() {
+            if (!confirm('⚠️ Voulez-vous vraiment supprimer toutes les données de test ?')) {
+                return;
+            }
+
+            updateStatus('Nettoyage des données...', 'warning');
+
+            try {
+                // Supprimer les messages
+                const { error: msgError } = await supabase
+                    .from('chat_messages')
+                    .delete()
+                    .or(`sender_id.eq.${TEST_USER_ID},sender_id.eq.${ADMIN_ID}`);
+
+                if (msgError) console.error('Erreur suppression messages:', msgError);
+
+                // Supprimer les conversations
+                const { error: convError } = await supabase
+                    .from('chat_conversations')
+                    .delete()
+                    .eq('user_id', TEST_USER_ID);
+
+                if (convError) console.error('Erreur suppression conversations:', convError);
+
+                updateStatus('Données nettoyées!', 'success');
+                addResult('Toutes les données de test ont été supprimées', 'success');
+                document.getElementById('results').innerHTML = '';
+
+            } catch (error) {
+                updateStatus(`Erreur: ${error.message}`, 'error');
+                addResult(`Erreur nettoyage: ${error.message}`, 'error');
+            }
+        }
+
+        // Message d'accueil
+        window.addEventListener('load', () => {
+            addResult('Page de test chargée. Utilisez les boutons dans l\'ordre pour configurer le système.', 'info');
+            addResult(`UUID Utilisateur Test: ${TEST_USER_ID}`, 'info');
+            addResult(`UUID Admin: ${ADMIN_ID}`, 'info');
+        });
+    </script>
+</body>
+</html>

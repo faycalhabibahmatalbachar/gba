@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Profiles Table</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Check Profiles Table Structure</h1>
+    <pre id="output"></pre>
+
+    <script>
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUyNDU0NzUsImV4cCI6MjA1MDgyMTQ3NX0.g2k71p56R-MzmrmQZJtLPPo0Hgyg0c0tBh91j5bxmgc';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const output = document.getElementById('output');
+
+        function log(msg, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue';
+            output.innerHTML += `<span style="color: ${color}">[${timestamp}] ${msg}</span>\n`;
+            console.log(msg);
+        }
+
+        async function checkProfiles() {
+            try {
+                // Sign in first
+                const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                    email: 'faycalmomo@gmail.com',
+                    password: 'Habib2003@@'
+                });
+
+                if (authError) {
+                    log(`Auth error: ${authError.message}`, 'error');
+                    return;
+                }
+
+                log(`Authenticated as user: ${authData.user.id}`, 'success');
+
+                // Try to get the profile
+                log('Fetching profile data...');
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', authData.user.id)
+                    .maybeSingle();
+
+                if (profileError) {
+                    log(`Profile error: ${profileError.message}`, 'error');
+                    return;
+                }
+
+                log('Profile response type: ' + typeof profile);
+                log('Profile data: ' + JSON.stringify(profile, null, 2));
+
+                // Check if profile exists
+                if (!profile) {
+                    log('No profile found, creating one...', 'info');
+                    
+                    const { data: newProfile, error: createError } = await supabase
+                        .from('profiles')
+                        .insert({
+                            id: authData.user.id,
+                            full_name: 'Test User',
+                            email: authData.user.email,
+                            address: {},
+                            preferences: {},
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        })
+                        .select()
+                        .single();
+
+                    if (createError) {
+                        log(`Error creating profile: ${createError.message}`, 'error');
+                    } else {
+                        log('Profile created: ' + JSON.stringify(newProfile, null, 2), 'success');
+                    }
+                }
+
+                // Check table structure
+                log('\n\nChecking table structure...');
+                const { data: columns, error: columnsError } = await supabase.rpc('get_table_columns', {
+                    table_name: 'profiles'
+                });
+
+                if (columnsError) {
+                    log(`Could not get table structure: ${columnsError.message}`, 'error');
+                } else {
+                    log('Table columns: ' + JSON.stringify(columns, null, 2));
+                }
+
+            } catch (error) {
+                log(`Unexpected error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // Run the check
+        checkProfiles();
+    </script>
+</body>
+</html>

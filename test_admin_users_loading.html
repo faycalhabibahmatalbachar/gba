@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chargement Utilisateurs Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        .user-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: transform 0.3s;
+        }
+        .user-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        .avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .user-info {
+            flex: 1;
+        }
+        .user-name {
+            font-weight: 600;
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .user-email {
+            color: #666;
+            font-size: 14px;
+        }
+        .status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .blocked {
+            background: #ff4444;
+            color: white;
+        }
+        .active {
+            background: #4CAF50;
+            color: white;
+        }
+        #output {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #4CAF50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+        .info { color: #2196F3; }
+        .warning { color: #ff9800; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test Chargement Utilisateurs Admin</h1>
+        
+        <div class="button-group">
+            <button onclick="testConnection()">1️⃣ Tester Connexion</button>
+            <button onclick="loadProfiles()">2️⃣ Charger Profils</button>
+            <button onclick="loadConversations()">3️⃣ Charger Conversations</button>
+            <button onclick="loadMessages()">4️⃣ Charger Messages</button>
+            <button onclick="simulateAdminLoad()">5️⃣ Simuler Chargement Admin</button>
+            <button onclick="createTestData()">6️⃣ Créer Données Test</button>
+        </div>
+
+        <div class="stats" id="stats"></div>
+        <div id="usersList"></div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ndvygtwqmhbibyrxqlqx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdnlndHdxbWhiaWJ5cnhxbHF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA3Mzc3NDMsImV4cCI6MjA0NjMxMzc0M30.T0VcULvLmR0WT3YpejBTy3ypQNqPPepHbJiRaLOn9K8';
+        const ADMIN_ID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `<span class="${type}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function updateStats(profiles = 0, conversations = 0, messages = 0) {
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${profiles}</div>
+                    <div class="stat-label">Profils Clients</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${conversations}</div>
+                    <div class="stat-label">Conversations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${messages}</div>
+                    <div class="stat-label">Messages</div>
+                </div>
+            `;
+        }
+
+        async function testConnection() {
+            log('Test de connexion à Supabase...', 'info');
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('count', { count: 'exact', head: true });
+                
+                if (error) throw error;
+                log(`✅ Connexion réussie!`, 'success');
+            } catch (error) {
+                log(`❌ Erreur de connexion: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadProfiles() {
+            log('Chargement des profils...', 'info');
+            try {
+                const { data, error, count } = await supabase
+                    .from('profiles')
+                    .select('*', { count: 'exact' })
+                    .neq('id', ADMIN_ID)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                log(`✅ ${data.length} profils chargés (total: ${count})`, 'success');
+                
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = '<h2>👥 Utilisateurs</h2>';
+                
+                data.forEach(user => {
+                    const initials = (user.first_name?.[0] || '') + (user.last_name?.[0] || 'U');
+                    const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Sans nom';
+                    
+                    usersList.innerHTML += `
+                        <div class="user-card">
+                            <div class="avatar">
+                                ${user.avatar_url ? `<img src="${user.avatar_url}" alt="${name}">` : initials.toUpperCase()}
+                            </div>
+                            <div class="user-info">
+                                <div class="user-name">${name}</div>
+                                <div class="user-email">${user.email || 'Pas d\'email'}</div>
+                            </div>
+                            <span class="status ${user.is_blocked ? 'blocked' : 'active'}">
+                                ${user.is_blocked ? 'Bloqué' : 'Actif'}
+                            </span>
+                        </div>
+                    `;
+                });
+                
+                updateStats(data.length, 0, 0);
+                
+                // Afficher les détails
+                log('Détails des profils:', 'info');
+                data.forEach(user => {
+                    log(`  - ID: ${user.id}`, 'info');
+                    log(`    Email: ${user.email || 'N/A'}`, 'info');
+                    log(`    Nom: ${user.first_name || 'N/A'} ${user.last_name || ''}`, 'info');
+                });
+                
+            } catch (error) {
+                log(`❌ Erreur chargement profils: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadConversations() {
+            log('Chargement des conversations...', 'info');
+            try {
+                const { data, error } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .order('updated_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                log(`✅ ${data.length} conversations trouvées`, 'success');
+                
+                data.forEach(conv => {
+                    log(`  - Conv ${conv.id}: User ${conv.user_id}`, 'info');
+                });
+                
+            } catch (error) {
+                log(`❌ Erreur chargement conversations: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadMessages() {
+            log('Chargement des messages...', 'info');
+            try {
+                const { data, error } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+                
+                if (error) throw error;
+                
+                log(`✅ ${data.length} derniers messages`, 'success');
+                
+                data.forEach(msg => {
+                    log(`  - ${msg.message.substring(0, 50)}...`, 'info');
+                });
+                
+            } catch (error) {
+                log(`❌ Erreur chargement messages: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateAdminLoad() {
+            log('🔄 Simulation du chargement admin...', 'warning');
+            
+            try {
+                // 1. Charger les profils
+                log('1️⃣ Chargement profils...', 'info');
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .neq('id', ADMIN_ID)
+                    .order('created_at', { ascending: false });
+                
+                if (profilesError) throw profilesError;
+                log(`   ✅ ${profilesData?.length || 0} profils trouvés`, 'success');
+                
+                // 2. Charger les conversations
+                log('2️⃣ Chargement conversations...', 'info');
+                const { data: conversationsData, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .order('updated_at', { ascending: false });
+                
+                if (convError) throw convError;
+                log(`   ✅ ${conversationsData?.length || 0} conversations trouvées`, 'success');
+                
+                // 3. Charger les messages
+                log('3️⃣ Chargement messages...', 'info');
+                const { data: messagesData, error: messagesError } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (messagesError) throw messagesError;
+                log(`   ✅ ${messagesData?.length || 0} messages trouvés`, 'success');
+                
+                // 4. Combiner les données
+                log('4️⃣ Combinaison des données...', 'info');
+                const usersWithData = profilesData?.map(profile => {
+                    const userConversations = conversationsData?.filter(c => c.user_id === profile.id) || [];
+                    const userMessages = messagesData?.filter(m => 
+                        userConversations.some(c => c.id === m.conversation_id)
+                    ) || [];
+                    
+                    return {
+                        ...profile,
+                        conversations: userConversations.length,
+                        messages: userMessages.length,
+                        hasConversation: userConversations.length > 0
+                    };
+                });
+                
+                log('📊 Résumé final:', 'warning');
+                log(`   Total profils: ${usersWithData?.length || 0}`, 'info');
+                log(`   Avec conversations: ${usersWithData?.filter(u => u.hasConversation).length || 0}`, 'info');
+                log(`   Sans conversations: ${usersWithData?.filter(u => !u.hasConversation).length || 0}`, 'info');
+                
+                updateStats(profilesData?.length || 0, conversationsData?.length || 0, messagesData?.length || 0);
+                
+                // Afficher la liste finale
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = '<h2>📋 Résultat Simulation Admin</h2>';
+                
+                usersWithData?.forEach(user => {
+                    const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || 'Sans nom';
+                    log(`   👤 ${name}: ${user.conversations} conv, ${user.messages} msg`, 'info');
+                });
+                
+            } catch (error) {
+                log(`❌ Erreur simulation: ${error.message}`, 'error');
+                log(`   Détails: ${JSON.stringify(error)}`, 'error');
+            }
+        }
+
+        async function createTestData() {
+            log('Création de données de test...', 'warning');
+            
+            if (!confirm('Créer des profils de test dans la base de données?')) {
+                log('Opération annulée', 'info');
+                return;
+            }
+            
+            try {
+                const testUsers = [
+                    { 
+                        email: 'test1@example.com', 
+                        first_name: 'Jean', 
+                        last_name: 'Dupont',
+                        phone: '+33612345678'
+                    },
+                    { 
+                        email: 'test2@example.com', 
+                        first_name: 'Marie', 
+                        last_name: 'Martin',
+                        phone: '+33687654321'
+                    },
+                    { 
+                        email: 'test3@example.com', 
+                        first_name: 'Pierre', 
+                        last_name: 'Bernard',
+                        phone: '+33698765432'
+                    }
+                ];
+                
+                for (const user of testUsers) {
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .upsert(user, { onConflict: 'email' })
+                        .select();
+                    
+                    if (error) {
+                        log(`⚠️ Erreur pour ${user.email}: ${error.message}`, 'warning');
+                    } else {
+                        log(`✅ Créé/Mis à jour: ${user.first_name} ${user.last_name}`, 'success');
+                    }
+                }
+                
+                log('Rechargez les profils pour voir les changements!', 'info');
+                
+            } catch (error) {
+                log(`❌ Erreur création données: ${error.message}`, 'error');
+            }
+        }
+
+        // Test au chargement
+        window.addEventListener('load', () => {
+            log('Page chargée. Cliquez sur les boutons pour tester.', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mise en place du système de blocage</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .warning {
+            color: #ffc107;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .step h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Système de Blocage d'Utilisateurs</h1>
+        
+        <div class="step">
+            <h3>📋 Description</h3>
+            <p>Ce système permet à l'admin de bloquer/débloquer des utilisateurs. Les utilisateurs bloqués sont automatiquement redirigés vers une page dédiée.</p>
+        </div>
+
+        <div class="button-group">
+            <button onclick="checkCurrentStructure()">1️⃣ Vérifier Structure Actuelle</button>
+            <button onclick="addBlockingFields()">2️⃣ Ajouter Champs de Blocage</button>
+            <button onclick="testBlockUser()">3️⃣ Tester Blocage</button>
+            <button onclick="listBlockedUsers()">4️⃣ Lister Utilisateurs Bloqués</button>
+            <button onclick="unblockAllUsers()">5️⃣ Débloquer Tous</button>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ndvygtwqmhbibyrxqlqx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdnlndHdxbWhiaWJ5cnhxbHF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA3Mzc3NDMsImV4cCI6MjA0NjMxMzc0M30.T0VcULvLmR0WT3YpejBTy3ypQNqPPepHbJiRaLOn9K8';
+        const ADMIN_ID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function checkCurrentStructure() {
+            log('Vérification de la structure actuelle de la table profiles...', 'info');
+            
+            try {
+                // Récupérer un profil pour voir la structure
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    const fields = Object.keys(data[0]);
+                    log('Champs actuels dans profiles:', 'info');
+                    fields.forEach(field => {
+                        log(`  - ${field}`, 'info');
+                    });
+                    
+                    // Vérifier les champs de blocage
+                    const blockingFields = ['is_blocked', 'block_reason', 'blocked_at', 'blocked_by'];
+                    const missingFields = blockingFields.filter(field => !fields.includes(field));
+                    
+                    if (missingFields.length === 0) {
+                        log('✓ Tous les champs de blocage sont déjà présents!', 'success');
+                    } else {
+                        log(`⚠️ Champs manquants: ${missingFields.join(', ')}`, 'warning');
+                        log('Cliquez sur "Ajouter Champs de Blocage" pour les créer.', 'info');
+                    }
+                } else {
+                    log('Aucun profil trouvé dans la base de données.', 'warning');
+                }
+            } catch (error) {
+                log(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function addBlockingFields() {
+            log('Ajout des champs de blocage à la table profiles...', 'info');
+            
+            try {
+                // Exécuter les requêtes SQL via l'API Supabase
+                const sqlCommands = [
+                    "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE",
+                    "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS block_reason TEXT",
+                    "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMPTZ",
+                    "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS blocked_by UUID REFERENCES profiles(id)"
+                ];
+                
+                // Note: Supabase n'expose pas directement l'exécution SQL via l'API cliente
+                // Nous devons créer les champs via l'interface Supabase ou utiliser une fonction RPC
+                
+                log('⚠️ Les champs doivent être ajoutés via l\'interface Supabase SQL Editor:', 'warning');
+                log('', 'info');
+                log('-- Copiez et exécutez ce SQL dans Supabase SQL Editor:', 'info');
+                sqlCommands.forEach(sql => {
+                    log(sql + ';', 'info');
+                });
+                log('', 'info');
+                log('CREATE INDEX IF NOT EXISTS idx_profiles_is_blocked ON profiles(is_blocked);', 'info');
+                log('', 'info');
+                log('Après l\'exécution, cliquez sur "Vérifier Structure Actuelle" pour confirmer.', 'info');
+                
+            } catch (error) {
+                log(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBlockUser() {
+            log('Test de blocage d\'un utilisateur...', 'info');
+            
+            try {
+                // Récupérer le premier utilisateur non-admin
+                const { data: users, error: fetchError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .neq('id', ADMIN_ID)
+                    .limit(1);
+                
+                if (fetchError) throw fetchError;
+                
+                if (!users || users.length === 0) {
+                    log('Aucun utilisateur trouvé pour le test.', 'warning');
+                    return;
+                }
+                
+                const user = users[0];
+                const isCurrentlyBlocked = user.is_blocked;
+                
+                log(`Utilisateur de test: ${user.email || user.id}`, 'info');
+                log(`Statut actuel: ${isCurrentlyBlocked ? 'Bloqué' : 'Non bloqué'}`, 'info');
+                
+                // Inverser le statut de blocage
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({
+                        is_blocked: !isCurrentlyBlocked,
+                        block_reason: !isCurrentlyBlocked ? 'Test de blocage' : null,
+                        blocked_at: !isCurrentlyBlocked ? new Date().toISOString() : null,
+                        blocked_by: !isCurrentlyBlocked ? ADMIN_ID : null
+                    })
+                    .eq('id', user.id);
+                
+                if (updateError) throw updateError;
+                
+                log(`✓ Utilisateur ${!isCurrentlyBlocked ? 'bloqué' : 'débloqué'} avec succès!`, 'success');
+                
+                // Vérifier le changement
+                const { data: updatedUser, error: verifyError } = await supabase
+                    .from('profiles')
+                    .select('is_blocked, block_reason, blocked_at')
+                    .eq('id', user.id)
+                    .single();
+                
+                if (!verifyError && updatedUser) {
+                    log(`Nouveau statut: ${updatedUser.is_blocked ? 'Bloqué' : 'Non bloqué'}`, 'info');
+                    if (updatedUser.block_reason) {
+                        log(`Raison: ${updatedUser.block_reason}`, 'info');
+                    }
+                }
+                
+            } catch (error) {
+                log(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function listBlockedUsers() {
+            log('Récupération des utilisateurs bloqués...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, email, first_name, last_name, is_blocked, block_reason, blocked_at')
+                    .eq('is_blocked', true);
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    log('✓ Aucun utilisateur bloqué actuellement.', 'success');
+                } else {
+                    log(`${data.length} utilisateur(s) bloqué(s):`, 'warning');
+                    data.forEach(user => {
+                        const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Sans nom';
+                        const blockedDate = user.blocked_at ? new Date(user.blocked_at).toLocaleString() : 'Date inconnue';
+                        log(`  - ${name} (${user.email || 'Pas d\'email'})`, 'error');
+                        log(`    Raison: ${user.block_reason || 'Non spécifiée'}`, 'info');
+                        log(`    Bloqué le: ${blockedDate}`, 'info');
+                    });
+                }
+            } catch (error) {
+                log(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function unblockAllUsers() {
+            if (!confirm('Êtes-vous sûr de vouloir débloquer TOUS les utilisateurs?')) {
+                log('Opération annulée.', 'info');
+                return;
+            }
+            
+            log('Déblocage de tous les utilisateurs...', 'info');
+            
+            try {
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({
+                        is_blocked: false,
+                        block_reason: null,
+                        blocked_at: null,
+                        blocked_by: null
+                    })
+                    .eq('is_blocked', true);
+                
+                if (error) throw error;
+                
+                log('✓ Tous les utilisateurs ont été débloqués!', 'success');
+                
+            } catch (error) {
+                log(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // Vérifier la structure au chargement
+        window.addEventListener('load', () => {
+            log('Système de blocage prêt. Cliquez sur "Vérifier Structure Actuelle" pour commencer.', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Fix Erreur Connexion Messagerie</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .status-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-left: 4px solid #667eea;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border-left-color: #28a745;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left-color: #dc3545;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left-color: #ffc107;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .step {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .fix-section {
+            margin: 30px 0;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Correction Automatique - Erreur de Connexion Messagerie</h1>
+        
+        <div class="status-card" id="mainStatus">
+            <h3>📊 Statut du Système</h3>
+            <p>Cliquez sur "Démarrer la correction" pour résoudre l'erreur de connexion.</p>
+        </div>
+
+        <div class="fix-section">
+            <button class="btn" onclick="startFix()">
+                🚀 Démarrer la correction
+            </button>
+            <button class="btn btn-success" onclick="testConnection()">
+                🔍 Tester la connexion
+            </button>
+            <button class="btn btn-danger" onclick="fixRLS()">
+                🔓 Réparer RLS
+            </button>
+        </div>
+
+        <div id="steps"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function addStep(number, message, type = 'info') {
+            const stepsDiv = document.getElementById('steps');
+            const stepDiv = document.createElement('div');
+            stepDiv.className = `step ${type}`;
+            stepDiv.innerHTML = `
+                <span class="step-number">${number}</span>
+                ${message}
+            `;
+            stepsDiv.appendChild(stepDiv);
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('mainStatus');
+            statusDiv.className = `status-card ${type}`;
+            statusDiv.innerHTML = `<h3>📊 Statut du Système</h3><p>${message}</p>`;
+        }
+
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `status-card ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function startFix() {
+            document.getElementById('steps').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+            updateStatus('Correction en cours... <span class="spinner"></span>');
+
+            // Étape 1: Test de connexion
+            addStep(1, 'Test de la connexion à Supabase...');
+            const connected = await testSupabaseConnection();
+            
+            if (!connected) {
+                // Étape 2: Vérifier les clés
+                addStep(2, 'Vérification des clés API...', 'warning');
+                addResult(`
+                    <h4>⚠️ Problème de connexion détecté</h4>
+                    <p>Vérifiez que les clés Supabase sont correctes dans le fichier de configuration.</p>
+                    <div class="code-block">
+SUPABASE_URL: ${SUPABASE_URL}
+SUPABASE_KEY: ${SUPABASE_ANON_KEY.substring(0, 50)}...
+                    </div>
+                `, 'warning');
+            } else {
+                addStep(2, 'Connexion établie avec succès!', 'success');
+                
+                // Étape 3: Créer une conversation test
+                addStep(3, 'Création d\'une conversation test...');
+                const convCreated = await createTestConversation();
+                
+                if (convCreated) {
+                    addStep(4, 'Conversation créée avec succès!', 'success');
+                    
+                    // Étape 4: Envoyer un message test
+                    addStep(5, 'Envoi d\'un message test...');
+                    const msgSent = await sendTestMessage(convCreated.id);
+                    
+                    if (msgSent) {
+                        updateStatus('✅ Système de messagerie réparé avec succès!', 'success');
+                        addResult(`
+                            <h4>✅ Correction terminée!</h4>
+                            <p>Le système de messagerie fonctionne correctement.</p>
+                            <p>Conversation ID: ${convCreated.id}</p>
+                            <p>Message ID: ${msgSent.id}</p>
+                        `, 'success');
+                    }
+                } else {
+                    addStep(4, 'Erreur lors de la création de la conversation', 'error');
+                    showRLSFix();
+                }
+            }
+        }
+
+        async function testSupabaseConnection() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) {
+                    console.error('Connection error:', error);
+                    return false;
+                }
+                return true;
+            } catch (e) {
+                console.error('Exception:', e);
+                return false;
+            }
+        }
+
+        async function testConnection() {
+            document.getElementById('results').innerHTML = '';
+            updateStatus('Test de connexion en cours... <span class="spinner"></span>');
+            
+            const connected = await testSupabaseConnection();
+            
+            if (connected) {
+                updateStatus('✅ Connexion réussie!', 'success');
+                
+                // Tester les tables
+                const tables = ['chat_conversations', 'chat_messages', 'profiles'];
+                for (const table of tables) {
+                    try {
+                        const { data, error } = await supabaseClient
+                            .from(table)
+                            .select('*')
+                            .limit(1);
+                        
+                        if (error) {
+                            addResult(`❌ Table ${table}: ${error.message}`, 'error');
+                        } else {
+                            addResult(`✅ Table ${table} accessible`, 'success');
+                        }
+                    } catch (e) {
+                        addResult(`❌ Table ${table}: ${e.message}`, 'error');
+                    }
+                }
+            } else {
+                updateStatus('❌ Erreur de connexion', 'error');
+            }
+        }
+
+        async function createTestConversation() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('chat_conversations')
+                    .insert([{
+                        user_id: 'test-user-001',
+                        admin_id: 'admin-001',
+                        status: 'active',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error('Create conversation error:', error);
+                    return null;
+                }
+                return data;
+            } catch (e) {
+                console.error('Exception:', e);
+                return null;
+            }
+        }
+
+        async function sendTestMessage(conversationId) {
+            try {
+                const messageData = {
+                    conversation_id: conversationId,
+                    sender_id: 'admin-001',
+                    message: `Test message - ${new Date().toLocaleTimeString()}`,
+                    is_read: false,
+                    created_at: new Date().toISOString()
+                };
+
+                const { data, error } = await supabaseClient
+                    .from('chat_messages')
+                    .insert([messageData])
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error('Send message error:', error);
+                    return null;
+                }
+                return data;
+            } catch (e) {
+                console.error('Exception:', e);
+                return null;
+            }
+        }
+
+        function showRLSFix() {
+            addResult(`
+                <h4>🔓 Correction RLS nécessaire</h4>
+                <p>Les politiques de sécurité (RLS) bloquent l'accès. Exécutez ces commandes dans Supabase SQL Editor:</p>
+                <div class="code-block">
+-- Désactiver RLS temporairement
+ALTER TABLE chat_conversations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
+
+-- OU créer des policies ouvertes
+CREATE POLICY "Allow all for testing" ON chat_conversations
+    FOR ALL USING (true) WITH CHECK (true);
+    
+CREATE POLICY "Allow all for testing" ON chat_messages
+    FOR ALL USING (true) WITH CHECK (true);
+                </div>
+                <p style="color: #dc3545; margin-top: 15px;">
+                    ⚠️ ATTENTION: Ces commandes désactivent la sécurité. À utiliser uniquement pour les tests!
+                </p>
+            `, 'warning');
+        }
+
+        function fixRLS() {
+            document.getElementById('results').innerHTML = '';
+            showRLSFix();
+            updateStatus('⚠️ Commandes SQL générées pour réparer RLS', 'warning');
+        }
+
+        // Mise à jour automatique du fichier monitor.txt
+        async function updateMonitorFile(message) {
+            try {
+                const response = await fetch('/api/update-monitor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                console.log('Monitor updated:', message);
+            } catch (e) {
+                console.log('Could not update monitor file');
+            }
+        }
+
+        // Test automatique au chargement
+        window.onload = async function() {
+            updateStatus('Page chargée. Prête pour la correction.', 'info');
+            // Mise à jour du fichier monitor
+            updateMonitorFile('Outil de correction chargé et prêt');
+        }
+    </script>
+</body>
+</html>

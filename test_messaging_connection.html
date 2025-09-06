@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Connexion Messagerie</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test de Connexion Messagerie</h1>
+        
+        <div class="test-section">
+            <h2>Configuration Supabase</h2>
+            <button onclick="testConnection()">1. Tester la connexion</button>
+            <button onclick="testTables()">2. Vérifier les tables</button>
+            <button onclick="testRealtime()">3. Tester Realtime</button>
+            <button onclick="sendTestMessage()">4. Envoyer message test</button>
+            <button onclick="fixRLS()">5. Réparer RLS</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Configuration Supabase
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = type;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testConnection() {
+            clearResults();
+            addResult('Test de connexion en cours... <span class="spinner"></span>');
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) {
+                    addResult(`❌ Erreur de connexion: ${error.message}`, 'error');
+                    addResult(`Code: ${error.code} - Détails: ${error.details}`, 'error');
+                } else {
+                    addResult('✅ Connexion réussie à Supabase!', 'success');
+                }
+            } catch (e) {
+                addResult(`❌ Erreur: ${e.message}`, 'error');
+            }
+        }
+
+        async function testTables() {
+            clearResults();
+            addResult('Vérification des tables...');
+            
+            // Test chat_conversations
+            try {
+                const { data: conv, error: convError } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('*')
+                    .limit(1);
+                
+                if (convError) {
+                    addResult(`❌ Table chat_conversations: ${convError.message}`, 'error');
+                } else {
+                    addResult(`✅ Table chat_conversations OK (${conv ? conv.length : 0} lignes)`, 'success');
+                }
+            } catch (e) {
+                addResult(`❌ chat_conversations: ${e.message}`, 'error');
+            }
+
+            // Test chat_messages
+            try {
+                const { data: msg, error: msgError } = await supabaseClient
+                    .from('chat_messages')
+                    .select('*')
+                    .limit(1);
+                
+                if (msgError) {
+                    addResult(`❌ Table chat_messages: ${msgError.message}`, 'error');
+                } else {
+                    addResult(`✅ Table chat_messages OK (${msg ? msg.length : 0} lignes)`, 'success');
+                }
+            } catch (e) {
+                addResult(`❌ chat_messages: ${e.message}`, 'error');
+            }
+
+            // Test profiles
+            try {
+                const { data: profiles, error: profError } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .limit(1);
+                
+                if (profError) {
+                    addResult(`❌ Table profiles: ${profError.message}`, 'error');
+                } else {
+                    addResult(`✅ Table profiles OK`, 'success');
+                }
+            } catch (e) {
+                addResult(`❌ profiles: ${e.message}`, 'error');
+            }
+        }
+
+        async function testRealtime() {
+            clearResults();
+            addResult('Test de la connexion Realtime...');
+            
+            try {
+                const channel = supabaseClient
+                    .channel('test-channel')
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'chat_messages'
+                    }, (payload) => {
+                        addResult(`📨 Événement reçu: ${JSON.stringify(payload)}`, 'success');
+                    })
+                    .subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            addResult('✅ Connexion Realtime établie!', 'success');
+                            addResult('En attente d\'événements... (envoyez un message pour tester)', 'info');
+                        } else {
+                            addResult(`Status: ${status}`, 'info');
+                        }
+                    });
+
+                // Se désabonner après 10 secondes
+                setTimeout(() => {
+                    supabaseClient.removeChannel(channel);
+                    addResult('Canal fermé après 10 secondes', 'info');
+                }, 10000);
+
+            } catch (e) {
+                addResult(`❌ Erreur Realtime: ${e.message}`, 'error');
+            }
+        }
+
+        async function sendTestMessage() {
+            clearResults();
+            addResult('Envoi d\'un message test...');
+            
+            try {
+                // D'abord créer ou récupérer une conversation test
+                const { data: convData, error: convError } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('*')
+                    .limit(1);
+
+                let conversationId;
+                
+                if (convError || !convData || convData.length === 0) {
+                    // Créer une conversation test
+                    addResult('Création d\'une conversation test...', 'info');
+                    const { data: newConv, error: createError } = await supabaseClient
+                        .from('chat_conversations')
+                        .insert([{
+                            user_id: 'test-user-001',
+                            admin_id: 'admin-001',
+                            status: 'active',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        }])
+                        .select()
+                        .single();
+
+                    if (createError) {
+                        addResult(`❌ Impossible de créer une conversation: ${createError.message}`, 'error');
+                        return;
+                    }
+                    conversationId = newConv.id;
+                    addResult(`✅ Conversation créée: ${conversationId}`, 'success');
+                } else {
+                    conversationId = convData[0].id;
+                    addResult(`Utilisation de la conversation: ${conversationId}`, 'info');
+                }
+
+                // Envoyer le message test
+                const messageData = {
+                    conversation_id: conversationId,
+                    sender_id: 'admin-001',
+                    message: `Message test envoyé à ${new Date().toLocaleTimeString()}`,
+                    is_read: false,
+                    created_at: new Date().toISOString()
+                };
+
+                const { data: msgData, error: msgError } = await supabaseClient
+                    .from('chat_messages')
+                    .insert([messageData])
+                    .select()
+                    .single();
+
+                if (msgError) {
+                    addResult(`❌ Erreur envoi message: ${msgError.message}`, 'error');
+                    addResult(`Détails: ${JSON.stringify(msgError)}`, 'error');
+                } else {
+                    addResult(`✅ Message envoyé avec succès!`, 'success');
+                    addResult(`ID du message: ${msgData.id}`, 'info');
+                }
+
+            } catch (e) {
+                addResult(`❌ Erreur: ${e.message}`, 'error');
+            }
+        }
+
+        async function fixRLS() {
+            clearResults();
+            addResult('Génération des commandes SQL pour réparer RLS...', 'info');
+            
+            const sql = `
+-- Désactiver temporairement RLS pour les tests
+ALTER TABLE chat_conversations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
+
+-- Ou créer des policies ouvertes temporaires
+CREATE POLICY "Temp Open Access" ON chat_conversations
+    FOR ALL USING (true) WITH CHECK (true);
+    
+CREATE POLICY "Temp Open Access" ON chat_messages
+    FOR ALL USING (true) WITH CHECK (true);
+            `;
+
+            addResult('Commandes SQL à exécuter dans Supabase SQL Editor:', 'info');
+            const codeBlock = document.createElement('div');
+            codeBlock.className = 'code-block';
+            codeBlock.textContent = sql;
+            document.getElementById('results').appendChild(codeBlock);
+            
+            addResult('⚠️ Attention: Ces commandes désactivent la sécurité. À utiliser uniquement pour les tests!', 'error');
+            
+            // Test si RLS est activé
+            try {
+                const { data, error } = await supabaseClient
+                    .from('chat_conversations')
+                    .select('*')
+                    .limit(1);
+                    
+                if (error && error.message.includes('row-level')) {
+                    addResult('❌ RLS est activé et bloque l\'accès', 'error');
+                } else {
+                    addResult('✅ Accès possible aux données', 'success');
+                }
+            } catch (e) {
+                addResult(`Test RLS: ${e.message}`, 'info');
+            }
+        }
+
+        // Test automatique au chargement
+        window.onload = function() {
+            addResult('Page chargée. Cliquez sur les boutons pour tester la connexion.', 'info');
+        }
+    </script>
+</body>
+</html>

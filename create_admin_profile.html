@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Créer Profil Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2d3748;
+            border-bottom: 2px solid #4a5568;
+            padding-bottom: 10px;
+        }
+        .btn {
+            background: #4a5568;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background: #2d3748;
+        }
+        .btn-success {
+            background: #48bb78;
+        }
+        .btn-success:hover {
+            background: #38a169;
+        }
+        #output {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #22543d;
+            background: #c6f6d5;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #742a2a;
+            background: #fed7d7;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #2c5282;
+            background: #bee3f8;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Créer le Profil Admin pour le Chat</h1>
+        
+        <p>Cette page va créer le profil admin nécessaire pour que le système de messagerie fonctionne correctement.</p>
+        
+        <div>
+            <button class="btn" onclick="checkAdminProfile()">Vérifier si Admin Existe</button>
+            <button class="btn btn-success" onclick="createAdminProfile()">Créer le Profil Admin</button>
+        </div>
+        
+        <div id="output"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        
+        const supabaseUrl = 'https://kquasbipcbqcvwdejtbh.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxdWFzYmlwY2JxY3Z3ZGVqdGJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzE0ODAyNTksImV4cCI6MjA0NzA1NjI1OX0.1GW-kvoGe3eCpX7lkkkBTqx-7GYAhBJvlr8ktEf5dko';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        const ADMIN_ID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+        
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString('fr-FR');
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${timestamp}] ${message}`;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        window.checkAdminProfile = async function() {
+            log('Vérification du profil admin...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', ADMIN_ID)
+                    .single();
+                
+                if (error && error.code === 'PGRST116') {
+                    log('❌ Le profil admin n\'existe pas', 'error');
+                    log(`ID recherché: ${ADMIN_ID}`, 'info');
+                    return false;
+                } else if (error) {
+                    log(`Erreur: ${error.message}`, 'error');
+                    return false;
+                }
+                
+                log('✅ Le profil admin existe déjà!', 'success');
+                log(`Nom: ${data.first_name} ${data.last_name}`, 'info');
+                log(`Email: ${data.email}`, 'info');
+                log(`Rôle: ${data.role}`, 'info');
+                return true;
+            } catch (err) {
+                log(`Erreur inattendue: ${err.message}`, 'error');
+                return false;
+            }
+        };
+        
+        window.createAdminProfile = async function() {
+            log('Création du profil admin...', 'info');
+            
+            // Vérifier d'abord si le profil existe
+            const exists = await checkAdminProfile();
+            if (exists) {
+                log('Le profil existe déjà, pas besoin de le créer', 'info');
+                return;
+            }
+            
+            try {
+                const adminProfile = {
+                    id: ADMIN_ID,
+                    email: 'admin@gba.com',
+                    first_name: 'Admin',
+                    last_name: 'GBA',
+                    phone: '+235 60 00 00 00',
+                    role: 'admin',
+                    status: 'active',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
+                log('Insertion du profil admin...', 'info');
+                
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .insert([adminProfile])
+                    .select()
+                    .single();
+                
+                if (error) {
+                    log(`Erreur lors de la création: ${error.message}`, 'error');
+                    
+                    // Si c'est une erreur de contrainte unique, essayer de mettre à jour
+                    if (error.code === '23505') {
+                        log('Tentative de mise à jour du profil existant...', 'info');
+                        
+                        const { data: updateData, error: updateError } = await supabase
+                            .from('profiles')
+                            .update({
+                                first_name: 'Admin',
+                                last_name: 'GBA',
+                                role: 'admin',
+                                status: 'active',
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', ADMIN_ID)
+                            .select()
+                            .single();
+                        
+                        if (updateError) {
+                            log(`Erreur lors de la mise à jour: ${updateError.message}`, 'error');
+                        } else {
+                            log('✅ Profil admin mis à jour avec succès!', 'success');
+                            log(JSON.stringify(updateData, null, 2), 'info');
+                        }
+                    }
+                    return;
+                }
+                
+                log('✅ Profil admin créé avec succès!', 'success');
+                log(JSON.stringify(data, null, 2), 'info');
+                
+                // Tester l'envoi d'un message
+                log('\nTest d\'envoi de message...', 'info');
+                await testSendMessage();
+                
+            } catch (err) {
+                log(`Erreur inattendue: ${err.message}`, 'error');
+            }
+        };
+        
+        async function testSendMessage() {
+            try {
+                // Récupérer une conversation existante ou en créer une de test
+                const { data: conversations, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .limit(1);
+                
+                if (convError) {
+                    log(`Erreur lors de la récupération des conversations: ${convError.message}`, 'error');
+                    return;
+                }
+                
+                if (!conversations || conversations.length === 0) {
+                    log('Aucune conversation trouvée pour le test', 'info');
+                    return;
+                }
+                
+                const testMessage = {
+                    conversation_id: conversations[0].id,
+                    sender_id: ADMIN_ID,
+                    message: 'Message de test depuis admin',
+                    is_read: false,
+                    created_at: new Date().toISOString()
+                };
+                
+                const { data: messageData, error: msgError } = await supabase
+                    .from('chat_messages')
+                    .insert([testMessage])
+                    .select()
+                    .single();
+                
+                if (msgError) {
+                    log(`❌ Erreur lors de l'envoi du message de test: ${msgError.message}`, 'error');
+                } else {
+                    log('✅ Message de test envoyé avec succès!', 'success');
+                    log(`Message ID: ${messageData.id}`, 'info');
+                }
+                
+            } catch (err) {
+                log(`Erreur lors du test: ${err.message}`, 'error');
+            }
+        }
+        
+        // Vérifier automatiquement au chargement
+        window.addEventListener('load', () => {
+            checkAdminProfile();
+        });
+    </script>
+</body>
+</html>

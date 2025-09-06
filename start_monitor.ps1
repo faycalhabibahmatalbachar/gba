@@ -3,14 +3,14 @@ $ErrorActionPreference = "Continue"
 
 # Configuration
 $SUPABASE_URL = "https://uvlrgwdbjegoavjfdrzb.supabase.co"
-$SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU1MTE0MDksImV4cCI6MjA1MTA4NzQwOX0.XWQM6dm4Mg5tQ_z8MvMG1wqzAzedv9M0TeYikblGUzA"
+$SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTQwNjU2NjksImV4cCI6MjA1MTA4NzQwOX0.XWQM6dm4Mg5tQ_z8MvMG1wqzAzedv9M0TeYikblGUzA"
 
 # Fonction de log
 function Write-Log {
-    param([string]$Message)
+    param($Message, $Type = "INFO")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logEntry = "[$timestamp] $Message"
-    Add-Content -Path "monitor.txt" -Value $logEntry -Encoding UTF8
+    $logEntry = "[$timestamp] [$Type] $Message"
+    Add-Content -Path "monitor_status.txt" -Value $logEntry -Encoding UTF8
     Write-Host $logEntry -ForegroundColor Cyan
 }
 

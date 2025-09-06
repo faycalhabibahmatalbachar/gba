@@ -633,11 +633,13 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Category image or icon
-                    Container(
-                      width: 80,
-                      height: 80,
+                    Flexible(
+                      child: Container(
+                        width: 80,
+                        height: 80,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
@@ -706,7 +708,8 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
                               ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    ),
+                    const SizedBox(height: 8),
                     // Category name
                     Text(
                       category.name,

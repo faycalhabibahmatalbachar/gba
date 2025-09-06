@@ -283,11 +283,9 @@ class MessagingService extends ChangeNotifier {
         }
       }
 
-      // Mettre à jour le cache
+      // Mettre à jour le cache - NE PAS émettre l'événement ici
+      // car le listener realtime va le faire
       _messagesCache[conversationId]?.add(newMessage);
-      
-      // Émettre l'événement
-      _newMessageController.add(newMessage);
       
       _log('Message envoyé avec succès: ${newMessage.id}', level: 'SUCCESS');
       notifyListeners();

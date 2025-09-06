@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../helpers/product_mapper.dart';
 
 class CartService {
   final _supabase = Supabase.instance.client;
@@ -116,7 +117,17 @@ class CartService {
           .order('created_at', ascending: false);
 
       print('✅ [CartService] ${response.length} articles récupérés');
-      return List<Map<String, dynamic>>.from(response);
+      
+      // Mapper les produits de snake_case vers camelCase
+      final mappedResponse = response.map((item) {
+        final mappedItem = Map<String, dynamic>.from(item);
+        if (mappedItem['products'] != null) {
+          mappedItem['products'] = ProductMapper.fromSupabase(mappedItem['products']);
+        }
+        return mappedItem;
+      }).toList();
+      
+      return List<Map<String, dynamic>>.from(mappedResponse);
     } catch (e, stackTrace) {
       print('❌ [CartService] Erreur récupération panier:');
       print('   Message: $e');

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../helpers/product_mapper.dart';
 
 class FavoritesService {
   final _supabase = Supabase.instance.client;
@@ -84,11 +85,11 @@ class FavoritesService {
           .select('*')
           .inFilter('id', productIds);
       
-      // Créer une map pour accès rapide aux produits
+      // Créer une map pour accès rapide aux produits avec mapping
       final productsMap = Map<String, dynamic>.fromIterable(
         productsResponse,
         key: (p) => p['id'],
-        value: (p) => p,
+        value: (p) => ProductMapper.fromSupabase(p),
       );
       
       // Combiner les données

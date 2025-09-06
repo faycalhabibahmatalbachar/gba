@@ -73,6 +73,29 @@ class AppDrawer extends StatelessWidget {
               Navigator.pop(context);
             },
           ),
+          ListTile(
+            leading: Icon(Icons.support_agent, color: Colors.orange[700]),
+            title: const Text('Support Admin'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/admin-chat');
+            },
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Chat',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.orange[700],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.settings),

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Admin ID et Responsive UI</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 10px 5px;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        #status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Admin ID & Responsive UI</h1>
+        <button onclick="createAdminProfile()">1. Créer Profil Admin</button>
+        <button onclick="verifyAdminProfile()">2. Vérifier Profil Admin</button>
+        <button onclick="testMessageSending()">3. Tester Envoi Message</button>
+        <div id="status"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const supabaseUrl = 'https://ptnhqmonekdwymqbnpcc.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0bmhxbW9uZWtkd3ltcWJucGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzE2NTA5NTksImV4cCI6MjA0NzIyNjk1OX0.7z1jB5B3Hm_8inFEE0AFr5ZKPkQOs2gFvTFtJhYvQAc';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const ADMIN_ID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+        const TEST_USER_ID = '60074c92-45c8-4ccb-a03c-466528d3dd43';
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString('fr-FR');
+            status.className = type;
+            status.innerHTML += `[${timestamp}] ${message}\n`;
+            status.scrollTop = status.scrollHeight;
+        }
+
+        async function createAdminProfile() {
+            updateStatus('Création du profil admin...', 'info');
+
+            try {
+                // Vérifier si l'admin existe déjà
+                const { data: existing, error: checkError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', ADMIN_ID)
+                    .single();
+
+                if (existing) {
+                    updateStatus('Le profil admin existe déjà', 'info');
+                    updateStatus(`Admin: ${existing.first_name} ${existing.last_name} (${existing.role})`, 'success');
+                    return;
+                }
+
+                // Créer le profil admin
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .insert([{
+                        id: ADMIN_ID,
+                        email: 'admin@gba.com',
+                        first_name: 'Admin',
+                        last_name: 'GBA',
+                        role: 'admin',
+                        phone: '+33 1 23 45 67 89',
+                        avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
+                        last_updated: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                updateStatus('✅ Profil admin créé avec succès!', 'success');
+                updateStatus(`ID: ${data.id}`, 'success');
+                updateStatus(`Email: ${data.email}`, 'success');
+                updateStatus(`Rôle: ${data.role}`, 'success');
+
+            } catch (error) {
+                updateStatus(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function verifyAdminProfile() {
+            updateStatus('Vérification du profil admin...', 'info');
+
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', ADMIN_ID)
+                    .single();
+
+                if (error) throw error;
+
+                if (data) {
+                    updateStatus('✅ Profil admin trouvé:', 'success');
+                    updateStatus(JSON.stringify(data, null, 2), 'success');
+                } else {
+                    updateStatus('⚠️ Profil admin non trouvé', 'error');
+                }
+
+            } catch (error) {
+                updateStatus(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMessageSending() {
+            updateStatus('Test d\'envoi de message...', 'info');
+
+            try {
+                // Créer une conversation test
+                const { data: conv, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .insert([{
+                        user_id: TEST_USER_ID,
+                        admin_id: ADMIN_ID,
+                        status: 'active',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (convError) throw convError;
+
+                updateStatus(`✅ Conversation créée: ${conv.id}`, 'success');
+
+                // Envoyer un message test
+                const { data: msg, error: msgError } = await supabase
+                    .from('chat_messages')
+                    .insert([{
+                        conversation_id: conv.id,
+                        sender_id: ADMIN_ID,
+                        message: 'Message test de l\'admin - ' + new Date().toLocaleTimeString(),
+                        is_read: false,
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (msgError) throw msgError;
+
+                updateStatus(`✅ Message envoyé avec succès!`, 'success');
+                updateStatus(`Message ID: ${msg.id}`, 'success');
+                updateStatus(`Contenu: ${msg.message}`, 'success');
+
+            } catch (error) {
+                updateStatus(`❌ Erreur: ${error.message}`, 'error');
+                if (error.message.includes('foreign key constraint')) {
+                    updateStatus('💡 Créez d\'abord le profil admin (Bouton 1)', 'info');
+                }
+            }
+        }
+
+        // Auto-vérification au chargement
+        window.addEventListener('load', () => {
+            updateStatus('Page chargée. Prêt pour les corrections.', 'info');
+            updateStatus(`Admin ID à utiliser: ${ADMIN_ID}`, 'info');
+        });
+    </script>
+</body>
+</html>

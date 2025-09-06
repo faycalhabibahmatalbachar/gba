@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Correction RLS Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .sql-command {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Consolas', monospace;
+            position: relative;
+        }
+        .sql-command h3 {
+            color: #495057;
+            margin-top: 0;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            color: #212529;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Correction des Politiques RLS pour le Chat</h1>
+        <p class="info">
+            ⚠️ <strong>Important:</strong> Ce script va modifier les politiques RLS pour permettre l'accès public temporaire aux tables chat.
+            C'est nécessaire pour le développement mais devra être sécurisé pour la production.
+        </p>
+
+        <div id="results"></div>
+
+        <div style="margin-top: 20px;">
+            <button onclick="executeRLSFix()" id="executeBtn">
+                🚀 Exécuter la Correction RLS
+            </button>
+            <button onclick="checkCurrentPolicies()" id="checkBtn">
+                🔍 Vérifier les Politiques Actuelles
+            </button>
+            <button onclick="testAccess()" id="testBtn">
+                ✅ Tester l'Accès
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        async function executeRLSFix() {
+            const btn = document.getElementById('executeBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Exécution en cours...';
+            
+            document.getElementById('results').innerHTML = '';
+            
+            try {
+                addResult('🔄 Début de la correction RLS...', 'info');
+                
+                // Note: Les politiques RLS ne peuvent pas être modifiées via l'API client
+                // Elles doivent être modifiées dans le dashboard Supabase ou via l'API admin
+                addResult(`
+                    <strong>⚠️ Action Requise:</strong><br>
+                    Les politiques RLS doivent être modifiées directement dans Supabase:<br>
+                    1. Allez sur <a href="https://app.supabase.com/project/uvlrgwdbjegoavjfdrzb/auth/policies" target="_blank">Supabase Dashboard > Authentication > Policies</a><br>
+                    2. Pour les tables <code>chat_conversations</code> et <code>chat_messages</code>:<br>
+                    3. Supprimez toutes les anciennes politiques<br>
+                    4. Créez une politique "Enable read access for all users" avec <code>true</code> pour SELECT<br>
+                    5. Créez une politique "Enable insert for all users" avec <code>true</code> pour INSERT<br>
+                    6. Créez une politique "Enable update for all users" avec <code>true</code> pour UPDATE<br>
+                    <br>
+                    Ou utilisez le SQL Editor avec le script fourni dans <code>fix_chat_rls_policies.sql</code>
+                `, 'warning');
+                
+                // Tester l'accès actuel
+                const { data: convTest, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('count')
+                    .limit(1);
+                
+                if (convError) {
+                    addResult(`❌ Erreur accès conversations: ${convError.message}`, 'error');
+                } else {
+                    addResult(`✅ Accès conversations OK`, 'success');
+                }
+                
+                const { data: msgTest, error: msgError } = await supabase
+                    .from('chat_messages')
+                    .select('count')
+                    .limit(1);
+                
+                if (msgError) {
+                    addResult(`❌ Erreur accès messages: ${msgError.message}`, 'error');
+                } else {
+                    addResult(`✅ Accès messages OK`, 'success');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erreur: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Exécuter la Correction RLS';
+            }
+        }
+
+        async function checkCurrentPolicies() {
+            const btn = document.getElementById('checkBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Vérification...';
+            
+            document.getElementById('results').innerHTML = '';
+            
+            try {
+                addResult('🔍 Vérification des accès actuels...', 'info');
+                
+                // Test lecture conversations
+                const { data: convData, error: convReadError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .limit(1);
+                
+                addResult(`<strong>Lecture Conversations:</strong> ${convReadError ? '❌ Bloqué - ' + convReadError.message : '✅ OK'}`, 
+                    convReadError ? 'error' : 'success');
+                
+                // Test insertion conversations
+                const testConvId = 'test-' + Date.now();
+                const { error: convInsertError } = await supabase
+                    .from('chat_conversations')
+                    .insert({
+                        user_id: '60074c92-45c8-4ccb-a03c-466528d3dd43',
+                        status: 'test'
+                    });
+                
+                if (!convInsertError) {
+                    // Nettoyer le test
+                    await supabase
+                        .from('chat_conversations')
+                        .delete()
+                        .eq('status', 'test');
+                }
+                
+                addResult(`<strong>Insertion Conversations:</strong> ${convInsertError ? '❌ Bloqué - ' + convInsertError.message : '✅ OK'}`, 
+                    convInsertError ? 'error' : 'success');
+                
+                // Test lecture messages
+                const { data: msgData, error: msgReadError } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .limit(1);
+                
+                addResult(`<strong>Lecture Messages:</strong> ${msgReadError ? '❌ Bloqué - ' + msgReadError.message : '✅ OK'}`, 
+                    msgReadError ? 'error' : 'success');
+                
+            } catch (error) {
+                addResult(`❌ Erreur: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Vérifier les Politiques Actuelles';
+            }
+        }
+
+        async function testAccess() {
+            const btn = document.getElementById('testBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Test en cours...';
+            
+            document.getElementById('results').innerHTML = '';
+            
+            try {
+                addResult('🧪 Test complet d\'accès...', 'info');
+                
+                // Récupérer les conversations
+                const { data: conversations, error: convError } = await supabase
+                    .from('chat_conversations')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                
+                if (convError) {
+                    addResult(`❌ Impossible de lire les conversations: ${convError.message}`, 'error');
+                } else {
+                    addResult(`✅ ${conversations.length} conversations trouvées`, 'success');
+                    
+                    if (conversations.length > 0) {
+                        // Tester la lecture des messages
+                        const { data: messages, error: msgError } = await supabase
+                            .from('chat_messages')
+                            .select('*')
+                            .eq('conversation_id', conversations[0].id)
+                            .limit(5);
+                        
+                        if (msgError) {
+                            addResult(`❌ Impossible de lire les messages: ${msgError.message}`, 'error');
+                        } else {
+                            addResult(`✅ ${messages.length} messages trouvés dans la première conversation`, 'success');
+                        }
+                    }
+                }
+                
+                // Test Realtime
+                addResult('🔴 Test connexion Realtime...', 'info');
+                const channel = supabase
+                    .channel('test-channel')
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'chat_conversations'
+                    }, (payload) => {
+                        console.log('Realtime test:', payload);
+                    })
+                    .subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            addResult('✅ Connexion Realtime établie', 'success');
+                            channel.unsubscribe();
+                        } else if (status === 'CHANNEL_ERROR') {
+                            addResult('❌ Erreur connexion Realtime', 'error');
+                        }
+                    });
+                
+                setTimeout(() => {
+                    channel.unsubscribe();
+                }, 5000);
+                
+            } catch (error) {
+                addResult(`❌ Erreur: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '✅ Tester l\'Accès';
+            }
+        }
+
+        // Auto-test au chargement
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(testAccess, 500);
+        });
+    </script>
+</body>
+</html>

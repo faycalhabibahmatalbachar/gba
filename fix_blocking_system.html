@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réparer le Système de Blocage</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        .success { 
+            background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+        }
+        .danger { 
+            background: linear-gradient(135deg, #f44336, #da190b) !important;
+        }
+        .warning { 
+            background: linear-gradient(135deg, #ff9800, #e68900) !important;
+        }
+        #output {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-success { color: #4CAF50; font-weight: bold; }
+        .log-error { color: #f44336; font-weight: bold; }
+        .log-info { color: #2196F3; }
+        .log-warning { color: #ff9800; font-weight: bold; }
+        .user-list {
+            margin: 20px 0;
+            display: grid;
+            gap: 15px;
+        }
+        .user-item {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        .user-item:hover {
+            transform: translateX(10px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .user-info {
+            flex: 1;
+        }
+        .user-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+        .user-email {
+            color: #666;
+            font-size: 14px;
+        }
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+        .blocked {
+            background: #f44336;
+        }
+        .active {
+            background: #4CAF50;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f0f2f5;
+            border-radius: 12px;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        .sql-code {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Réparer le Système de Blocage</h1>
+
+        <div class="section">
+            <h2>1️⃣ Vérifier la Structure de la Base de Données</h2>
+            <button onclick="checkDatabaseStructure()">Vérifier Structure</button>
+            <button onclick="showSQLCommands()">Afficher SQL à Exécuter</button>
+        </div>
+
+        <div class="section">
+            <h2>2️⃣ Ajouter les Champs de Blocage</h2>
+            <p>Si les champs n'existent pas, exécutez ce SQL dans Supabase SQL Editor:</p>
+            <div id="sqlCommands" style="display:none;">
+                <div class="sql-code">
+-- Ajouter les champs de blocage à la table profiles
+ALTER TABLE profiles 
+ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS block_reason TEXT,
+ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS blocked_by UUID REFERENCES profiles(id);
+
+-- Créer un index pour améliorer les performances
+CREATE INDEX IF NOT EXISTS idx_profiles_is_blocked ON profiles(is_blocked);
+
+-- Mettre à jour les politiques RLS
+DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
+CREATE POLICY "Users can view their own profile" ON profiles
+    FOR SELECT
+    USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Admin can view all profiles" ON profiles;
+CREATE POLICY "Admin can view all profiles" ON profiles
+    FOR SELECT
+    USING (auth.uid() = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d');
+
+DROP POLICY IF EXISTS "Admin can update profiles" ON profiles;
+CREATE POLICY "Admin can update profiles" ON profiles
+    FOR UPDATE
+    USING (auth.uid() = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d');
+
+-- Permettre aux utilisateurs de voir leur propre statut de blocage
+DROP POLICY IF EXISTS "Users can see their block status" ON profiles;
+CREATE POLICY "Users can see their block status" ON profiles
+    FOR SELECT
+    USING (auth.uid() = id)
+    WITH CHECK (true);
+                </div>
+                <button class="warning" onclick="copySQL()">📋 Copier le SQL</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3️⃣ Tester le Blocage/Déblocage</h2>
+            <button onclick="loadAllUsers()">Charger Tous les Utilisateurs</button>
+            <button class="success" onclick="testUnblockAll()">Débloquer Tous</button>
+            <div id="usersList" class="user-list"></div>
+        </div>
+
+        <div class="section">
+            <h2>4️⃣ Tests de Connexion Admin</h2>
+            <button onclick="testAdminAuth()">Tester Auth Admin</button>
+            <button onclick="testUserAuth()">Tester Auth Utilisateur</button>
+            <button onclick="getCurrentUser()">Voir Utilisateur Actuel</button>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ndvygtwqmhbibyrxqlqx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdnlndHdxbWhiaWJ5cnhxbHF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA3Mzc3NDMsImV4cCI6MjA0NjMxMzc0M30.T0VcULvLmR0WT3YpejBTy3ypQNqPPepHbJiRaLOn9K8';
+        const ADMIN_ID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+        const ADMIN_EMAIL = 'admin@example.com';
+        const ADMIN_PASSWORD = 'adminpass123';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = `log-${type}`;
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function checkDatabaseStructure() {
+            log('Vérification de la structure de la base de données...', 'info');
+            
+            try {
+                // Essayer de récupérer un profil avec les champs de blocage
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, email, is_blocked, block_reason, blocked_at, blocked_by')
+                    .limit(1);
+                
+                if (error) {
+                    if (error.message.includes('column') && error.message.includes('does not exist')) {
+                        log('❌ Les champs de blocage n\'existent pas dans la table profiles', 'error');
+                        log('➡️ Exécutez le SQL fourni dans Supabase SQL Editor', 'warning');
+                        showSQLCommands();
+                    } else {
+                        log(`❌ Erreur: ${error.message}`, 'error');
+                    }
+                } else {
+                    log('✅ Les champs de blocage existent dans la base de données', 'success');
+                    if (data && data.length > 0) {
+                        log('Structure détectée:', 'info');
+                        Object.keys(data[0]).forEach(key => {
+                            log(`  - ${key}: ${typeof data[0][key]}`, 'info');
+                        });
+                    }
+                }
+            } catch (err) {
+                log(`❌ Erreur inattendue: ${err.message}`, 'error');
+            }
+        }
+
+        function showSQLCommands() {
+            document.getElementById('sqlCommands').style.display = 'block';
+            log('📋 Commandes SQL affichées. Copiez et exécutez dans Supabase SQL Editor', 'warning');
+        }
+
+        function copySQL() {
+            const sqlCode = document.querySelector('.sql-code').innerText;
+            navigator.clipboard.writeText(sqlCode).then(() => {
+                log('✅ SQL copié dans le presse-papier!', 'success');
+            });
+        }
+
+        async function loadAllUsers() {
+            log('Chargement de tous les utilisateurs...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .neq('id', ADMIN_ID)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                log(`✅ ${data.length} utilisateurs trouvés`, 'success');
+                
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = '';
+                
+                data.forEach(user => {
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'user-item';
+                    userDiv.innerHTML = `
+                        <div class="user-info">
+                            <div class="user-name">${user.first_name || ''} ${user.last_name || 'Sans nom'}</div>
+                            <div class="user-email">${user.email || 'Pas d\'email'}</div>
+                        </div>
+                        <span class="status-badge ${user.is_blocked ? 'blocked' : 'active'}">
+                            ${user.is_blocked ? 'Bloqué' : 'Actif'}
+                        </span>
+                        <button onclick="toggleBlock('${user.id}', ${!user.is_blocked})">
+                            ${user.is_blocked ? '🔓 Débloquer' : '🔒 Bloquer'}
+                        </button>
+                    `;
+                    usersList.appendChild(userDiv);
+                });
+                
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function toggleBlock(userId, shouldBlock) {
+            const action = shouldBlock ? 'blocage' : 'déblocage';
+            log(`Tentative de ${action} pour l'utilisateur ${userId}...`, 'info');
+            
+            try {
+                // D'abord, se connecter en tant qu'admin
+                await testAdminAuth();
+                
+                const updateData = {
+                    is_blocked: shouldBlock,
+                    block_reason: shouldBlock ? 'Bloqué par l\'admin via interface de test' : null,
+                    blocked_at: shouldBlock ? new Date().toISOString() : null,
+                    blocked_by: shouldBlock ? ADMIN_ID : null
+                };
+                
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .update(updateData)
+                    .eq('id', userId)
+                    .select();
+                
+                if (error) {
+                    log(`❌ Erreur ${action}: ${error.message}`, 'error');
+                    
+                    // Si erreur de permissions, essayer sans RLS
+                    if (error.message.includes('policy')) {
+                        log('⚠️ Tentative sans RLS...', 'warning');
+                        // Ici on pourrait désactiver RLS temporairement via SQL
+                        log('➡️ Exécutez dans SQL Editor: ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;', 'warning');
+                    }
+                } else {
+                    log(`✅ Utilisateur ${shouldBlock ? 'bloqué' : 'débloqué'} avec succès!`, 'success');
+                    loadAllUsers(); // Recharger la liste
+                }
+                
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUnblockAll() {
+            if (!confirm('Débloquer tous les utilisateurs?')) return;
+            
+            log('Déblocage de tous les utilisateurs...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .update({
+                        is_blocked: false,
+                        block_reason: null,
+                        blocked_at: null,
+                        blocked_by: null
+                    })
+                    .neq('id', ADMIN_ID)
+                    .select();
+                
+                if (error) throw error;
+                
+                log(`✅ ${data.length} utilisateurs débloqués!`, 'success');
+                loadAllUsers();
+                
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAdminAuth() {
+            log('Test connexion admin...', 'info');
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: ADMIN_EMAIL,
+                    password: ADMIN_PASSWORD
+                });
+                
+                if (error) {
+                    log(`❌ Erreur connexion admin: ${error.message}`, 'error');
+                    log('Tentative de création du compte admin...', 'warning');
+                    
+                    // Créer le compte admin s'il n'existe pas
+                    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                        email: ADMIN_EMAIL,
+                        password: ADMIN_PASSWORD,
+                        options: {
+                            data: {
+                                id: ADMIN_ID,
+                                role: 'admin'
+                            }
+                        }
+                    });
+                    
+                    if (signUpError) {
+                        log(`❌ Erreur création admin: ${signUpError.message}`, 'error');
+                    } else {
+                        log('✅ Compte admin créé!', 'success');
+                    }
+                } else {
+                    log('✅ Connecté en tant qu\'admin', 'success');
+                    log(`Admin ID: ${data.user.id}`, 'info');
+                }
+                
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUserAuth() {
+            log('Test connexion utilisateur test...', 'info');
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: 'test1@example.com',
+                    password: 'test123'
+                });
+                
+                if (error) {
+                    log(`⚠️ Pas de compte utilisateur test: ${error.message}`, 'warning');
+                } else {
+                    log('✅ Connecté en tant qu\'utilisateur test', 'success');
+                    log(`User ID: ${data.user.id}`, 'info');
+                }
+                
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function getCurrentUser() {
+            log('Récupération utilisateur actuel...', 'info');
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                    log('✅ Utilisateur connecté:', 'success');
+                    log(`  Email: ${user.email}`, 'info');
+                    log(`  ID: ${user.id}`, 'info');
+                    log(`  Role: ${user.role}`, 'info');
+                } else {
+                    log('⚠️ Aucun utilisateur connecté', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // Charger automatiquement au démarrage
+        window.addEventListener('load', () => {
+            log('🚀 Interface de réparation prête', 'info');
+            log('Cliquez sur "Vérifier Structure" pour commencer', 'info');
+        });
+    </script>
+</body>
+</html>

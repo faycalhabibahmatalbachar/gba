@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Auto - Surveillance en temps réel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .status-active {
+            background: #4caf50;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .status-inactive {
+            background: #f44336;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-info {
+            background: #2196f3;
+            color: white;
+        }
+
+        .monitor-content {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            margin-bottom: 20px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .log-entry {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-error {
+            background: #ffebee;
+            border-left-color: #f44336;
+            color: #b71c1c;
+        }
+
+        .log-success {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+            color: #1b5e20;
+        }
+
+        .log-warning {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+            color: #e65100;
+        }
+
+        .log-info {
+            background: #e3f2fd;
+            border-left-color: #2196f3;
+            color: #0d47a1;
+        }
+
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-right: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .clear-icon {
+            animation: rotate 0.5s ease;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .solution-section {
+            background: #f0f4ff;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .solution-title {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .solution-content {
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            🔍 Monitor Auto - Surveillance temps réel
+            <span id="status" class="status-indicator status-inactive">
+                ⏸️ Inactif
+            </span>
+        </h1>
+
+        <div class="controls">
+            <input type="file" id="fileInput" class="file-input" accept=".txt">
+            <button class="btn-primary" onclick="selectFile()">
+                📁 Sélectionner monitor.txt
+            </button>
+            <button class="btn-success" onclick="startMonitoring()" id="startBtn">
+                ▶️ Démarrer
+            </button>
+            <button class="btn-danger" onclick="stopMonitoring()" id="stopBtn" disabled>
+                ⏹️ Arrêter
+            </button>
+            <button class="btn-info" onclick="clearLogs()">
+                🗑️ Effacer logs
+            </button>
+            <button class="btn-info" onclick="analyzeLogs()">
+                🔍 Analyser erreurs
+            </button>
+        </div>
+
+        <div id="monitorContent" class="monitor-content">
+            <div class="log-entry log-info">
+                <span class="timestamp">[${new Date().toLocaleTimeString()}]</span>
+                En attente de la sélection du fichier monitor.txt...
+            </div>
+        </div>
+
+        <div id="solutionSection" style="display: none;" class="solution-section">
+            <div class="solution-title">💡 Solutions suggérées:</div>
+            <div id="solutionContent" class="solution-content"></div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">📊 Total des logs</div>
+                <div class="stat-value" id="totalLogs">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">❌ Erreurs</div>
+                <div class="stat-value" id="errorCount" style="color: #f44336;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">⚠️ Avertissements</div>
+                <div class="stat-value" id="warningCount" style="color: #ff9800;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">✅ Succès</div>
+                <div class="stat-value" id="successCount" style="color: #4caf50;">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let monitorInterval = null;
+        let fileContent = '';
+        let lastContent = '';
+        let stats = {
+            total: 0,
+            errors: 0,
+            warnings: 0,
+            success: 0
+        };
+
+        function selectFile() {
+            document.getElementById('fileInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.name === 'monitor.txt') {
+                readFile(file);
+            } else {
+                alert('Veuillez sélectionner le fichier monitor.txt');
+            }
+        });
+
+        function readFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                fileContent = e.target.result;
+                displayContent(fileContent);
+                addLog('Fichier monitor.txt chargé avec succès', 'success');
+            };
+            reader.readAsText(file);
+        }
+
+        function startMonitoring() {
+            if (!fileContent && !document.getElementById('fileInput').files[0]) {
+                alert('Veuillez d\'abord sélectionner le fichier monitor.txt');
+                return;
+            }
+
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('status').className = 'status-indicator status-active';
+            document.getElementById('status').innerHTML = '🟢 Actif';
+            
+            addLog('Surveillance démarrée', 'success');
+
+            // Vérifier le fichier toutes les 2 secondes
+            monitorInterval = setInterval(() => {
+                if (document.getElementById('fileInput').files[0]) {
+                    readFileForMonitoring(document.getElementById('fileInput').files[0]);
+                }
+            }, 2000);
+        }
+
+        function stopMonitoring() {
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('status').className = 'status-indicator status-inactive';
+            document.getElementById('status').innerHTML = '⏸️ Inactif';
+            
+            addLog('Surveillance arrêtée', 'warning');
+        }
+
+        function readFileForMonitoring(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const newContent = e.target.result;
+                if (newContent !== lastContent) {
+                    lastContent = newContent;
+                    displayContent(newContent);
+                    analyzeContent(newContent);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayContent(content) {
+            const container = document.getElementById('monitorContent');
+            container.innerHTML = '';
+            
+            const lines = content.split('\n');
+            lines.forEach(line => {
+                if (line.trim()) {
+                    const type = detectLineType(line);
+                    const div = document.createElement('div');
+                    div.className = `log-entry log-${type}`;
+                    div.innerHTML = `
+                        <span class="timestamp">[${new Date().toLocaleTimeString()}]</span>
+                        ${escapeHtml(line)}
+                    `;
+                    container.appendChild(div);
+                    updateStats(type);
+                }
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function detectLineType(line) {
+            const lowerLine = line.toLowerCase();
+            if (lowerLine.includes('error') || lowerLine.includes('failed') || lowerLine.includes('erreur')) {
+                return 'error';
+            } else if (lowerLine.includes('warning') || lowerLine.includes('warn')) {
+                return 'warning';
+            } else if (lowerLine.includes('success') || lowerLine.includes('✅') || lowerLine.includes('completed')) {
+                return 'success';
+            }
+            return 'info';
+        }
+
+        function analyzeContent(content) {
+            const lowerContent = content.toLowerCase();
+            const solutions = [];
+
+            // Analyser les erreurs spécifiques
+            if (lowerContent.includes('failed to resolve import')) {
+                solutions.push({
+                    title: 'Erreur d\'import',
+                    solution: 'Vérifiez que le chemin d\'import est correct et que le fichier existe.'
+                });
+            }
+
+            if (lowerContent.includes('supabase')) {
+                solutions.push({
+                    title: 'Problème Supabase',
+                    solution: 'Vérifiez la configuration Supabase et les clés API.'
+                });
+            }
+
+            if (lowerContent.includes('websocket')) {
+                solutions.push({
+                    title: 'Connexion WebSocket',
+                    solution: 'Vérifiez la connexion réseau et les paramètres de Realtime.'
+                });
+            }
+
+            if (solutions.length > 0) {
+                showSolutions(solutions);
+            }
+        }
+
+        function showSolutions(solutions) {
+            const solutionSection = document.getElementById('solutionSection');
+            const solutionContent = document.getElementById('solutionContent');
+            
+            solutionContent.innerHTML = solutions.map(s => `
+                <div style="margin-bottom: 10px;">
+                    <strong>${s.title}:</strong> ${s.solution}
+                </div>
+            `).join('');
+            
+            solutionSection.style.display = 'block';
+        }
+
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('monitorContent');
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.innerHTML = `
+                <span class="timestamp">[${new Date().toLocaleTimeString()}]</span>
+                ${message}
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            updateStats(type);
+        }
+
+        function updateStats(type) {
+            stats.total++;
+            if (type === 'error') stats.errors++;
+            else if (type === 'warning') stats.warnings++;
+            else if (type === 'success') stats.success++;
+
+            document.getElementById('totalLogs').textContent = stats.total;
+            document.getElementById('errorCount').textContent = stats.errors;
+            document.getElementById('warningCount').textContent = stats.warnings;
+            document.getElementById('successCount').textContent = stats.success;
+        }
+
+        function clearLogs() {
+            document.getElementById('monitorContent').innerHTML = '';
+            stats = { total: 0, errors: 0, warnings: 0, success: 0 };
+            updateStats('');
+            addLog('Logs effacés', 'info');
+        }
+
+        function analyzeLogs() {
+            const content = document.getElementById('monitorContent').textContent;
+            if (!content) {
+                alert('Aucun log à analyser');
+                return;
+            }
+
+            addLog(`Analyse: ${stats.errors} erreurs détectées`, stats.errors > 0 ? 'error' : 'success');
+            
+            if (stats.errors > 0) {
+                showSolutions([
+                    {
+                        title: 'Résolution recommandée',
+                        solution: 'Vérifiez les imports, les configurations et relancez l\'application.'
+                    }
+                ]);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Auto-load si fichier déjà présent (pour le développement)
+        window.addEventListener('load', function() {
+            // Essayer de charger automatiquement monitor.txt s'il est dans le même dossier
+            fetch('/monitor.txt')
+                .then(response => {
+                    if (response.ok) return response.text();
+                    throw new Error('Fichier non trouvé');
+                })
+                .then(content => {
+                    fileContent = content;
+                    displayContent(content);
+                    addLog('Fichier monitor.txt chargé automatiquement', 'success');
+                })
+                .catch(() => {
+                    console.log('monitor.txt non trouvé, sélection manuelle requise');
+                });
+        });
+    </script>
+</body>
+</html>

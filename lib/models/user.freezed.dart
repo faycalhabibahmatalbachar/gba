@@ -21,13 +21,32 @@ UserProfile _$UserProfileFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$UserProfile {
   String get id => throw _privateConstructorUsedError;
-  String? get fullName => throw _privateConstructorUsedError;
   String? get email => throw _privateConstructorUsedError;
+  @JsonKey(name: 'first_name')
+  String? get firstName => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_name')
+  String? get lastName => throw _privateConstructorUsedError;
   String? get phone => throw _privateConstructorUsedError;
+  String? get bio => throw _privateConstructorUsedError;
+  String? get address => throw _privateConstructorUsedError;
+  String? get city => throw _privateConstructorUsedError;
+  @JsonKey(name: 'postal_code')
+  String? get postalCode => throw _privateConstructorUsedError;
+  String? get country => throw _privateConstructorUsedError;
+  @JsonKey(name: 'avatar_url')
   String? get avatarUrl => throw _privateConstructorUsedError;
-  Map<String, dynamic> get address => throw _privateConstructorUsedError;
-  Map<String, dynamic> get preferences => throw _privateConstructorUsedError;
+  @JsonKey(name: 'loyalty_points')
+  int get loyaltyPoints => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_premium')
+  bool get isPremium => throw _privateConstructorUsedError;
+  @JsonKey(name: 'notification_preferences')
+  Map<String, dynamic>? get notificationPreferences =>
+      throw _privateConstructorUsedError;
+  @JsonKey(name: 'member_since')
+  DateTime? get memberSince => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
   /// Serializes this UserProfile to a JSON map.
@@ -48,14 +67,23 @@ abstract class $UserProfileCopyWith<$Res> {
   @useResult
   $Res call(
       {String id,
-      String? fullName,
       String? email,
+      @JsonKey(name: 'first_name') String? firstName,
+      @JsonKey(name: 'last_name') String? lastName,
       String? phone,
-      String? avatarUrl,
-      Map<String, dynamic> address,
-      Map<String, dynamic> preferences,
-      DateTime? createdAt,
-      DateTime? updatedAt});
+      String? bio,
+      String? address,
+      String? city,
+      @JsonKey(name: 'postal_code') String? postalCode,
+      String? country,
+      @JsonKey(name: 'avatar_url') String? avatarUrl,
+      @JsonKey(name: 'loyalty_points') int loyaltyPoints,
+      @JsonKey(name: 'is_premium') bool isPremium,
+      @JsonKey(name: 'notification_preferences')
+      Map<String, dynamic>? notificationPreferences,
+      @JsonKey(name: 'member_since') DateTime? memberSince,
+      @JsonKey(name: 'created_at') DateTime? createdAt,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -74,12 +102,20 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
   @override
   $Res call({
     Object? id = null,
-    Object? fullName = freezed,
     Object? email = freezed,
+    Object? firstName = freezed,
+    Object? lastName = freezed,
     Object? phone = freezed,
+    Object? bio = freezed,
+    Object? address = freezed,
+    Object? city = freezed,
+    Object? postalCode = freezed,
+    Object? country = freezed,
     Object? avatarUrl = freezed,
-    Object? address = null,
-    Object? preferences = null,
+    Object? loyaltyPoints = null,
+    Object? isPremium = null,
+    Object? notificationPreferences = freezed,
+    Object? memberSince = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -88,30 +124,62 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
-      fullName: freezed == fullName
-          ? _value.fullName
-          : fullName // ignore: cast_nullable_to_non_nullable
-              as String?,
       email: freezed == email
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
+              as String?,
+      firstName: freezed == firstName
+          ? _value.firstName
+          : firstName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      lastName: freezed == lastName
+          ? _value.lastName
+          : lastName // ignore: cast_nullable_to_non_nullable
               as String?,
       phone: freezed == phone
           ? _value.phone
           : phone // ignore: cast_nullable_to_non_nullable
               as String?,
+      bio: freezed == bio
+          ? _value.bio
+          : bio // ignore: cast_nullable_to_non_nullable
+              as String?,
+      address: freezed == address
+          ? _value.address
+          : address // ignore: cast_nullable_to_non_nullable
+              as String?,
+      city: freezed == city
+          ? _value.city
+          : city // ignore: cast_nullable_to_non_nullable
+              as String?,
+      postalCode: freezed == postalCode
+          ? _value.postalCode
+          : postalCode // ignore: cast_nullable_to_non_nullable
+              as String?,
+      country: freezed == country
+          ? _value.country
+          : country // ignore: cast_nullable_to_non_nullable
+              as String?,
       avatarUrl: freezed == avatarUrl
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
               as String?,
-      address: null == address
-          ? _value.address
-          : address // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
-      preferences: null == preferences
-          ? _value.preferences
-          : preferences // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
+      loyaltyPoints: null == loyaltyPoints
+          ? _value.loyaltyPoints
+          : loyaltyPoints // ignore: cast_nullable_to_non_nullable
+              as int,
+      isPremium: null == isPremium
+          ? _value.isPremium
+          : isPremium // ignore: cast_nullable_to_non_nullable
+              as bool,
+      notificationPreferences: freezed == notificationPreferences
+          ? _value.notificationPreferences
+          : notificationPreferences // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      memberSince: freezed == memberSince
+          ? _value.memberSince
+          : memberSince // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       createdAt: freezed == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -134,14 +202,23 @@ abstract class _$$UserProfileImplCopyWith<$Res>
   @useResult
   $Res call(
       {String id,
-      String? fullName,
       String? email,
+      @JsonKey(name: 'first_name') String? firstName,
+      @JsonKey(name: 'last_name') String? lastName,
       String? phone,
-      String? avatarUrl,
-      Map<String, dynamic> address,
-      Map<String, dynamic> preferences,
-      DateTime? createdAt,
-      DateTime? updatedAt});
+      String? bio,
+      String? address,
+      String? city,
+      @JsonKey(name: 'postal_code') String? postalCode,
+      String? country,
+      @JsonKey(name: 'avatar_url') String? avatarUrl,
+      @JsonKey(name: 'loyalty_points') int loyaltyPoints,
+      @JsonKey(name: 'is_premium') bool isPremium,
+      @JsonKey(name: 'notification_preferences')
+      Map<String, dynamic>? notificationPreferences,
+      @JsonKey(name: 'member_since') DateTime? memberSince,
+      @JsonKey(name: 'created_at') DateTime? createdAt,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -158,12 +235,20 @@ class __$$UserProfileImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? id = null,
-    Object? fullName = freezed,
     Object? email = freezed,
+    Object? firstName = freezed,
+    Object? lastName = freezed,
     Object? phone = freezed,
+    Object? bio = freezed,
+    Object? address = freezed,
+    Object? city = freezed,
+    Object? postalCode = freezed,
+    Object? country = freezed,
     Object? avatarUrl = freezed,
-    Object? address = null,
-    Object? preferences = null,
+    Object? loyaltyPoints = null,
+    Object? isPremium = null,
+    Object? notificationPreferences = freezed,
+    Object? memberSince = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -172,30 +257,62 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
-      fullName: freezed == fullName
-          ? _value.fullName
-          : fullName // ignore: cast_nullable_to_non_nullable
-              as String?,
       email: freezed == email
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
+              as String?,
+      firstName: freezed == firstName
+          ? _value.firstName
+          : firstName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      lastName: freezed == lastName
+          ? _value.lastName
+          : lastName // ignore: cast_nullable_to_non_nullable
               as String?,
       phone: freezed == phone
           ? _value.phone
           : phone // ignore: cast_nullable_to_non_nullable
               as String?,
+      bio: freezed == bio
+          ? _value.bio
+          : bio // ignore: cast_nullable_to_non_nullable
+              as String?,
+      address: freezed == address
+          ? _value.address
+          : address // ignore: cast_nullable_to_non_nullable
+              as String?,
+      city: freezed == city
+          ? _value.city
+          : city // ignore: cast_nullable_to_non_nullable
+              as String?,
+      postalCode: freezed == postalCode
+          ? _value.postalCode
+          : postalCode // ignore: cast_nullable_to_non_nullable
+              as String?,
+      country: freezed == country
+          ? _value.country
+          : country // ignore: cast_nullable_to_non_nullable
+              as String?,
       avatarUrl: freezed == avatarUrl
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
               as String?,
-      address: null == address
-          ? _value._address
-          : address // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
-      preferences: null == preferences
-          ? _value._preferences
-          : preferences // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
+      loyaltyPoints: null == loyaltyPoints
+          ? _value.loyaltyPoints
+          : loyaltyPoints // ignore: cast_nullable_to_non_nullable
+              as int,
+      isPremium: null == isPremium
+          ? _value.isPremium
+          : isPremium // ignore: cast_nullable_to_non_nullable
+              as bool,
+      notificationPreferences: freezed == notificationPreferences
+          ? _value._notificationPreferences
+          : notificationPreferences // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      memberSince: freezed == memberSince
+          ? _value.memberSince
+          : memberSince // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       createdAt: freezed == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -213,16 +330,24 @@ class __$$UserProfileImplCopyWithImpl<$Res>
 class _$UserProfileImpl implements _UserProfile {
   const _$UserProfileImpl(
       {required this.id,
-      this.fullName,
       this.email,
+      @JsonKey(name: 'first_name') this.firstName,
+      @JsonKey(name: 'last_name') this.lastName,
       this.phone,
-      this.avatarUrl,
-      final Map<String, dynamic> address = const {},
-      final Map<String, dynamic> preferences = const {},
-      this.createdAt,
-      this.updatedAt})
-      : _address = address,
-        _preferences = preferences;
+      this.bio,
+      this.address,
+      this.city,
+      @JsonKey(name: 'postal_code') this.postalCode,
+      this.country,
+      @JsonKey(name: 'avatar_url') this.avatarUrl,
+      @JsonKey(name: 'loyalty_points') this.loyaltyPoints = 0,
+      @JsonKey(name: 'is_premium') this.isPremium = false,
+      @JsonKey(name: 'notification_preferences')
+      final Map<String, dynamic>? notificationPreferences,
+      @JsonKey(name: 'member_since') this.memberSince,
+      @JsonKey(name: 'created_at') this.createdAt,
+      @JsonKey(name: 'updated_at') this.updatedAt})
+      : _notificationPreferences = notificationPreferences;
 
   factory _$UserProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserProfileImplFromJson(json);
@@ -230,39 +355,60 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String id;
   @override
-  final String? fullName;
-  @override
   final String? email;
+  @override
+  @JsonKey(name: 'first_name')
+  final String? firstName;
+  @override
+  @JsonKey(name: 'last_name')
+  final String? lastName;
   @override
   final String? phone;
   @override
+  final String? bio;
+  @override
+  final String? address;
+  @override
+  final String? city;
+  @override
+  @JsonKey(name: 'postal_code')
+  final String? postalCode;
+  @override
+  final String? country;
+  @override
+  @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
-  final Map<String, dynamic> _address;
   @override
-  @JsonKey()
-  Map<String, dynamic> get address {
-    if (_address is EqualUnmodifiableMapView) return _address;
+  @JsonKey(name: 'loyalty_points')
+  final int loyaltyPoints;
+  @override
+  @JsonKey(name: 'is_premium')
+  final bool isPremium;
+  final Map<String, dynamic>? _notificationPreferences;
+  @override
+  @JsonKey(name: 'notification_preferences')
+  Map<String, dynamic>? get notificationPreferences {
+    final value = _notificationPreferences;
+    if (value == null) return null;
+    if (_notificationPreferences is EqualUnmodifiableMapView)
+      return _notificationPreferences;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(_address);
+    return EqualUnmodifiableMapView(value);
   }
 
-  final Map<String, dynamic> _preferences;
   @override
-  @JsonKey()
-  Map<String, dynamic> get preferences {
-    if (_preferences is EqualUnmodifiableMapView) return _preferences;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(_preferences);
-  }
-
+  @JsonKey(name: 'member_since')
+  final DateTime? memberSince;
   @override
+  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'UserProfile(id: $id, fullName: $fullName, email: $email, phone: $phone, avatarUrl: $avatarUrl, address: $address, preferences: $preferences, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'UserProfile(id: $id, email: $email, firstName: $firstName, lastName: $lastName, phone: $phone, bio: $bio, address: $address, city: $city, postalCode: $postalCode, country: $country, avatarUrl: $avatarUrl, loyaltyPoints: $loyaltyPoints, isPremium: $isPremium, notificationPreferences: $notificationPreferences, memberSince: $memberSince, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -271,15 +417,28 @@ class _$UserProfileImpl implements _UserProfile {
         (other.runtimeType == runtimeType &&
             other is _$UserProfileImpl &&
             (identical(other.id, id) || other.id == id) &&
-            (identical(other.fullName, fullName) ||
-                other.fullName == fullName) &&
             (identical(other.email, email) || other.email == email) &&
+            (identical(other.firstName, firstName) ||
+                other.firstName == firstName) &&
+            (identical(other.lastName, lastName) ||
+                other.lastName == lastName) &&
             (identical(other.phone, phone) || other.phone == phone) &&
+            (identical(other.bio, bio) || other.bio == bio) &&
+            (identical(other.address, address) || other.address == address) &&
+            (identical(other.city, city) || other.city == city) &&
+            (identical(other.postalCode, postalCode) ||
+                other.postalCode == postalCode) &&
+            (identical(other.country, country) || other.country == country) &&
             (identical(other.avatarUrl, avatarUrl) ||
                 other.avatarUrl == avatarUrl) &&
-            const DeepCollectionEquality().equals(other._address, _address) &&
-            const DeepCollectionEquality()
-                .equals(other._preferences, _preferences) &&
+            (identical(other.loyaltyPoints, loyaltyPoints) ||
+                other.loyaltyPoints == loyaltyPoints) &&
+            (identical(other.isPremium, isPremium) ||
+                other.isPremium == isPremium) &&
+            const DeepCollectionEquality().equals(
+                other._notificationPreferences, _notificationPreferences) &&
+            (identical(other.memberSince, memberSince) ||
+                other.memberSince == memberSince) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -291,12 +450,20 @@ class _$UserProfileImpl implements _UserProfile {
   int get hashCode => Object.hash(
       runtimeType,
       id,
-      fullName,
       email,
+      firstName,
+      lastName,
       phone,
+      bio,
+      address,
+      city,
+      postalCode,
+      country,
       avatarUrl,
-      const DeepCollectionEquality().hash(_address),
-      const DeepCollectionEquality().hash(_preferences),
+      loyaltyPoints,
+      isPremium,
+      const DeepCollectionEquality().hash(_notificationPreferences),
+      memberSince,
       createdAt,
       updatedAt);
 
@@ -318,15 +485,25 @@ class _$UserProfileImpl implements _UserProfile {
 
 abstract class _UserProfile implements UserProfile {
   const factory _UserProfile(
-      {required final String id,
-      final String? fullName,
-      final String? email,
-      final String? phone,
-      final String? avatarUrl,
-      final Map<String, dynamic> address,
-      final Map<String, dynamic> preferences,
-      final DateTime? createdAt,
-      final DateTime? updatedAt}) = _$UserProfileImpl;
+          {required final String id,
+          final String? email,
+          @JsonKey(name: 'first_name') final String? firstName,
+          @JsonKey(name: 'last_name') final String? lastName,
+          final String? phone,
+          final String? bio,
+          final String? address,
+          final String? city,
+          @JsonKey(name: 'postal_code') final String? postalCode,
+          final String? country,
+          @JsonKey(name: 'avatar_url') final String? avatarUrl,
+          @JsonKey(name: 'loyalty_points') final int loyaltyPoints,
+          @JsonKey(name: 'is_premium') final bool isPremium,
+          @JsonKey(name: 'notification_preferences')
+          final Map<String, dynamic>? notificationPreferences,
+          @JsonKey(name: 'member_since') final DateTime? memberSince,
+          @JsonKey(name: 'created_at') final DateTime? createdAt,
+          @JsonKey(name: 'updated_at') final DateTime? updatedAt}) =
+      _$UserProfileImpl;
 
   factory _UserProfile.fromJson(Map<String, dynamic> json) =
       _$UserProfileImpl.fromJson;
@@ -334,20 +511,46 @@ abstract class _UserProfile implements UserProfile {
   @override
   String get id;
   @override
-  String? get fullName;
-  @override
   String? get email;
+  @override
+  @JsonKey(name: 'first_name')
+  String? get firstName;
+  @override
+  @JsonKey(name: 'last_name')
+  String? get lastName;
   @override
   String? get phone;
   @override
+  String? get bio;
+  @override
+  String? get address;
+  @override
+  String? get city;
+  @override
+  @JsonKey(name: 'postal_code')
+  String? get postalCode;
+  @override
+  String? get country;
+  @override
+  @JsonKey(name: 'avatar_url')
   String? get avatarUrl;
   @override
-  Map<String, dynamic> get address;
+  @JsonKey(name: 'loyalty_points')
+  int get loyaltyPoints;
   @override
-  Map<String, dynamic> get preferences;
+  @JsonKey(name: 'is_premium')
+  bool get isPremium;
   @override
+  @JsonKey(name: 'notification_preferences')
+  Map<String, dynamic>? get notificationPreferences;
+  @override
+  @JsonKey(name: 'member_since')
+  DateTime? get memberSince;
+  @override
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
 
   /// Create a copy of UserProfile

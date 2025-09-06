@@ -39,6 +39,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   bool _isSending = false;
   bool _isTyping = false;
   
+  // Subscription pour éviter l'erreur setState après dispose
+  var _messageSubscription;
+  
   @override
   void initState() {
     super.initState();
@@ -105,27 +108,34 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       // Marquer comme lus
       await messagingService.markMessagesAsRead([_conversation!.id]);
       
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       
       // Scroll vers le bas
       _scrollToBottom();
       
-      // Écouter les nouveaux messages
-      messagingService.newMessageStream.listen((message) {
+      // Écouter les nouveaux messages (avec subscription pour cleanup)
+      _messageSubscription = messagingService.newMessageStream.listen((message) {
         if (message.conversationId == _conversation!.id) {
-          setState(() {
-            _messages.add(message);
-          });
-          _scrollToBottom();
+          // Vérifier si le widget est toujours monté avant setState
+          if (mounted) {
+            setState(() {
+              _messages.add(message);
+            });
+            _scrollToBottom();
+          }
         }
       });
     } catch (e) {
       print('❌ Erreur chargement conversation: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -145,9 +155,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     final text = _messageController.text.trim();
     if (text.isEmpty || _conversation == null) return;
     
-    setState(() {
-      _isSending = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isSending = true;
+      });
+    }
     
     // Vibration feedback
     HapticFeedback.lightImpact();
@@ -168,9 +180,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         ),
       );
     } finally {
-      setState(() {
-        _isSending = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
   }
 
@@ -632,6 +646,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    // Annuler la subscription pour éviter setState après dispose
+    _messageSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
