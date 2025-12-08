@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -14,30 +14,14 @@ import '../providers/favorites_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'settings_screen_premium.dart';
 
-// Provider pour le profil utilisateur
-final profileProvider = FutureProvider<Profile?>((ref) async {
-  final profileService = ProfileService();
-  return await profileService.getCurrentUserProfile();
-});
-
-// Provider pour les statistiques
-final profileStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  return {
-    'orders': 12,
-    'favorites': 8,
-    'reviews': 15,
-    'points': 250,
-  };
-});
-
-class ProfileScreenUltra extends ConsumerStatefulWidget {
+class ProfileScreenUltra extends StatefulWidget {
   const ProfileScreenUltra({super.key});
 
   @override
-  ConsumerState<ProfileScreenUltra> createState() => _ProfileScreenUltraState();
+  State<ProfileScreenUltra> createState() => _ProfileScreenUltraState();
 }
 
-class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
+class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -52,23 +36,28 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
   late final ProfileService _profileService;
   bool _isEditing = false;
   bool _isUploadingPhoto = false;
+  Profile? _profile;
+  bool _isLoadingProfile = true;
+  Map<String, dynamic> _stats = {'orders': 0, 'favorites': 0, 'reviews': 0, 'points': 0};
   int _selectedTab = 0;
   
   // Controllers pour les champs
-  late TextEditingController _firstNameController;
-  late TextEditingController _lastNameController;
-  late TextEditingController _emailController;
-  late TextEditingController _phoneController;
-  late TextEditingController _bioController;
-  late TextEditingController _addressController;
-  late TextEditingController _cityController;
-  late TextEditingController _postalCodeController;
-  late TextEditingController _countryController;
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _bioController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _postalCodeController = TextEditingController();
+  final _countryController = TextEditingController(text: 'France');
   
   @override
   void initState() {
     super.initState();
     _profileService = ProfileService();
+    _loadProfile();
+    _loadStats();
     
     // Initialisation des animations
     _fadeController = AnimationController(
@@ -115,17 +104,48 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
     _slideController.forward();
     _scaleController.forward();
     _pulseController.repeat(reverse: true);
-    
-    // Initialisation des controllers de texte
-    _firstNameController = TextEditingController();
-    _lastNameController = TextEditingController();
-    _emailController = TextEditingController();
-    _phoneController = TextEditingController();
-    _bioController = TextEditingController();
-    _addressController = TextEditingController();
-    _cityController = TextEditingController();
-    _postalCodeController = TextEditingController();
-    _countryController = TextEditingController(text: 'France');
+  }
+  
+  Future<void> _loadProfile() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _isLoadingProfile = false;
+          if (profile != null) {
+            _firstNameController.text = profile.firstName ?? '';
+            _lastNameController.text = profile.lastName ?? '';
+            _phoneController.text = profile.phone ?? '';
+            _bioController.text = profile.bio ?? '';
+            _addressController.text = profile.address ?? '';
+            _cityController.text = profile.city ?? '';
+            _postalCodeController.text = profile.postalCode ?? '';
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading profile: $e');
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+      }
+    }
+  }
+  
+  Future<void> _loadStats() async {
+    // Simulate loading stats - in production, load from API
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() {
+        _stats = {
+          'orders': 12,
+          'favorites': 8,
+          'reviews': 15,
+          'points': 250,
+        };
+      });
+    }
   }
   
   @override
@@ -213,7 +233,7 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
           final avatarUrl = await _profileService.uploadAvatar(image);
           
           if (avatarUrl != null) {
-            ref.refresh(profileProvider);
+            _loadProfile();
             _showSuccessMessage('Photo mise à jour avec succès!');
           }
         }
@@ -269,7 +289,7 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
     
     if (success && mounted) {
       setState(() => _isEditing = false);
-      ref.refresh(profileProvider);
+      _loadProfile();
       _showSuccessMessage('Profil mis à jour avec succès!');
     }
   }
@@ -326,92 +346,87 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
   
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(profileProvider);
-    final statsAsync = ref.watch(profileStatsProvider);
+    // Get data from state
+    final profile = _profile;
+    final isLoading = _isLoadingProfile;
+    final stats = _stats;
+    final favoritesCount = 0; // TODO: Get from FavoritesProvider
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
     
+    if (isLoading) {
+      return _buildLoadingState();
+    }
+    
+    if (profile == null) {
+      return _buildErrorState();
+    }
+    
     return Scaffold(
       extendBodyBehindAppBar: true,
-      body: profileAsync.when(
-        loading: () => _buildLoadingState(),
-        error: (error, stack) => _buildErrorState(),
-        data: (profile) {
-          if (profile != null && !_isEditing) {
-            _firstNameController.text = profile.firstName ?? '';
-            _lastNameController.text = profile.lastName ?? '';
-            _emailController.text = profile.email ?? '';
-            _phoneController.text = profile.phone ?? '';
-            _bioController.text = profile.bio ?? '';
-            _addressController.text = profile.address ?? '';
-            _cityController.text = profile.city ?? '';
-            _postalCodeController.text = profile.postalCode ?? '';
-          }
+      body: Stack(
+        children: [
+          // Background gradient
+          AnimatedContainer(
+            duration: const Duration(seconds: 3),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDarkMode
+                    ? [
+                        Colors.deepPurple.shade900.withOpacity(0.3),
+                        Colors.purple.shade900.withOpacity(0.3),
+                      ]
+                    : [
+                        const Color(0xFF667eea).withOpacity(0.05),
+                        const Color(0xFF764ba2).withOpacity(0.05),
+                      ],
+              ),
+            ),
+          ),
           
-          return Stack(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(seconds: 3),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDarkMode
-                        ? [
-                            Colors.deepPurple.shade900.withOpacity(0.3),
-                            Colors.purple.shade900.withOpacity(0.3),
-                          ]
-                        : [
-                            const Color(0xFF667eea).withOpacity(0.05),
-                            const Color(0xFF764ba2).withOpacity(0.05),
-                          ],
-                  ),
-                ),
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 320,
+                pinned: true,
+                backgroundColor: Colors.transparent,
+                flexibleSpace: _buildModernHeader(profile),
               ),
               
-              CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  SliverAppBar(
-                    expandedHeight: 320,
-                    pinned: true,
-                    backgroundColor: Colors.transparent,
-                    flexibleSpace: _buildModernHeader(profile),
-                  ),
-                  
-                  SliverToBoxAdapter(
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: SlideTransition(
-                        position: _slideAnimation,
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            children: [
-                              _buildAnimatedStats(statsAsync),
-                              const SizedBox(height: 32),
-                              _buildTabSelector(),
-                              const SizedBox(height: 24),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 500),
-                                child: _selectedTab == 0
-                                    ? _buildProfileInfo(profile)
-                                    : _buildEditForm(profile),
-                              ),
-                              const SizedBox(height: 32),
-                              _buildQuickActions(),
-                              const SizedBox(height: 100),
-                            ],
+              SliverToBoxAdapter(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          _buildAnimatedStats(stats),
+                          const SizedBox(height: 32),
+                          _buildTabSelector(),
+                          const SizedBox(height: 24),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 500),
+                            child: _selectedTab == 0
+                                ? _buildProfileInfo(profile)
+                                : _buildEditForm(profile),
                           ),
-                        ),
+                          const SizedBox(height: 32),
+                          _buildQuickActions(),
+                          const SizedBox(height: 100),
+                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ],
-          );
-        },
+          ),
+        ],
       ),
       bottomNavigationBar: const BottomNavBar(currentIndex: 4),
     );
@@ -426,24 +441,33 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
   }
   
   Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            FontAwesomeIcons.triangleExclamation,
-            size: 60,
-            color: Colors.red[300],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Erreur de chargement',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              FontAwesomeIcons.triangleExclamation,
+              size: 60,
+              color: Colors.red[300],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              'Erreur de chargement',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                _loadProfile();
+              },
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -614,11 +638,8 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
     );
   }
   
-  Widget _buildAnimatedStats(AsyncValue<Map<String, dynamic>> statsAsync) {
-    return statsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const SizedBox(),
-      data: (stats) => GridView.count(
+  Widget _buildAnimatedStats(Map<String, dynamic> stats) {
+    return GridView.count(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         crossAxisCount: 2,
@@ -655,8 +676,7 @@ class _ProfileScreenUltraState extends ConsumerState<ProfileScreenUltra>
             delay: 300,
           ),
         ],
-      ),
-    );
+      );
   }
   
   Widget _buildStatCard({

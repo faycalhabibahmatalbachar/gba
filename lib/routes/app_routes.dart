@@ -6,6 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/home_screen_premium.dart';
 import '../screens/product/product_detail_screen.dart';
+// import '../screens/product/product_search_screen.dart'; // Fichier n'existe pas encore
+import '../screens/checkout/ultra_checkout_screen.dart';
+import '../screens/orders/my_orders_screen.dart';
 import '../screens/favorites_screen_premium.dart';
 import '../screens/categories_screen_premium.dart';
 import '../screens/cart_screen_premium.dart';
@@ -98,6 +101,10 @@ class AppRoutes {
             );
           },
         ),
+      ),
+      GoRoute(
+        path: '/checkout',
+        builder: (context, state) => const UltraCheckoutScreen(),
       ),
       GoRoute(
         path: '/categories',

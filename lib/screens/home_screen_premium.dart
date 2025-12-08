@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:provider/provider.dart' as provider;
+import 'package:provider/provider.dart';
 import 'dart:ui';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -9,19 +8,20 @@ import 'package:go_router/go_router.dart';
 import 'package:badges/badges.dart' as badges;
 import '../providers/cart_provider.dart';
 import '../providers/categories_provider.dart';
-import '../providers/products_provider.dart';
+import '../providers/product_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../providers/messaging_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../services/messaging_service.dart';
+import '../services/activity_tracking_service.dart';
 
-class HomeScreenPremium extends ConsumerStatefulWidget {
+class HomeScreenPremium extends StatefulWidget {
   const HomeScreenPremium({super.key});
 
   @override
-  ConsumerState<HomeScreenPremium> createState() => _HomeScreenPremiumState();
+  State<HomeScreenPremium> createState() => _HomeScreenPremiumState();
 }
 
-class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> 
+class _HomeScreenPremiumState extends State<HomeScreenPremium> 
     with TickerProviderStateMixin {
   String? selectedCategoryId;
   int _currentIndex = 0;
@@ -61,24 +61,9 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
   
   void _loadUnreadMessages() async {
     try {
-      final messagingService = context.read<MessagingService>();
-      await messagingService.loadConversations();
-      
+      final messagingService = Provider.of<MessagingService>(context, listen: false);
       setState(() {
-        _unreadMessages = messagingService.conversations
-            .where((c) => c.unreadCount > 0)
-            .fold(0, (sum, c) => sum + c.unreadCount);
-      });
-      
-      // Écouter les changements
-      messagingService.addListener(() {
-        if (mounted) {
-          setState(() {
-            _unreadMessages = messagingService.conversations
-                .where((c) => c.unreadCount > 0)
-                .fold(0, (sum, c) => sum + c.unreadCount);
-          });
-        }
+        _unreadMessages = messagingService.unreadCount;
       });
     } catch (e) {
       print('Erreur chargement messages: $e');
@@ -96,9 +81,10 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
   
   @override
   Widget build(BuildContext context) {
-    final categoriesAsync = ref.watch(categoriesProvider);
-    final productsAsync = ref.watch(productsProvider);
-    final cartItems = ref.watch(cartProvider);
+    final categoriesProvider = Provider.of<CategoriesProvider>(context);
+    final productsProvider = Provider.of<ProductProvider>(context);
+    final cartProvider = Provider.of<CartProvider>(context);
+    final cartCount = cartProvider.itemCount;
     
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -327,16 +313,15 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
                                 // Cart avec badge animé
                                 badges.Badge(
                                   position: badges.BadgePosition.topEnd(top: -8, end: -8),
-                                  showBadge: cartItems.isNotEmpty,
+                                  showBadge: Provider.of<CartProvider>(context).itemCount > 0,
                                   badgeAnimation: const badges.BadgeAnimation.scale(
                                     animationDuration: Duration(milliseconds: 300),
                                   ),
                                   badgeContent: Text(
-                                    '${cartItems.length}',
+                                    Provider.of<CartProvider>(context).itemCount.toString(),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 10,
-                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   badgeStyle: badges.BadgeStyle(
@@ -358,7 +343,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
                                       child: Container(
                                         padding: const EdgeInsets.all(10),
                                         child: const Icon(
-                                          FontAwesomeIcons.bagShopping,
+                                          Icons.shopping_cart,
                                           color: Colors.white,
                                           size: 20,
                                         ),
@@ -451,158 +436,64 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
           ),
           
           // Catégories
-          categoriesAsync.when(
-            data: (categories) => categories.isNotEmpty
-                ? SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Catégories',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D3436),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () => context.go('/categories'),
-                                child: const Text(
-                                  'Voir tout',
-                                  style: TextStyle(
-                                    color: Color(0xFF667eea),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+          // Categories section
+          Builder(
+            builder: (context) {
+              final categories = categoriesProvider.categories;
+              if (categories.isEmpty) {
+                return const SliverToBoxAdapter(
+                  child: SizedBox.shrink(),
+                );
+              }
+              return SliverToBoxAdapter(
+                child: Container(
+                  height: 120,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: categories.length,
+                    itemBuilder: (context, index) {
+                      final category = categories[index];
+                      final isSelected = selectedCategoryId == category['id'].toString();
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedCategoryId = isSelected ? null : category['id'].toString();
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF667eea) : Colors.white,
+                            borderRadius: BorderRadius.circular(25),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isSelected 
+                                  ? const Color(0xFF667eea).withOpacity(0.3)
+                                  : Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
-                        ),
-                        Container(
-                          height: 120,
-                          padding: const EdgeInsets.only(left: 16),
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: categories.length,
-                            itemBuilder: (context, index) {
-                              final category = categories[index];
-                              final isSelected = selectedCategoryId == category.id;
-                              
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    selectedCategoryId = isSelected ? null : category.id;
-                                  });
-                                },
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOutBack,
-                                  width: 90,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  transform: isSelected 
-                                      ? (Matrix4.identity()..scale(1.05))
-                                      : Matrix4.identity(),
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        width: 70,
-                                        height: 70,
-                                        decoration: BoxDecoration(
-                                          gradient: isSelected
-                                              ? const LinearGradient(
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                  colors: [
-                                                    Color(0xFF667eea),
-                                                    Color(0xFF764ba2),
-                                                    Color(0xFFf093fb),
-                                                  ],
-                                                )
-                                              : null,
-                                          color: isSelected ? null : Colors.white,
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(
-                                            color: isSelected 
-                                                ? Colors.white.withOpacity(0.3)
-                                                : Colors.transparent,
-                                            width: 2,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: isSelected
-                                                  ? const Color(0xFF667eea).withOpacity(0.4)
-                                                  : Colors.black.withOpacity(0.1),
-                                              blurRadius: isSelected ? 20 : 10,
-                                              offset: const Offset(0, 5),
-                                              spreadRadius: isSelected ? 2 : 0,
-                                            ),
-                                          ],
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(20),
-                                          child: category.imageUrl != null
-                                              ? CachedNetworkImage(
-                                                  imageUrl: category.imageUrl!,
-                                                  fit: BoxFit.cover,
-                                                  placeholder: (context, url) => Center(
-                                                    child: CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      valueColor: AlwaysStoppedAnimation(
-                                                        Colors.grey.shade300,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  errorWidget: (context, url, error) =>
-                                                      _getCategoryIcon(category.name),
-                                                )
-                                              : _getCategoryIcon(category.name),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        category.name,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.w500,
-                                          color: isSelected
-                                              ? const Color(0xFF667eea)
-                                              : const Color(0xFF2D3436),
-                                        ),
-                                        textAlign: TextAlign.center,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
+                          child: Center(
+                            child: Text(
+                              category['name'] ?? '',
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : const Color(0xFF2D3748),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                  )
-                : const SliverToBoxAdapter(child: SizedBox.shrink()),
-            loading: () => const SliverToBoxAdapter(
-              child: Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ),
-            error: (error, stack) => SliverToBoxAdapter(
-              child: Center(
-                child: Text('Erreur: $error'),
-              ),
-            ),
+              );
+            },
           ),
           
           // Titre Produits
@@ -641,18 +532,12 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
           ),
           
           // Grille de produits
-          Consumer(
-            builder: (context, ref, _) {
-              final productsState = ref.watch(productsProvider);
-              final products = productsState.products;
+          Builder(
+            builder: (context) {
+              final productsProvider = Provider.of<ProductProvider>(context);
+              final products = productsProvider.products;
               
-              if (productsState.isLoading && products.isEmpty) {
-                return const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              
-              if (productsState.error != null && products.isEmpty) {
+              if (products.isEmpty) {
                 return SliverFillRemaining(
                   child: Center(
                     child: Column(
@@ -664,11 +549,11 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
                           color: Colors.red,
                         ),
                         const SizedBox(height: 16),
-                        Text('Erreur: ${productsState.error}'),
+                        const Text('Chargement des produits...'),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: () {
-                            ref.read(productsProvider.notifier).loadProducts(refresh: true);
+                            // Refresh products
                           },
                           icon: const FaIcon(FontAwesomeIcons.arrowRotateRight, size: 16),
                           label: const Text('Réessayer'),
@@ -937,10 +822,10 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
                             width: 1.5,
                           ),
                         ),
-                        child: Consumer(
-                          builder: (context, ref, child) {
-                            final favorites = ref.watch(favoritesProvider);
-                            final isFavorite = favorites.any((p) => p.id == product.id);
+                        child: Builder(
+                          builder: (context) {
+                            final favoritesProvider = Provider.of<FavoritesProvider>(context);
+                            final isFavorite = favoritesProvider.isFavorite(product.id);
                             
                             return IconButton(
                               padding: EdgeInsets.zero,
@@ -954,7 +839,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
                               onPressed: () async {
                                 HapticFeedback.lightImpact();
                                 // Toggle favorite avec le product_id (String)
-                                await ref.read(favoritesProvider.notifier).toggleFavorite(product.id);
+                                Provider.of<FavoritesProvider>(context, listen: false).toggleFavorite(product.id);
                               },
                             );
                           },
@@ -1030,7 +915,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium>
                           borderRadius: BorderRadius.circular(50),
                           onTap: () {
                             HapticFeedback.mediumImpact();
-                            ref.read(cartProvider.notifier).addItem(product, 1);
+                            Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Row(

@@ -160,7 +160,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       await _cartService.addToCart(widget.productId, quantity, productPrice.toDouble());
       
       // Rafraîchir le provider du panier
-      ref.invalidate(cartItemCountProvider);
+      // TODO: Refresh cart count
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

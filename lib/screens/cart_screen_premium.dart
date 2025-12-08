@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'dart:math' as math;
@@ -10,14 +11,14 @@ import '../models/cart_item.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/bottom_nav_bar.dart';
 
-class CartScreenPremium extends ConsumerStatefulWidget {
+class CartScreenPremium extends StatefulWidget {
   const CartScreenPremium({super.key});
 
   @override
-  ConsumerState<CartScreenPremium> createState() => _CartScreenPremiumState();
+  State<CartScreenPremium> createState() => _CartScreenPremiumState();
 }
 
-class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
+class _CartScreenPremiumState extends State<CartScreenPremium>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -103,8 +104,9 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
 
   @override
   Widget build(BuildContext context) {
-    final cartItems = ref.watch(cartProvider);
-    final cartNotifier = ref.read(cartProvider.notifier);
+    final cartProvider = Provider.of<CartProvider>(context);
+    final cartItems = cartProvider.items;
+    final totalAmount = cartProvider.totalAmount;
     final localizations = AppLocalizations.of(context);
     final total = cartItems.fold(0.0, (sum, item) => sum + ((item.product?.price ?? 0) * item.quantity));
     final theme = Theme.of(context);
@@ -136,7 +138,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                               position: _slideAnimation,
                               child: FadeTransition(
                                 opacity: _fadeAnimation,
-                                child: _buildCartItem(item, cartNotifier, theme),
+                                child: _buildCartItem(item, cartProvider, theme),
                               ),
                             );
                           },
@@ -263,7 +265,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
             ),
             const SizedBox(height: 32),
             _buildGlassmorphicButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+              onPressed: () => context.go('/'),
               icon: FontAwesomeIcons.arrowLeft,
               label: 'Continuer vos achats',
             ),
@@ -373,7 +375,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
     );
   }
 
-  Widget _buildCartItem(CartItem item, CartNotifier notifier, ThemeData theme) {
+  Widget _buildCartItem(CartItem item, CartProvider cartProvider, ThemeData theme) {
     final deleteController = _getDeleteAnimation(item.product?.id ?? 'unknown');
     
     return AnimatedBuilder(
@@ -427,7 +429,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                   HapticFeedback.mediumImpact();
                   // Suppression avec confirmation
                   try {
-                    await notifier.removeItem(item.id);
+                    await cartProvider.removeItem(item.id);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -581,10 +583,10 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                               onPressed: () {
                                 HapticFeedback.selectionClick();
                                 if (item.quantity > 1) {
-                                  notifier.updateQuantity(item.id, item.quantity - 1);
+                                  cartProvider.updateQuantity(item.id, item.quantity - 1);
                                 } else {
                                   deleteController.forward().then((_) {
-                                    notifier.removeItem(item.id);
+                                    cartProvider.removeItem(item.id);
                                   });
                                 }
                               },
@@ -604,7 +606,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                               icon: FontAwesomeIcons.plus,
                               onPressed: () {
                                 HapticFeedback.selectionClick();
-                                notifier.updateQuantity(item.id, item.quantity + 1);
+                                cartProvider.updateQuantity(item.id, item.quantity + 1);
                               },
                               enabled: item.quantity < 99,
                             ),
@@ -681,78 +683,50 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(
-                          '${(total * 655.957).toStringAsFixed(0)} FCFA',
-                          style: const TextStyle(
-                            fontSize: 16,
+                          '${total.toStringAsFixed(0)} FCFA',
+                          style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 20),
+                    // Bouton Checkout
+                    ElevatedButton(
+                      onPressed: () {
+                        HapticFeedback.heavyImpact();
+                        GoRouter.of(context).go('/checkout');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 15,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 5,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(FontAwesomeIcons.creditCard, size: 18),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Passer la commande',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-                // Checkout button
-                _buildCheckoutButton(theme),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCheckoutButton(ThemeData theme) {
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() => _isProcessingCheckout = true);
-        HapticFeedback.lightImpact();
-      },
-      onTapUp: (_) {
-        setState(() => _isProcessingCheckout = false);
-        // Navigate to checkout
-      },
-      onTapCancel: () {
-        setState(() => _isProcessingCheckout = false);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        transform: Matrix4.identity()..scale(_isProcessingCheckout ? 0.95 : 1.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: _isProcessingCheckout
-                ? [theme.primaryColor.withOpacity(0.8), Colors.purple.shade600]
-                : [theme.primaryColor, Colors.purple.shade500],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: theme.primaryColor.withOpacity(0.3),
-              blurRadius: _isProcessingCheckout ? 10 : 20,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              FontAwesomeIcons.creditCard,
-              color: Colors.white,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            const Flexible(
-              child: Text(
-                'Commander',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ),
           ],
         ),
@@ -795,8 +769,9 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
                 const SizedBox(width: 8),
                 Text(
                   label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],

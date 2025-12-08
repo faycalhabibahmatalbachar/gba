@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../models/category.dart';
+import '../models/product.dart';
 import '../providers/categories_provider.dart';
 import '../providers/products_provider.dart' as prod_provider;
 import '../widgets/bottom_nav_bar.dart';
@@ -15,14 +16,14 @@ import '../services/supabase_service.dart';
 import '../localization/app_localizations.dart';
 import 'products_by_category_screen.dart';
 
-class CategoriesScreenPremium extends ConsumerStatefulWidget {
+class CategoriesScreenPremium extends StatefulWidget {
   const CategoriesScreenPremium({super.key});
 
   @override
-  ConsumerState<CategoriesScreenPremium> createState() => _CategoriesScreenPremiumState();
+  State<CategoriesScreenPremium> createState() => _CategoriesScreenPremiumState();
 }
 
-class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremium>
+class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _scaleController;
@@ -186,7 +187,8 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
 
   @override
   Widget build(BuildContext context) {
-    final categoriesAsync = ref.watch(categoriesProvider);
+    final categoriesProvider = Provider.of<CategoriesProvider>(context);
+    final categories = categoriesProvider.categories;
     final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
@@ -200,11 +202,11 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
           _buildAnimatedBackground(),
           // Main content
           SafeArea(
-            child: categoriesAsync.when(
-              data: (categories) => _buildCategoriesGrid(categories, localizations, theme),
-              loading: () => _buildLoadingState(),
-              error: (error, stack) => _buildErrorState(error, localizations),
-            ),
+            child: categoriesProvider.isLoading
+                ? _buildLoadingState()
+                : categories.isEmpty
+                    ? _buildEmptyState(localizations)
+                    : _buildCategoriesGrid(categories, localizations, theme),
           ),
         ],
       ),
@@ -404,7 +406,7 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
     );
   }
 
-  Widget _buildCategoriesGrid(List<Category> categories, AppLocalizations localizations, ThemeData theme) {
+  Widget _buildCategoriesGrid(List<dynamic> categories, AppLocalizations localizations, ThemeData theme) {
     return Column(
       children: [
         // Header with stats
@@ -422,7 +424,7 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
             itemCount: categories.length,
             itemBuilder: (context, index) {
               final category = categories[index];
-              final categoryKey = 'category_${category.id}';
+              final categoryKey = 'category_${category['id']}';
               final isHovered = _hoveredCategories[categoryKey] ?? false;
               
               return FadeTransition(
@@ -550,14 +552,15 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
   }
 
   Widget _buildCategoryCard(
-    Category category,
+    dynamic category,
     int index,
     bool isHovered,
     String categoryKey,
     ThemeData theme,
   ) {
     final color = _getCategoryColor(index);
-    final productsAsync = ref.watch(prod_provider.productsByCategoryProvider(category.id));
+    // TODO: Load products by category
+    final products = <Product>[];
     
     return GestureDetector(
       onTapDown: (_) {
@@ -570,8 +573,8 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
           context,
           MaterialPageRoute(
             builder: (context) => ProductsByCategoryScreen(
-              categoryId: category.id,
-              categoryName: category.name,
+              categoryId: category['id'].toString(),
+              categoryName: category['name'] ?? 'Catégorie',
             ),
           ),
         );
@@ -659,60 +662,18 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
                         ],
                       ),
                       child: ClipOval(
-                        child: category.imageUrl != null && category.imageUrl!.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: _fixImageUrl(category.imageUrl!),
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: color.withOpacity(0.1),
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) {
-                                  debugPrint('Erreur image catégorie: $url - $error');
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          color.withOpacity(0.3),
-                                          color.withOpacity(0.1),
-                                        ],
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      _getCategoryIcon(category.name),
-                                      size: 40,
-                                      color: Colors.white,
-                                    ),
-                                  );
-                                },
-                              )
-                            : Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      color.withOpacity(0.3),
-                                      color.withOpacity(0.1),
-                                    ],
-                                  ),
-                                ),
-                                child: Icon(
-                                  _getCategoryIcon(category.name),
-                                  size: 40,
-                                  color: Colors.white,
-                                ),
-                              ),
+                        child: FaIcon(
+                          _getCategoryIcon(category['icon'] ?? category['name'] ?? 'default'),
+                          size: 40,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                     ),
                     const SizedBox(height: 8),
                     // Category name
                     Text(
-                      category.name,
+                      category['name'] ?? 'Catégorie',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -723,56 +684,20 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Consumer(
-                      builder: (context, ref, child) {
-                        return productsAsync.when(
-                          data: (products) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${products.length} produits',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: color,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          loading: () => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '...',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: color,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          error: (_, __) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '0 produits',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: color,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '0 produits',  // TODO: Load actual count
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -838,6 +763,48 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
     );
   }
 
+  Widget _buildEmptyState(AppLocalizations localizations) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey.shade50,
+              ),
+              child: Icon(
+                FontAwesomeIcons.folderOpen,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Aucune catégorie',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vous n\'avez aucune catégorie pour le moment.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildErrorState(Object error, AppLocalizations localizations) {
     return Center(
       child: Padding(
@@ -877,7 +844,7 @@ class _CategoriesScreenPremiumState extends ConsumerState<CategoriesScreenPremiu
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                ref.invalidate(categoriesProvider);
+                // TODO: Refresh categories
               },
               icon: const Icon(FontAwesomeIcons.arrowRotateRight, size: 16),
               label: const Text('Réessayer'),

@@ -19,6 +19,7 @@ import {
   FaServer, FaGlobe, FaBell, FaLock
 } from 'react-icons/fa';
 import './UserManagementUltra.css';
+import UserActivityModal from './UserActivityModal';
 
 const UserManagementUltra = () => {
   const [users, setUsers] = useState([]);
@@ -28,6 +29,7 @@ const UserManagementUltra = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
   const [userActivities, setUserActivities] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [dbTables, setDbTables] = useState([]);
@@ -686,12 +688,25 @@ const UserManagementUltra = () => {
                 <td>{getStatusBadge(user.status)}</td>
                 <td>
                   <div className="action-buttons">
-                    <button
-                      className="btn-icon btn-view"
-                      onClick={() => handleViewDetails(user)}
-                      title="Voir détails"
+                    <button 
+                      className="btn-action btn-view"
+                      onClick={() => handleViewUser(user)}
+                      title="Voir les détails"
                     >
                       <FaEye />
+                    </button>
+                    <button 
+                      className="btn-action"
+                      onClick={() => {
+                        window.location.href = `/user-tracking/${user.id}`;
+                      }}
+                      title="Voir l'activité"
+                      style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white'
+                      }}
+                    >
+                      <FiActivity />
                     </button>
                     <button
                       className={`btn-icon ${user.is_blocked ? 'btn-unblock' : 'btn-block'}`}
@@ -707,6 +722,13 @@ const UserManagementUltra = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Modal activité utilisateur */}
+      <UserActivityModal
+        open={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        user={selectedUser}
+      />
 
       {/* Modal détails utilisateur */}
       {showDetailsModal && selectedUser && (

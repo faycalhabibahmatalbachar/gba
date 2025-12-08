@@ -21,7 +21,7 @@ dependencies:
   google_fonts: ^6.1.0
   flutter_animate: ^4.3.0
   carousel_slider: ^5.0.0
-  badges: ^3.1.1
+  badges: ^3.1.2
   flutter_svg: ^2.0.9
   intl: ^0.20.2
   cached_network_image: ^3.3.1

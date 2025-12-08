@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +8,7 @@ import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
 
-class PremiumProductCard extends ConsumerWidget {
+class PremiumProductCard extends StatelessWidget {
   final Product product;
   final double? width;
   final bool showQuickActions;
@@ -21,7 +21,7 @@ class PremiumProductCard extends ConsumerWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasDiscount = product.compareAtPrice != null && 
                         product.compareAtPrice! > product.price;
@@ -205,12 +205,11 @@ class PremiumProductCard extends ConsumerWidget {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
                         onTap: () {
-                          ref.read(favoritesProvider.notifier).toggleFavorite(product.id);
+                          Provider.of<FavoritesProvider>(context, listen: false).toggleFavorite(product.id);
                         },
-                        child: Consumer(
-                          builder: (context, ref, child) {
-                            final favorites = ref.watch(favoritesProvider);
-                            final isFavorite = favorites.any((p) => p.id == product.id);
+                        child: Consumer<FavoritesProvider>(
+                          builder: (context, favoritesProvider, child) {
+                            final isFavorite = favoritesProvider.isFavorite(product.id);
                             return Padding(
                               padding: const EdgeInsets.all(8.0),
                               child: FaIcon(
@@ -368,7 +367,7 @@ class PremiumProductCard extends ConsumerWidget {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () {
-                                  ref.read(cartProvider.notifier).addItem(product, 1);
+                                  Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('${product.name} ajouté au panier'),
@@ -410,7 +409,7 @@ class PremiumProductCard extends ConsumerWidget {
 }
 
 // Grid View for Products
-class PremiumProductGrid extends ConsumerWidget {
+class PremiumProductGrid extends StatelessWidget {
   final List<Product> products;
   final bool showQuickActions;
   final ScrollPhysics? physics;
@@ -423,7 +422,7 @@ class PremiumProductGrid extends ConsumerWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return GridView.builder(
       shrinkWrap: true,
       physics: physics ?? const NeverScrollableScrollPhysics(),
@@ -446,7 +445,7 @@ class PremiumProductGrid extends ConsumerWidget {
 }
 
 // Horizontal List View for Products
-class PremiumProductList extends ConsumerWidget {
+class PremiumProductList extends StatelessWidget {
   final List<Product> products;
   final double height;
   final bool showQuickActions;
@@ -459,7 +458,7 @@ class PremiumProductList extends ConsumerWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return SizedBox(
       height: height,
       child: ListView.builder(

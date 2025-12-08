@@ -1,67 +1,20 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/product.dart';
-import '../services/favorites_service.dart';
+import 'package:flutter/material.dart';
 
-class FavoritesNotifier extends StateNotifier<List<Product>> {
-  final FavoritesService _service = FavoritesService();
+class FavoritesProvider extends ChangeNotifier {
+  final List<String> _favoriteIds = [];
   
-  FavoritesNotifier() : super([]) {
-    loadFavorites();
+  List<String> get favoriteIds => _favoriteIds;
+  
+  bool isFavorite(String productId) {
+    return _favoriteIds.contains(productId);
   }
-
-  Future<void> loadFavorites() async {
-    try {
-      final favorites = await _service.getFavorites();
-      state = favorites.map((item) {
-        final productData = item['products'] as Map<String, dynamic>;
-        return Product.fromJson(productData);
-      }).toList();
-    } catch (e) {
-      print('❌ Erreur chargement favoris: $e');
+  
+  void toggleFavorite(String productId) {
+    if (_favoriteIds.contains(productId)) {
+      _favoriteIds.remove(productId);
+    } else {
+      _favoriteIds.add(productId);
     }
-  }
-
-  Future<void> toggleFavorite(String productId) async {
-    try {
-      final wasFavorite = state.any((p) => p.id == productId);
-      
-      // Mise à jour optimiste de l'UI
-      if (wasFavorite) {
-        state = state.where((p) => p.id != productId).toList();
-      }
-      
-      // Synchroniser avec Supabase
-      await _service.toggleFavorite(productId);
-      
-      // Recharger pour s'assurer de la synchronisation
-      await loadFavorites();
-    } catch (e) {
-      print('❌ Erreur toggle favori: $e');
-      // Recharger en cas d'erreur pour restaurer l'état correct
-      await loadFavorites();
-    }
-  }
-
-  bool isFavorite(Product product) {
-    return state.any((p) => p.id == product.id);
-  }
-
-  Future<void> clearFavorites() async {
-    try {
-      await _service.clearFavorites();
-      state = [];
-    } catch (e) {
-      print('❌ Erreur vidage favoris: $e');
-    }
+    notifyListeners();
   }
 }
-
-final favoritesProvider = StateNotifierProvider<FavoritesNotifier, List<Product>>((ref) {
-  return FavoritesNotifier();
-});
-
-// Provider pour le nombre de favoris
-final favoritesCountProvider = Provider<int>((ref) {
-  final favorites = ref.watch(favoritesProvider);
-  return favorites.length;
-});

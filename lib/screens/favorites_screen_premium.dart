@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
@@ -11,14 +11,14 @@ import '../localization/app_localizations.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'product/product_detail_screen.dart';
 
-class FavoritesScreenPremium extends ConsumerStatefulWidget {
+class FavoritesScreenPremium extends StatefulWidget {
   const FavoritesScreenPremium({super.key});
 
   @override
-  ConsumerState<FavoritesScreenPremium> createState() => _FavoritesScreenPremiumState();
+  State<FavoritesScreenPremium> createState() => _FavoritesScreenPremiumState();
 }
 
-class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
+class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     with TickerProviderStateMixin {
   
   String _getCorrectImageUrl(String url) {
@@ -140,11 +140,10 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
 
   @override
   Widget build(BuildContext context) {
-    final favorites = ref.watch(favoritesProvider);
-    final sortedFavorites = _sortFavorites(List.from(favorites));
-    final favoritesNotifier = ref.read(favoritesProvider.notifier);
-    final localizations = AppLocalizations.of(context);
+    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    final favorites = <Product>[];  // TODO: Load favorites from provider
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -167,8 +166,8 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
                       // Favorites list/grid
                       Expanded(
                         child: _selectedView == 'grid'
-                            ? _buildGridView(sortedFavorites, favoritesNotifier, theme)
-                            : _buildListView(sortedFavorites, favoritesNotifier, theme),
+                            ? _buildGridView(favorites, favoritesProvider, theme)
+                            : _buildListView(favorites, favoritesProvider, theme),
                       ),
                     ],
                   ),
@@ -514,7 +513,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildGridView(List<Product> favorites, FavoritesNotifier notifier, ThemeData theme) {
+  Widget _buildGridView(List<Product> favorites, FavoritesProvider notifier, ThemeData theme) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -537,7 +536,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildListView(List<Product> favorites, FavoritesNotifier notifier, ThemeData theme) {
+  Widget _buildListView(List<Product> favorites, FavoritesProvider notifier, ThemeData theme) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: favorites.length,
@@ -554,7 +553,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildFavoriteCard(Product product, FavoritesNotifier notifier, ThemeData theme) {
+  Widget _buildFavoriteCard(Product product, FavoritesProvider notifier, ThemeData theme) {
     final productKey = 'favorite_${product.id}';
     final isPressed = _pressedItems[productKey] ?? false;
     
@@ -721,7 +720,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildFavoriteListItem(Product product, FavoritesNotifier notifier, ThemeData theme) {
+  Widget _buildFavoriteListItem(Product product, FavoritesProvider notifier, ThemeData theme) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
@@ -836,7 +835,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildRemoveFavoriteButton(Product product, FavoritesNotifier notifier) {
+  Widget _buildRemoveFavoriteButton(Product product, FavoritesProvider notifier) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.mediumImpact();

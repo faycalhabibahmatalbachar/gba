@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
@@ -10,14 +10,14 @@ import '../localization/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../services/supabase_service.dart';
 
-class SettingsScreenPremium extends ConsumerStatefulWidget {
+class SettingsScreenPremium extends StatefulWidget {
   const SettingsScreenPremium({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<SettingsScreenPremium> createState() => _SettingsScreenPremiumState();
+  State<SettingsScreenPremium> createState() => _SettingsScreenPremiumState();
 }
 
-class _SettingsScreenPremiumState extends ConsumerState<SettingsScreenPremium>
+class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -288,9 +288,9 @@ class _SettingsScreenPremiumState extends ConsumerState<SettingsScreenPremium>
         icon: FontAwesomeIcons.moon,
         title: 'Mode Sombre',
         subtitle: 'Activer le thème sombre',
-        value: ref.watch(themeModeProvider) == ThemeMode.dark,
+        value: Provider.of<ThemeProvider>(context).isDarkMode,
         onChanged: (value) {
-          ref.read(themeModeProvider.notifier).toggleTheme();
+          Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
           setState(() => _darkModeEnabled = value);
           _saveSetting('darkMode', value);
           HapticFeedback.selectionClick();

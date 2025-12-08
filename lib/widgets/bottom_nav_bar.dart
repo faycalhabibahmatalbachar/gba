@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/cart_provider.dart';
 
-class BottomNavBar extends ConsumerStatefulWidget {
+class BottomNavBar extends StatefulWidget {
   final int currentIndex;
   
   const BottomNavBar({
@@ -16,10 +16,10 @@ class BottomNavBar extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<BottomNavBar> createState() => _BottomNavBarState();
+  State<BottomNavBar> createState() => _BottomNavBarState();
 }
 
-class _BottomNavBarState extends ConsumerState<BottomNavBar> 
+class _BottomNavBarState extends State<BottomNavBar> 
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -73,7 +73,8 @@ class _BottomNavBarState extends ConsumerState<BottomNavBar>
 
   @override
   Widget build(BuildContext context) {
-    final cartItemCount = ref.watch(cartItemCountProvider);
+    final cartProvider = Provider.of<CartProvider>(context);
+    final cartItemCount = cartProvider.itemCount;
     
     return Container(
       decoration: BoxDecoration(
@@ -266,4 +267,4 @@ class _BottomNavBarState extends ConsumerState<BottomNavBar>
 }
 
 // Provider pour gérer l'index de navigation actuel
-final currentNavIndexProvider = StateProvider<int>((ref) => 0);
+// Navigation index handled by widget state

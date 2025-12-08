@@ -6,9 +6,10 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Categories from './pages/Categories';
-import Orders from './pages/Orders';
+import UltraOrders from './pages/UltraOrders';
 import Users from './pages/Users';
-import Analytics from './pages/Analytics';
+import UltraAnalytics from './pages/UltraAnalytics';
+import UserTracking from './pages/UserTracking';
 import Settings from './pages/Settings';
 import Monitoring from './pages/Monitoring';
 import MonitoringCarts from './pages/MonitoringCarts';
@@ -54,9 +55,10 @@ function App() {
         <Route path="products" element={<Products />} />
         <Route path="products/categories" element={<Categories />} />
         <Route path="categories" element={<Categories />} />
-        <Route path="orders" element={<Orders />} />
+        <Route path="orders" element={<UltraOrders />} />
         <Route path="users" element={<Users />} />
-        <Route path="analytics" element={<Analytics />} />
+        <Route path="user-tracking/:userId" element={<UserTracking />} />
+        <Route path="analytics" element={<UltraAnalytics />} />
         <Route path="settings" element={<Settings />} />
         <Route path="settings/monitoring" element={<Monitoring />} />
         <Route path="settings/security" element={<Settings />} />

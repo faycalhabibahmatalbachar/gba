@@ -1,42 +1,23 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import '../models/profile.dart';
 import '../services/profile_service.dart';
-import '../providers/auth_provider.dart';
-import '../providers/favorites_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'settings_screen_premium.dart';
 
-// Provider pour le profil utilisateur
-final profileProvider = FutureProvider<Profile?>((ref) async {
-  final profileService = ProfileService();
-  return await profileService.getCurrentUserProfile();
-});
-
-// Provider pour les statistiques
-final profileStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  // Simule des données de stats
-  // En production, récupérer depuis la base de données
-  return {
-    'orders': 12,
-    'favorites': 8,
-    'reviews': 15,
-  };
-});
-
-class ProfileScreenPremium extends ConsumerStatefulWidget {
+class ProfileScreenPremium extends StatefulWidget {
   const ProfileScreenPremium({super.key});
 
   @override
-  ConsumerState<ProfileScreenPremium> createState() => _ProfileScreenPremiumState();
+  State<ProfileScreenPremium> createState() => _ProfileScreenPremiumState();
 }
 
-class _ProfileScreenPremiumState extends ConsumerState<ProfileScreenPremium>
+class _ProfileScreenPremiumState extends State<ProfileScreenPremium>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -54,12 +35,12 @@ class _ProfileScreenPremiumState extends ConsumerState<ProfileScreenPremium>
   late TextEditingController _bioController;
   late TextEditingController _addressController;
   late TextEditingController _cityController;
-  late TextEditingController _postalCodeController;
   
   @override
   void initState() {
     super.initState();
     _profileService = ProfileService();
+    _loadProfile();
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -79,14 +60,33 @@ class _ProfileScreenPremiumState extends ConsumerState<ProfileScreenPremium>
     
     _fadeController.forward();
     _slideController.forward();
-    
-    _firstNameController = TextEditingController();
-    _lastNameController = TextEditingController();
-    _phoneController = TextEditingController();
-    _bioController = TextEditingController();
-    _addressController = TextEditingController();
-    _cityController = TextEditingController();
-    _postalCodeController = TextEditingController();
+  }
+  
+  Future<void> _loadProfile() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      final profile = await _profileService.getCurrentUserProfile();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _isLoadingProfile = false;
+          if (profile != null) {
+            _firstNameController.text = profile.firstName ?? '';
+            _lastNameController.text = profile.lastName ?? '';
+            _phoneController.text = profile.phone ?? '';
+            _bioController.text = profile.bio ?? '';
+            _addressController.text = profile.address ?? '';
+            _cityController.text = profile.city ?? '';
+            _postalCodeController.text = profile.postalCode ?? '';
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading profile: $e');
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+      }
+    }
   }
   
   @override
@@ -122,7 +122,8 @@ class _ProfileScreenPremiumState extends ConsumerState<ProfileScreenPremium>
         final avatarUrl = await _profileService.uploadAvatar(image);
         
         if (avatarUrl != null) {
-          ref.refresh(profileProvider);
+          // Refresh profile data
+          _loadProfile();
           
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -189,16 +190,22 @@ class _ProfileScreenPremiumState extends ConsumerState<ProfileScreenPremium>
   
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(profileProvider);
-    final statsAsync = ref.watch(profileStatsProvider);
+    // Get profile data from state
+    final profile = _profile;
+    final isLoading = _isLoadingProfile;
+
+    
+    if (isLoading) {
+      return _buildLoadingState();
+    }
+    
+    if (profile == null) {
+      return _buildErrorState();
+    }
     
     return Scaffold(
-      body: profileAsync.when(
-        loading: () => _buildLoadingState(),
-        error: (error, stack) => _buildErrorState(),
-        data: (profile) {
-          if (profile != null && !_isEditing) {
-            _firstNameController.text = profile.firstName ?? '';
+      body: Stack(
+        children: [
             _lastNameController.text = profile.lastName ?? '';
             _phoneController.text = profile.phone ?? '';
             _bioController.text = profile.bio ?? '';
