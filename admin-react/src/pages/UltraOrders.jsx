@@ -6,6 +6,14 @@ import {
   Chip, 
   IconButton,
   Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
   Menu,
   MenuItem,
   Select,
@@ -69,10 +77,166 @@ const statusIcons = {
   refunded: <AttachMoney />
 };
 
+function OrderDetailsDialog({ open, order, onClose, loading }) {
+  if (!order) return null;
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const totalAmount = Number(order.total_amount ?? 0);
+  const shippingFee = Number(order.shipping_fee ?? order.shipping_cost ?? 0);
+  const subtotal = totalAmount - shippingFee;
+
+  const hasClientInfo = Boolean(order.customer_name || order.customer_email || order.customer_phone || order.customer_phone_profile);
+  const hasShippingInfo = Boolean(order.shipping_country || order.shipping_city || order.shipping_district || order.shipping_address);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+          <Box>
+            <Typography variant="h6" fontWeight="bold">
+              {order.order_number || order.id}
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              {order.created_at ? new Date(order.created_at).toLocaleString() : ''}
+            </Typography>
+          </Box>
+          <Chip
+            icon={statusIcons[order.status]}
+            label={(order.status || '').toUpperCase()}
+            sx={{
+              bgcolor: `${statusColors[order.status] || '#999'}20`,
+              color: statusColors[order.status] || '#666',
+              border: `1px solid ${(statusColors[order.status] || '#999')}40`,
+              fontWeight: 'bold'
+            }}
+          />
+        </Box>
+      </DialogTitle>
+
+      <DialogContent dividers>
+        {loading && <LinearProgress sx={{ mb: 2 }} />}
+        <Grid container spacing={2}>
+          {hasClientInfo && (
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 2, borderRadius: 2 }} variant="outlined">
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Client
+                </Typography>
+                <Box display="flex" alignItems="center" gap={1.5} mb={1}>
+                  <Avatar sx={{ bgcolor: '#667eea' }}>
+                    {(order.customer_name || 'C')[0]?.toUpperCase()}
+                  </Avatar>
+                  <Box>
+                    {order.customer_name && (
+                      <Typography fontWeight={600}>{order.customer_name}</Typography>
+                    )}
+                    {order.customer_email && (
+                      <Typography variant="body2" color="textSecondary">
+                        {order.customer_email}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+                {(order.customer_phone || order.customer_phone_profile) && (
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Phone sx={{ fontSize: 18, color: 'text.secondary' }} />
+                    <Typography variant="body2">
+                      {order.customer_phone || order.customer_phone_profile}
+                    </Typography>
+                  </Box>
+                )}
+              </Paper>
+            </Grid>
+          )}
+
+          {hasShippingInfo && (
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 2, borderRadius: 2 }} variant="outlined">
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  Adresse de livraison
+                </Typography>
+                {(order.shipping_country || order.shipping_city || order.shipping_district) && (
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <LocationOn sx={{ fontSize: 18, color: 'text.secondary' }} />
+                    <Typography variant="body2">
+                      {[order.shipping_country, order.shipping_city, order.shipping_district].filter(Boolean).join(', ')}
+                    </Typography>
+                  </Box>
+                )}
+                {order.shipping_address && (
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                    {order.shipping_address}
+                  </Typography>
+                )}
+              </Paper>
+            </Grid>
+          )}
+
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2, borderRadius: 2 }} variant="outlined">
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                Articles ({items.length})
+              </Typography>
+              {items.length === 0 && (
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+                  Aucun article
+                </Typography>
+              )}
+              <List dense disablePadding>
+                {items.map((item, idx) => (
+                  <ListItem key={idx} sx={{ px: 0 }}>
+                    <ListItemAvatar>
+                      <Avatar
+                        variant="rounded"
+                        src={item.product_image || undefined}
+                        sx={{ bgcolor: '#f3f4f6', width: 48, height: 48 }}
+                      >
+                        <ShoppingBag sx={{ fontSize: 18 }} />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={item.product_name || ''}
+                      secondary={`${Number(item.quantity ?? 0)} x ${Number(item.unit_price ?? 0).toFixed(0)} FCFA`}
+                    />
+                    <Typography fontWeight="bold">
+                      {Number(item.total_price ?? 0).toFixed(0)} FCFA
+                    </Typography>
+                  </ListItem>
+                ))}
+              </List>
+              <Divider sx={{ my: 1.5 }} />
+              <Box display="flex" justifyContent="space-between">
+                <Typography color="textSecondary">Sous-total</Typography>
+                <Typography fontWeight={700}>{Math.max(0, subtotal).toFixed(0)} FCFA</Typography>
+              </Box>
+              <Box display="flex" justifyContent="space-between" sx={{ mt: 0.5 }}>
+                <Typography color="textSecondary">Livraison</Typography>
+                <Typography fontWeight={700}>{shippingFee.toFixed(0)} FCFA</Typography>
+              </Box>
+              <Box display="flex" justifyContent="space-between" sx={{ mt: 1 }}>
+                <Typography fontWeight={800}>Total</Typography>
+                <Typography fontWeight={800} color="primary">
+                  {totalAmount.toFixed(0)} FCFA
+                </Typography>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={onClose}>Fermer</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function UltraOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
@@ -106,6 +270,42 @@ function UltraOrders() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedOrder?.id) return;
+    const updated = orders.find((o) => o.id === selectedOrder.id);
+    if (updated) {
+      setSelectedOrder(updated);
+    }
+  }, [orders, selectedOrder?.id]);
+
+  const fetchOrderDetails = async (orderId) => {
+    try {
+      setDetailsLoading(true);
+      const { data: orderRow, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+      if (orderError) throw orderError;
+
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true });
+      if (itemsError) throw itemsError;
+
+      setSelectedOrder({
+        ...orderRow,
+        items: items || []
+      });
+    } catch (e) {
+      enqueueSnackbar('Erreur chargement détails', { variant: 'error' });
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -144,18 +344,47 @@ function UltraOrders() {
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
-      const { error } = await supabase
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('[UltraOrders] auth.getUser error:', authError);
+      } else {
+        console.log('[UltraOrders] auth user:', authData?.user?.id, authData?.user?.email);
+      }
+
+      const { data, error } = await supabase
         .from('orders')
         .update({ status: newStatus })
-        .eq('id', orderId);
+        .eq('id', orderId)
+        .select('id,status')
+        .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        throw new Error(
+          'Mise à jour refusée (0 ligne modifiée). Vérifie les RLS/policies admin sur la table orders.'
+        );
+      }
+
+      console.log('[UltraOrders] order status updated:', data);
       
       enqueueSnackbar('Statut mis à jour', { variant: 'success' });
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+      setSelectedOrder((prev) => (prev && prev.id === orderId ? { ...prev, status: newStatus } : prev));
       fetchOrders();
+
+      if (detailsOpen && selectedOrder?.id === orderId) {
+        fetchOrderDetails(orderId);
+      }
+
       setAnchorEl(null);
     } catch (error) {
-      enqueueSnackbar('Erreur mise à jour', { variant: 'error' });
+      console.error('[UltraOrders] handleStatusChange error:', error);
+      const message =
+        (error && typeof error === 'object' && 'message' in error && error.message)
+          ? error.message
+          : 'Erreur mise à jour';
+      enqueueSnackbar(message, { variant: 'error' });
     }
   };
 
@@ -388,7 +617,11 @@ function UltraOrders() {
                       <Tooltip title="Voir détails">
                         <IconButton
                           size="small"
-                          onClick={() => setSelectedOrder(order)}
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setDetailsOpen(true);
+                            fetchOrderDetails(order.id);
+                          }}
                           sx={{
                             bgcolor: '#667eea10',
                             '&:hover': { bgcolor: '#667eea20' }
@@ -460,6 +693,13 @@ function UltraOrders() {
           </MenuItem>
         ))}
       </Menu>
+
+      <OrderDetailsDialog
+        open={detailsOpen}
+        order={selectedOrder}
+        onClose={() => setDetailsOpen(false)}
+        loading={detailsLoading}
+      />
     </Box>
   );
 }

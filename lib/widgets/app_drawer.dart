@@ -49,35 +49,45 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.home),
             title: const Text('Accueil'),
             onTap: () {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
             },
           ),
           ListTile(
             leading: const Icon(Icons.shopping_cart),
             title: const Text('Panier'),
             onTap: () {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
             },
           ),
           ListTile(
             leading: const Icon(Icons.favorite),
             title: const Text('Favoris'),
             onTap: () {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
             },
           ),
           ListTile(
             leading: const Icon(Icons.person),
             title: const Text('Profil'),
             onTap: () {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
             },
           ),
           ListTile(
             leading: Icon(Icons.support_agent, color: Colors.orange[700]),
             title: const Text('Support Admin'),
             onTap: () {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
               Navigator.pushNamed(context, '/admin-chat');
             },
             trailing: Container(
@@ -101,14 +111,18 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.settings),
             title: const Text('Paramètres'),
             onTap: () {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
             },
           ),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Déconnexion'),
             onTap: () {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
             },
           ),
         ],

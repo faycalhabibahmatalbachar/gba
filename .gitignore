@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+devtools_options.yaml
 
 # Symbolication related
 app.*.symbols
@@ -51,6 +52,7 @@ admin-react/.env
 admin-react/dist/
 admin-react/build/
 admin-react/*.log
+admin-react/vite.config.js.timestamp-*
 
 # React Native Mobile
 gba-mobile/node_modules/

@@ -33,13 +33,53 @@ class CartProvider extends ChangeNotifier {
           .order('created_at', ascending: false);
       
       _items = (response as List).map((item) {
-        final productData = item['products'] as Map<String, dynamic>;
+        final rawProduct = item['products'];
+
+        Product? product;
+        if (rawProduct is Map<String, dynamic>) {
+          final rawImages = rawProduct['images'];
+          final images = (rawImages is List)
+              ? rawImages.map((e) => e.toString()).toList()
+              : <String>[];
+
+          final mainImage = (rawProduct['main_image'] ?? rawProduct['mainImage'])?.toString();
+          final mappedProduct = <String, dynamic>{
+            'id': rawProduct['id']?.toString(),
+            'name': rawProduct['name'],
+            'slug': rawProduct['slug'],
+            'description': rawProduct['description'],
+            'price': (rawProduct['price'] as num?)?.toDouble() ?? 0.0,
+            'compareAtPrice': (rawProduct['compare_at_price'] as num?)?.toDouble(),
+            'sku': rawProduct['sku'],
+            'quantity': rawProduct['quantity'] ?? 0,
+            'trackQuantity': rawProduct['track_quantity'] ?? true,
+            'categoryId': rawProduct['category_id'],
+            'categoryName': rawProduct['category_name'] ?? rawProduct['categoryName'],
+            'brand': rawProduct['brand'],
+            'mainImage': (mainImage != null && mainImage.isNotEmpty)
+                ? mainImage
+                : (images.isNotEmpty ? images.first : null),
+            'images': images,
+            'specifications': rawProduct['specifications'] ?? {},
+            'tags': (rawProduct['tags'] is List)
+                ? (rawProduct['tags'] as List).map((e) => e.toString()).toList()
+                : <String>[],
+            'rating': (rawProduct['rating'] as num?)?.toDouble() ?? 0.0,
+            'reviewsCount': rawProduct['reviews_count'] ?? rawProduct['reviewsCount'] ?? 0,
+            'isFeatured': rawProduct['is_featured'] ?? rawProduct['isFeatured'] ?? false,
+            'isActive': rawProduct['is_active'] ?? rawProduct['isActive'] ?? true,
+            'createdAt': rawProduct['created_at'],
+            'updatedAt': rawProduct['updated_at'],
+          };
+
+          product = Product.fromJson(mappedProduct);
+        }
         return CartItem(
           id: item['id'].toString(),
           userId: item['user_id'] as String,
           productId: item['product_id'] as String,
           quantity: item['quantity'] as int,
-          product: Product.fromJson(productData),
+          product: product,
           createdAt: item['created_at'] != null 
               ? DateTime.parse(item['created_at']) 
               : null,

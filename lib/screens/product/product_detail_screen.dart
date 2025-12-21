@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:provider/provider.dart' as classic_provider;
 import '../../providers/cart_provider.dart';
 import '../../services/cart_service.dart';
 import '../../services/favorites_service.dart';
@@ -159,8 +160,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       final productPrice = product?['price'] ?? 0.0;
       await _cartService.addToCart(widget.productId, quantity, productPrice.toDouble());
       
-      // Rafraîchir le provider du panier
-      // TODO: Refresh cart count
+      // Rafraîchir le provider du panier (Provider/ChangeNotifier)
+      try {
+        if (mounted) {
+          await classic_provider.Provider.of<CartProvider>(context, listen: false).loadCart();
+        }
+      } catch (e) {
+        // Éviter de casser l'ajout au panier si le rafraîchissement local échoue
+        debugPrint('Erreur lors du rafraîchissement du panier local: $e');
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

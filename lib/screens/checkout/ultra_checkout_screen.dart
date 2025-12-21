@@ -1,9 +1,12 @@
+import 'dart:convert';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:ui';
+import 'package:provider/provider.dart' as provider;
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/order_service.dart';
@@ -63,21 +66,35 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     HapticFeedback.heavyImpact();
     
     try {
-      final cartItems = ref.read(cartProvider);
-      final total = ref.read(cartTotalProvider);
-      
+      final cart = provider.Provider.of<CartProvider>(context, listen: false);
+      final cartItems = cart.items;
+      final total = cart.totalAmount;
+
+      final authState = ref.read(authProvider);
+      final user = authState.user;
+      final profile = authState.profile;
+
+       print('[Checkout] submit order: userId=${user?.id}, email=${user?.email}');
+       print('[Checkout] profile.id=${profile?.id}');
+
+      const shippingFee = 2000.0;
+
       final orderData = {
-        'user_id': ref.read(authProvider).user?.id,
-        'shipping_address': {
-          'name': _nameController.text,
-          'phone': _phoneController.text,
-          'address': _addressController.text,
-          'city': _cityController.text,
-        },
+        'user_id': user?.id,
+        'status': 'pending',
         'payment_method': _paymentMethod,
-        'subtotal': total,
-        'shipping_cost': 1000.0,
-        'total_amount': total + 1000.0,
+        'payment_status': 'pending',
+        'total_amount': total + shippingFee,
+        'shipping_fee': shippingFee,
+        'tax_amount': 0.0,
+        'discount_amount': 0.0,
+        'customer_name': _nameController.text,
+        'customer_phone': _phoneController.text,
+        'customer_email': user?.email,
+        'shipping_country': profile?.country ?? 'Tchad',
+        'shipping_city': _cityController.text,
+        'shipping_district': profile?.address ?? _addressController.text,
+        'shipping_address': _addressController.text,
         'items': cartItems.map((item) => {
           'product_id': item.product?.id,
           'product_name': item.product?.name,
@@ -87,11 +104,14 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
           'total_price': (item.product?.price ?? 0) * item.quantity,
         }).toList(),
       };
+
+       print('[Checkout] orderData.user_id runtimeType=${orderData['user_id']?.runtimeType}');
+       print('[Checkout] orderData payload: ${jsonEncode(orderData)}');
       
       final result = await OrderService().createOrder(orderData);
       
       if (result['success']) {
-        await ref.read(cartProvider.notifier).clearCart();
+        await cart.clearCart();
         
         if (mounted) {
           // Show success dialog
@@ -114,8 +134,9 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cartItems = ref.watch(cartProvider);
-    final total = ref.watch(cartTotalProvider);
+    final cart = provider.Provider.of<CartProvider>(context);
+    final cartItems = cart.items;
+    final total = cart.totalAmount;
     
     return Scaffold(
       body: Container(
@@ -230,7 +251,13 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
       child: Row(
         children: [
           IconButton(
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/cart');
+              }
+            },
             icon: const Icon(FontAwesomeIcons.arrowLeft),
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
@@ -405,6 +432,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
         onPressed: _isProcessing ? null : _submitOrder,
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
+          foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
@@ -417,6 +445,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
       ),

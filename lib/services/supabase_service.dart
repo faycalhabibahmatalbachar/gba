@@ -6,6 +6,7 @@ import '../models/user.dart';
 
 class SupabaseService {
   static final SupabaseClient client = Supabase.instance.client;
+  static const bool _debugLogs = false;
   
   // Auth
   static User? get currentUser => client.auth.currentUser;
@@ -131,8 +132,11 @@ class SupabaseService {
             if (json['image_url'] != null && 
                 json['image_url'].toString().isNotEmpty &&
                 !json['image_url'].toString().startsWith('http')) {
-              // Add Supabase storage base URL if it's a relative path
-              json['image_url'] = 'https://uvlrgwdbjegoavjfdrzb.supabase.co/storage/v1/object/public/${json['image_url']}';
+              final storagePath = json['image_url'].toString();
+              final publicUrl = client.storage
+                  .from('categories')
+                  .getPublicUrl(storagePath);
+              json['image_url'] = publicUrl;
             }
             return Category.fromJson(json);
           })
@@ -254,24 +258,32 @@ class SupabaseService {
           .maybeSingle();
       
       // Debug log
-      print('Profile response type: ${response.runtimeType}');
-      print('Profile response: $response');
+      if (_debugLogs) {
+        print('Profile response type: ${response.runtimeType}');
+        print('Profile response: $response');
+      }
       
       if (response == null) {
-        print('No profile found for user ${currentUser!.id}');
+        if (_debugLogs) {
+          print('No profile found for user ${currentUser!.id}');
+        }
         return null;
       }
       
       // Ensure response is a Map
       if (response is! Map<String, dynamic>) {
-        print('Unexpected response type: ${response.runtimeType}');
+        if (_debugLogs) {
+          print('Unexpected response type: ${response.runtimeType}');
+        }
         return null;
       }
       
       return UserProfile.fromJson(response);
     } catch (e) {
-      print('Error fetching user profile: $e');
-      print('Stack trace: ${StackTrace.current}');
+      if (_debugLogs) {
+        print('Error fetching user profile: $e');
+        print('Stack trace: ${StackTrace.current}');
+      }
       return null;
     }
   }

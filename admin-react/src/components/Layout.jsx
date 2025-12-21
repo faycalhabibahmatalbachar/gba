@@ -48,19 +48,19 @@ import { useAuth } from '../contexts/AuthContext';
 const drawerWidth = 280;
 
 const menuItems = [
-  { title: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
-  { title: 'Messages', path: '/messages', icon: <MessageIcon />, badge: 'new' },
+  { title: 'Tableau de bord', path: '/dashboard', icon: <DashboardIcon /> },
+  { title: 'Messages', path: '/messages', icon: <MessageIcon />, badge: 'nouveau' },
   { 
-    title: 'Products', 
+    title: 'Produits', 
     path: '/products', 
     icon: <InventoryIcon />,
     subItems: [
-      { title: 'All Products', path: '/products' },
-      { title: 'Categories', path: '/products/categories', icon: <CategoryIcon /> },
+      { title: 'Tous les produits', path: '/products' },
+      { title: 'Catégories', path: '/products/categories', icon: <CategoryIcon /> },
       { title: 'Tags', path: '/products/tags', icon: <LocalOfferIcon /> },
     ]
   },
-  { title: 'Orders', path: '/orders', icon: <ShoppingCartIcon />, badge: 5 },
+  { title: 'Commandes', path: '/orders', icon: <ShoppingCartIcon />, badge: 5 },
   { 
     title: 'Monitoring', 
     path: '/monitoring', 
@@ -71,16 +71,16 @@ const menuItems = [
       { title: 'Monitoring Produits', path: '/monitoring/products', icon: <TrendingIcon /> },
     ]
   },
-  { title: 'Users', path: '/users', icon: <PeopleIcon /> },
-  { title: 'Analytics', path: '/analytics', icon: <AnalyticsIcon /> },
+  { title: 'Utilisateurs', path: '/users', icon: <PeopleIcon /> },
+  { title: 'Analyses', path: '/analytics', icon: <AnalyticsIcon /> },
   { 
-    title: 'Settings', 
+    title: 'Paramètres', 
     path: '/settings', 
     icon: <SettingsIcon />,
     subItems: [
-      { title: 'General', path: '/settings' },
+      { title: 'Général', path: '/settings' },
       { title: 'Monitoring', path: '/settings/monitoring' },
-      { title: 'Security', path: '/settings/security' },
+      { title: 'Sécurité', path: '/settings/security' },
       { title: 'Notifications', path: '/settings/notifications' },
     ]
   },
@@ -144,7 +144,7 @@ function Layout() {
           </IconButton>
           
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {menuItems.find(item => isActive(item.path))?.title || 'Admin Dashboard'}
+            {menuItems.find(item => isActive(item.path))?.title || 'Tableau de bord admin'}
           </Typography>
 
           <Tooltip title="Notifications">
@@ -155,7 +155,7 @@ function Layout() {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Account settings">
+          <Tooltip title="Paramètres du compte">
             <IconButton onClick={handleMenuClick} sx={{ ml: 2 }}>
               <Avatar
                 sx={{
@@ -178,13 +178,13 @@ function Layout() {
               <ListItemIcon>
                 <Avatar sx={{ width: 24, height: 24 }} />
               </ListItemIcon>
-              Profile
+              Profil
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
                 <LogoutIcon fontSize="small" />
               </ListItemIcon>
-              Logout
+              Déconnexion
             </MenuItem>
           </Menu>
         </Toolbar>
@@ -301,7 +301,7 @@ function Layout() {
         
         <Box sx={{ p: 2 }}>
           <Chip
-            label="Pro Version"
+            label="Version Pro"
             color="warning"
             size="small"
             sx={{ mb: 1 }}

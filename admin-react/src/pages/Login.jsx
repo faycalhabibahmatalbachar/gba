@@ -95,10 +95,10 @@ function Login() {
                 </Box>
               </motion.div>
               <Typography variant="h4" fontWeight="bold" gutterBottom>
-                Welcome Back
+                Bon retour
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Sign in to GBA Admin Dashboard
+                Connectez-vous au tableau de bord admin GBA
               </Typography>
             </Box>
 
@@ -116,7 +116,7 @@ function Login() {
             <form onSubmit={handleSubmit}>
               <TextField
                 fullWidth
-                label="Email Address"
+                label="Adresse e-mail"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -134,7 +134,7 @@ function Login() {
 
               <TextField
                 fullWidth
-                label="Password"
+                label="Mot de passe"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -169,10 +169,10 @@ function Login() {
                       color="primary"
                     />
                   }
-                  label="Remember me"
+                  label="Se souvenir de moi"
                 />
                 <Button color="primary" sx={{ textTransform: 'none' }}>
-                  Forgot password?
+                  Mot de passe oublié ?
                 </Button>
               </Box>
 
@@ -193,7 +193,7 @@ function Login() {
                   {loading ? (
                     <CircularProgress size={24} color="inherit" />
                   ) : (
-                    'Sign In'
+                    'Se connecter'
                   )}
                 </Button>
               </motion.div>
@@ -201,7 +201,7 @@ function Login() {
 
             <Divider sx={{ my: 3 }}>
               <Typography variant="body2" color="text.secondary">
-                OR
+                OU
               </Typography>
             </Divider>
 

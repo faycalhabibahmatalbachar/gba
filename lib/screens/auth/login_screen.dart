@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/foundation.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -29,6 +30,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
+
+      debugPrint('[Login] submit: email=$email');
       
       await ref.read(authProvider.notifier).signIn(email, password);
       
@@ -38,6 +41,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final authState = ref.read(authProvider);
       if (authState.user != null) {
         context.go('/home');
+      } else if (authState.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(authState.error!)),
+        );
       }
     }
   }
@@ -115,6 +122,72 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     .fadeIn(delay: 400.ms),
                   
                   const SizedBox(height: 48),
+
+                  if (authState.error != null)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.red.withOpacity(0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.red),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  authState.error!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => ref.read(authProvider.notifier).clearError(),
+                                icon: const Icon(Icons.close, color: Colors.red),
+                              ),
+                            ],
+                          ),
+                          if (authState.errorCode == 'invalid_credentials') ...[
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: () async {
+                                final email = _emailController.text.trim();
+                                if (email.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Entre ton email d\'abord.')),
+                                  );
+                                  return;
+                                }
+                                try {
+                                  await ref
+                                      .read(authProvider.notifier)
+                                      .resendEmailConfirmation(email);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Email de confirmation renvoyé. Vérifie ta boîte mail.'),
+                                    ),
+                                  );
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Erreur renvoi email: $e')),
+                                  );
+                                }
+                              },
+                              child: Text(
+                                'Renvoyer l\'email de confirmation',
+                                style: TextStyle(color: theme.colorScheme.primary),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 450.ms),
+                  if (authState.error != null) const SizedBox(height: 16),
                   
                   // Formulaire
                   Form(

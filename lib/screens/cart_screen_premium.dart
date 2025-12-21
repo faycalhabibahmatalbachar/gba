@@ -20,6 +20,7 @@ class CartScreenPremium extends StatefulWidget {
 
 class _CartScreenPremiumState extends State<CartScreenPremium>
     with TickerProviderStateMixin {
+  static const bool _debugImageLogs = false;
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late AnimationController _scaleController;
@@ -123,30 +124,33 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
           SafeArea(
             child: cartItems.isEmpty
                 ? _buildEmptyCart(localizations)
-                : Column(
-                    children: [
-                      // Cart summary card
-                      _buildCartSummary(cartItems.length, total, theme),
-                      // Cart items list
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          itemCount: cartItems.length,
-                          itemBuilder: (context, index) {
-                            final item = cartItems[index];
-                            return SlideTransition(
-                              position: _slideAnimation,
-                              child: FadeTransition(
-                                opacity: _fadeAnimation,
-                                child: _buildCartItem(item, cartProvider, theme),
-                              ),
-                            );
-                          },
+                : Padding(
+                    padding: const EdgeInsets.only(top: kToolbarHeight + 8),
+                    child: Column(
+                      children: [
+                        // Cart summary card
+                        _buildCartSummary(cartItems.length, total, theme),
+                        // Cart items list
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            itemCount: cartItems.length,
+                            itemBuilder: (context, index) {
+                              final item = cartItems[index];
+                              return SlideTransition(
+                                position: _slideAnimation,
+                                child: FadeTransition(
+                                  opacity: _fadeAnimation,
+                                  child: _buildCartItem(item, cartProvider, theme),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      // Checkout section
-                      _buildCheckoutSection(total, localizations, theme),
-                    ],
+                        // Checkout section
+                        _buildCheckoutSection(total, localizations, theme),
+                      ],
+                    ),
                   ),
           ),
         ],
@@ -316,35 +320,42 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          '${(total * 655.957).toStringAsFixed(0)} FCFA',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.green.shade400, Colors.green.shade600],
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Livraison',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Wrap(
+                        spacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '${(total * 655.957).toStringAsFixed(0)} FCFA',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.green.shade400, Colors.green.shade600],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Livraison',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -462,8 +473,8 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                       Hero(
                         tag: 'product_${item.product?.id ?? 'unknown'}',
                         child: Container(
-                          width: 80,
-                          height: 80,
+                          width: 72,
+                          height: 72,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(16),
                             gradient: LinearGradient(
@@ -479,10 +490,12 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                             borderRadius: BorderRadius.circular(16),
                             child: Builder(
                               builder: (context) {
-                                print('🔍 Cart - Checking image for: ${item.product?.name}');
-                                print('   mainImage: ${item.product?.mainImage}');
-                                print('   is null: ${item.product?.mainImage == null}');
-                                print('   is empty: ${item.product?.mainImage?.isEmpty ?? true}');
+                                if (_debugImageLogs) {
+                                  print('🔍 Cart - Checking image for: ${item.product?.name}');
+                                  print('   mainImage: ${item.product?.mainImage}');
+                                  print('   is null: ${item.product?.mainImage == null}');
+                                  print('   is empty: ${item.product?.mainImage?.isEmpty ?? true}');
+                                }
                                 
                                 if (item.product?.mainImage != null && item.product!.mainImage!.isNotEmpty) {
                                   return CachedNetworkImage(
@@ -500,7 +513,9 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                                     ),
                                   );
                                 } else {
-                                  print('⚠️ No image for cart item: ${item.product?.name}');
+                                  if (_debugImageLogs) {
+                                    print('⚠️ No image for cart item: ${item.product?.name}');
+                                  }
                                   return Icon(
                                     FontAwesomeIcons.boxOpen,
                                     color: Colors.grey[400],
@@ -511,7 +526,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       // Product details
                       Expanded(
                         child: Column(
@@ -533,20 +548,27 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                                 color: Colors.grey[600],
                                 fontSize: 14,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 8),
                             Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Text(
-                                  '${((item.product?.price ?? 0) * 655.957).toStringAsFixed(0)} FCFA',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: theme.primaryColor,
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    '${((item.product?.price ?? 0) * 655.957).toStringAsFixed(0)} FCFA',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: theme.primaryColor,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                  if (false) // TODO: Add discount field to Product model
+                                if (false) // TODO: Add discount field to Product model
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -570,47 +592,53 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                         ),
                       ),
                       // Quantity controls
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildQuantityButton(
-                              icon: FontAwesomeIcons.minus,
-                              onPressed: () {
-                                HapticFeedback.selectionClick();
-                                if (item.quantity > 1) {
-                                  cartProvider.updateQuantity(item.id, item.quantity - 1);
-                                } else {
-                                  deleteController.forward().then((_) {
-                                    cartProvider.removeItem(item.id);
-                                  });
-                                }
-                              },
-                              enabled: true,
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                '${item.quantity}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildQuantityButton(
+                                  icon: FontAwesomeIcons.minus,
+                                  onPressed: () {
+                                    HapticFeedback.selectionClick();
+                                    if (item.quantity > 1) {
+                                      cartProvider.updateQuantity(item.id, item.quantity - 1);
+                                    } else {
+                                      deleteController.forward().then((_) {
+                                        cartProvider.removeItem(item.id);
+                                      });
+                                    }
+                                  },
+                                  enabled: true,
                                 ),
-                              ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  child: Text(
+                                    '${item.quantity}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                _buildQuantityButton(
+                                  icon: FontAwesomeIcons.plus,
+                                  onPressed: () {
+                                    HapticFeedback.selectionClick();
+                                    cartProvider.updateQuantity(item.id, item.quantity + 1);
+                                  },
+                                  enabled: item.quantity < 99,
+                                ),
+                              ],
                             ),
-                            _buildQuantityButton(
-                              icon: FontAwesomeIcons.plus,
-                              onPressed: () {
-                                HapticFeedback.selectionClick();
-                                cartProvider.updateQuantity(item.id, item.quantity + 1);
-                              },
-                              enabled: item.quantity < 99,
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
@@ -633,7 +661,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
       onTap: enabled ? onPressed : null,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(6),
         child: Icon(
           icon,
           size: 12,
@@ -644,6 +672,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
   }
 
   Widget _buildCheckoutSection(double total, AppLocalizations localizations, ThemeData theme) {
+    final totalFcfa = total * 655.957;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -664,12 +693,13 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
         top: false,
         child: Column(
           children: [
-            // Total row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 520;
+
+                final totalBlock = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'Total',
@@ -678,55 +708,80 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                         color: Colors.grey[600],
                       ),
                     ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${totalFcfa.toStringAsFixed(0)} FCFA',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+
+                final checkoutButton = SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      HapticFeedback.heavyImpact();
+                      GoRouter.of(context).go('/checkout');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 15,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 5,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          '${total.toStringAsFixed(0)} FCFA',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
+                        const Icon(FontAwesomeIcons.creditCard, size: 18, color: Colors.white),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            'Passer la commande',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    // Bouton Checkout
-                    ElevatedButton(
-                      onPressed: () {
-                        HapticFeedback.heavyImpact();
-                        GoRouter.of(context).go('/checkout');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 40,
-                          vertical: 15,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        elevation: 5,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(FontAwesomeIcons.creditCard, size: 18),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'Passer la commande',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  ),
+                );
+
+                if (isWide) {
+                  return Row(
+                    children: [
+                      Expanded(child: totalBlock),
+                      const SizedBox(width: 16),
+                      Expanded(child: checkoutButton),
+                    ],
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    totalBlock,
+                    const SizedBox(height: 14),
+                    checkoutButton,
                   ],
-                ),
-              ],
+                );
+              },
             ),
           ],
         ),

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:math';
 
 class ActivityTrackingService {
   static final ActivityTrackingService _instance = ActivityTrackingService._internal();
@@ -10,9 +11,23 @@ class ActivityTrackingService {
   String? _currentSessionId;
   DateTime? _sessionStartTime;
 
+  String _generateUuidV4() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+
+    // Set version to 4
+    bytes[6] = (bytes[6] & 0x0F) | 0x40;
+    // Set variant to RFC4122
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+
+    String byteToHex(int b) => b.toRadixString(16).padLeft(2, '0');
+    final hex = bytes.map(byteToHex).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
   // Initialize session
   Future<void> initSession() async {
-    _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    _currentSessionId = _generateUuidV4();
     _sessionStartTime = DateTime.now();
     await trackActivity('app_opened');
   }
@@ -64,8 +79,29 @@ class ActivityTrackingService {
         'page_name': pageName,
         'session_id': _currentSessionId,
       };
+      final params = {
+        'p_user_id': userId,
+        'p_action_type': actionType,
+        'p_action_details': actionDetails ?? {},
+        'p_entity_type': entityType,
+        'p_entity_id': entityId,
+        'p_entity_name': entityName,
+        'p_page_name': pageName,
+        'p_session_id': _currentSessionId,
+      };
 
-      await _supabase.from('user_activities').insert(data);
+      try {
+        // Prefer the correct RPC name when available.
+        await _supabase.rpc('log_user_activity', params: params);
+      } catch (rpcError) {
+        // Best-effort fallback: do not block the app on tracking failures.
+        debugPrint('Fallback to direct insert for activity tracking: $rpcError');
+        try {
+          await _supabase.from('user_activities').insert(data);
+        } catch (insertError) {
+          debugPrint('Error tracking activity: $insertError');
+        }
+      }
       
       debugPrint('📊 Activity tracked: $actionType${entityName != null ? ' - $entityName' : ''}');
     } catch (e) {

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OrderService {
@@ -6,25 +8,84 @@ class OrderService {
   // Créer une nouvelle commande
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> orderData) async {
     try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      print('[OrderService] createOrder start: auth.userId=$currentUserId');
+
+      final now = DateTime.now().toUtc();
+      final yyyymmdd = '${now.year.toString().padLeft(4, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      final suffix = (now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0');
+      final generatedOrderNumber = 'ORD-$yyyymmdd-$suffix';
+
+      final insertData = <String, dynamic>{
+        'order_number': generatedOrderNumber,
+        'user_id': orderData['user_id'],
+        'status': orderData['status'] ?? 'pending',
+        'total_amount': orderData['total_amount'],
+        'shipping_fee': orderData['shipping_fee'],
+        'tax_amount': orderData['tax_amount'],
+        'discount_amount': orderData['discount_amount'],
+        'payment_method': orderData['payment_method'],
+        'payment_status': orderData['payment_status'] ?? 'pending',
+        'customer_name': orderData['customer_name'],
+        'customer_phone': orderData['customer_phone'],
+        'customer_email': orderData['customer_email'],
+        'shipping_country': orderData['shipping_country'],
+        'shipping_city': orderData['shipping_city'],
+        'shipping_district': orderData['shipping_district'],
+        'shipping_address': orderData['shipping_address'],
+        'notes': orderData['notes'],
+      };
+
+      insertData.removeWhere((key, value) => value == null);
+
+      print('[OrderService] orders.insert payload: ${jsonEncode(insertData)}');
+      final userIdValue = insertData['user_id'];
+      print('[OrderService] orders.insert user_id value=$userIdValue runtimeType=${userIdValue.runtimeType}');
+
       // Créer la commande principale
-      final orderResponse = await _supabase
-          .from('orders')
-          .insert({
-            'user_id': orderData['user_id'],
-            'shipping_address': orderData['shipping_address'],
-            'payment_method': orderData['payment_method'],
-            'subtotal': orderData['subtotal'],
-            'shipping_cost': orderData['shipping_cost'],
-            'total_amount': orderData['total_amount'],
-            'notes': orderData['notes'],
-            'status': 'pending',
-            'payment_status': 'pending',
-          })
-          .select()
-          .single();
+      Map<String, dynamic> orderResponse;
+      var attemptsLeft = 6;
+      while (true) {
+        try {
+          orderResponse = await _supabase
+              .from('orders')
+              .insert(insertData)
+              .select()
+              .single();
+          break;
+        } catch (e) {
+          if (e is PostgrestException) {
+            print(
+              '[OrderService] orders.insert PostgrestException: code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}',
+            );
+          } else {
+            print('[OrderService] orders.insert exception: $e');
+          }
+
+          // Si le schéma côté Supabase n'a pas certaines colonnes, on réessaie en les retirant.
+          final message = e.toString();
+          final isMissingColumn = message.contains("code: PGRST204") &&
+              message.contains("Could not find the '") &&
+              message.contains("' column");
+
+          if (!isMissingColumn || attemptsLeft <= 0) {
+            rethrow;
+          }
+
+          final match = RegExp(r"Could not find the '([^']+)' column")
+              .firstMatch(message);
+          final missingColumn = match?.group(1);
+          if (missingColumn == null || !insertData.containsKey(missingColumn)) {
+            rethrow;
+          }
+
+          insertData.remove(missingColumn);
+          attemptsLeft--;
+        }
+      }
 
       final orderId = orderResponse['id'];
-      final orderNumber = orderResponse['order_number'];
+      final orderNumber = orderResponse['order_number'] ?? generatedOrderNumber;
 
       // Créer les items de la commande
       final items = orderData['items'] as List;
@@ -46,7 +107,13 @@ class OrderService {
         'order_number': orderNumber,
       };
     } catch (e) {
-      print('Erreur création commande: $e');
+      if (e is PostgrestException) {
+        print(
+          '[OrderService] Erreur création commande (PostgrestException): code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}',
+        );
+      } else {
+        print('[OrderService] Erreur création commande: $e');
+      }
       return {
         'success': false,
         'error': e.toString(),
@@ -137,9 +204,13 @@ class OrderService {
 
   // Stream pour écouter les changements de commandes en temps réel
   Stream<List<Map<String, dynamic>>> ordersStream() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return Stream.value(const []);
+
     return _supabase
         .from('orders')
         .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
         .order('created_at', ascending: false);
   }
 

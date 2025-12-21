@@ -132,28 +132,28 @@ const StatCard = ({ title, value, icon, change, color, gradient }) => (
 function Dashboard() {
   const stats = [
     {
-      title: 'Total Revenue',
+      title: 'Revenus totaux',
       value: '$24,568',
       icon: <AttachMoney sx={{ fontSize: 30 }} />,
       change: 12,
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     },
     {
-      title: 'Total Orders',
+      title: 'Total des commandes',
       value: '1,456',
       icon: <ShoppingCart sx={{ fontSize: 30 }} />,
       change: 8,
       gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
     },
     {
-      title: 'Total Products',
+      title: 'Total des produits',
       value: '324',
       icon: <Inventory sx={{ fontSize: 30 }} />,
       change: -3,
       gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
     },
     {
-      title: 'Total Users',
+      title: "Total des utilisateurs",
       value: '8,945',
       icon: <People sx={{ fontSize: 30 }} />,
       change: 15,
@@ -162,7 +162,7 @@ function Dashboard() {
   ];
 
   const salesData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    labels: ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin'],
     datasets: [
       {
         label: 'Sales',
@@ -176,7 +176,7 @@ function Dashboard() {
   };
 
   const categoryData = {
-    labels: ['Electronics', 'Clothing', 'Food', 'Books', 'Others'],
+    labels: ['Électronique', 'Vêtements', 'Alimentation', 'Livres', 'Autres'],
     datasets: [
       {
         data: [30, 25, 20, 15, 10],
@@ -192,19 +192,19 @@ function Dashboard() {
   };
 
   const recentOrders = [
-    { id: '#1234', customer: 'John Doe', amount: '$129.99', status: 'completed' },
-    { id: '#1235', customer: 'Jane Smith', amount: '$89.50', status: 'processing' },
-    { id: '#1236', customer: 'Bob Johnson', amount: '$245.00', status: 'pending' },
-    { id: '#1237', customer: 'Alice Brown', amount: '$67.30', status: 'completed' },
-    { id: '#1238', customer: 'Charlie Wilson', amount: '$199.99', status: 'shipped' },
+    { id: '#1234', customer: 'Jean Dupont', amount: '$129.99', status: 'completed' },
+    { id: '#1235', customer: 'Marie Martin', amount: '$89.50', status: 'processing' },
+    { id: '#1236', customer: 'Paul Durand', amount: '$245.00', status: 'pending' },
+    { id: '#1237', customer: 'Alice Bernard', amount: '$67.30', status: 'completed' },
+    { id: '#1238', customer: 'Charles Moreau', amount: '$199.99', status: 'shipped' },
   ];
 
   const topProducts = [
-    { name: 'Wireless Headphones', sales: 234, revenue: '$12,543' },
-    { name: 'Smart Watch', sales: 189, revenue: '$9,876' },
-    { name: 'Laptop Stand', sales: 156, revenue: '$7,234' },
-    { name: 'USB-C Hub', sales: 134, revenue: '$5,678' },
-    { name: 'Wireless Mouse', sales: 98, revenue: '$3,456' },
+    { name: 'Casque sans fil', sales: 234, revenue: '$12,543' },
+    { name: 'Montre connectée', sales: 189, revenue: '$9,876' },
+    { name: 'Support d’ordinateur portable', sales: 156, revenue: '$7,234' },
+    { name: 'Hub USB-C', sales: 134, revenue: '$5,678' },
+    { name: 'Souris sans fil', sales: 98, revenue: '$3,456' },
   ];
 
   return (
@@ -215,10 +215,10 @@ function Dashboard() {
         transition={{ duration: 0.5 }}
       >
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Dashboard Overview
+          Vue d'ensemble du tableau de bord
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
-          Welcome back! Here's what's happening with your store today.
+          Heureux de vous revoir ! Voici ce qui se passe sur votre boutique aujourd'hui.
         </Typography>
       </motion.div>
 
@@ -239,7 +239,7 @@ function Dashboard() {
           >
             <Paper sx={{ p: 3, height: 400 }}>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Sales Overview
+                Vue d'ensemble des ventes
               </Typography>
               <Box sx={{ height: 320 }}>
                 <Line
@@ -275,7 +275,7 @@ function Dashboard() {
           >
             <Paper sx={{ p: 3, height: 400 }}>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Sales by Category
+                Ventes par catégorie
               </Typography>
               <Box sx={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Doughnut
@@ -304,7 +304,7 @@ function Dashboard() {
             <Paper sx={{ p: 3 }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" fontWeight="bold">
-                  Recent Orders
+                  Commandes récentes
                 </Typography>
                 <IconButton size="small">
                   <MoreVert />
@@ -356,7 +356,7 @@ function Dashboard() {
             <Paper sx={{ p: 3 }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" fontWeight="bold">
-                  Top Products
+                  Meilleurs produits
                 </Typography>
                 <IconButton size="small">
                   <MoreVert />
@@ -372,7 +372,7 @@ function Dashboard() {
                     </ListItemAvatar>
                     <ListItemText
                       primary={product.name}
-                      secondary={`${product.sales} sales`}
+                      secondary={`${product.sales} ventes`}
                     />
                     <ListItemSecondaryAction>
                       <Typography variant="body2" fontWeight="bold">

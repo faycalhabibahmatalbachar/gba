@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -19,6 +21,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
   String _filter = 'all';
+  StreamSubscription<List<Map<String, dynamic>>>? _ordersSubscription;
   
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -60,17 +63,49 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
     _loadOrders();
     
     // Écouter les changements en temps réel
-    _orderService.ordersStream().listen((orders) {
-      if (mounted) {
-        setState(() {
-          _orders = orders;
-        });
+    _ordersSubscription = _orderService.ordersStream().listen((orders) {
+      if (!mounted) return;
+
+      final incomingIds = orders.map((o) => o['id']).whereType<String>().toSet();
+      final existingIds = _orders.map((o) => o['id']).whereType<String>().toSet();
+      final hasNewOrMissing = incomingIds.difference(existingIds).isNotEmpty ||
+          existingIds.difference(incomingIds).isNotEmpty;
+
+      // Ne pas écraser la liste détaillée (order_details_view) par les lignes brutes (orders).
+      // On merge uniquement les champs qui changent souvent (status/updated_at).
+      setState(() {
+        final byId = <String, Map<String, dynamic>>{};
+        for (final o in orders) {
+          final id = o['id'];
+          if (id is String) {
+            byId[id] = o;
+          }
+        }
+
+        _orders = _orders.map((existing) {
+          final id = existing['id'];
+          if (id is! String) return existing;
+          final updated = byId[id];
+          if (updated == null) return existing;
+
+          return {
+            ...existing,
+            'status': updated['status'],
+            'updated_at': updated['updated_at'],
+          };
+        }).toList();
+      });
+
+      // Si une commande a été ajoutée/supprimée, on refetch pour récupérer items/images.
+      if (hasNewOrMissing) {
+        _loadOrders();
       }
     });
   }
 
   @override
   void dispose() {
+    _ordersSubscription?.cancel();
     _animController.dispose();
     super.dispose();
   }
@@ -138,7 +173,13 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
       child: Row(
         children: [
           IconButton(
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/home');
+              }
+            },
             icon: const Icon(FontAwesomeIcons.arrowLeft),
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
@@ -410,7 +451,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                         style: theme.textTheme.bodyMedium,
                       ),
                       Text(
-                        '${order['total_amount']?.toStringAsFixed(0) ?? '0'} FCFA',
+                        '${(((order['total_amount'] as num?) ?? 0)).toStringAsFixed(0)} FCFA',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.primary,
@@ -512,6 +553,24 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Builder(
+                      builder: (context) {
+                        final clientRows = <Widget>[
+                          _buildDetailRow('Nom', order['customer_name']?.toString()),
+                          _buildDetailRow('Téléphone', order['customer_phone']?.toString()),
+                          _buildDetailRow('Email', order['customer_email']?.toString()),
+                        ].where((w) => w is! SizedBox).toList();
+
+                        final shippingRows = <Widget>[
+                          _buildDetailRow('Pays', order['shipping_country']?.toString()),
+                          _buildDetailRow('Ville', order['shipping_city']?.toString()),
+                          _buildDetailRow('Quartier', order['shipping_district']?.toString()),
+                          _buildDetailRow('Adresse', order['shipping_address']?.toString()),
+                        ].where((w) => w is! SizedBox).toList();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                     // Order info
                     _buildDetailSection(
                       'Informations',
@@ -526,16 +585,13 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                     const SizedBox(height: 20),
                     
                     // Shipping address
-                    if (order['shipping_address'] != null) ...[
-                      _buildDetailSection(
-                        'Adresse de livraison',
-                        [
-                          _buildDetailRow('Nom', order['shipping_address']['name']),
-                          _buildDetailRow('Téléphone', order['shipping_address']['phone']),
-                          _buildDetailRow('Adresse', order['shipping_address']['address']),
-                          _buildDetailRow('Ville', order['shipping_address']['city']),
-                        ],
-                      ),
+                    if (clientRows.isNotEmpty) ...[
+                      _buildDetailSection('Client', clientRows),
+                      const SizedBox(height: 20),
+                    ],
+
+                    if (shippingRows.isNotEmpty) ...[
+                      _buildDetailSection('Adresse de livraison', shippingRows),
                       const SizedBox(height: 20),
                     ],
                     
@@ -546,6 +602,16 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if ((order['items'] as List? ?? []).isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          'Aucun article',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 10),
                     ...(order['items'] as List? ?? []).map((item) => Container(
                       margin: const EdgeInsets.only(bottom: 10),
@@ -563,11 +629,24 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                               borderRadius: BorderRadius.circular(8),
                               color: Colors.white,
                             ),
-                            child: Icon(
-                              FontAwesomeIcons.boxOpen,
-                              color: Colors.grey.shade400,
-                              size: 20,
-                            ),
+                            child: (item is Map && item['product_image'] != null)
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      item['product_image'].toString(),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Icon(
+                                        FontAwesomeIcons.boxOpen,
+                                        color: Colors.grey.shade400,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    FontAwesomeIcons.boxOpen,
+                                    color: Colors.grey.shade400,
+                                    size: 20,
+                                  ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -575,11 +654,17 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  item['product_name'] ?? '',
+                                  (item is Map ? item['product_name'] : null)?.toString() ?? '',
                                   style: const TextStyle(fontWeight: FontWeight.w600),
                                 ),
                                 Text(
-                                  '${item['quantity']} x ${item['unit_price']?.toStringAsFixed(0)} FCFA',
+                                  (() {
+                                    final qty = (item is Map ? item['quantity'] : null) as num?;
+                                    final unit = (item is Map ? item['unit_price'] : null) as num?;
+                                    final qtyLabel = qty?.toStringAsFixed(0) ?? '0';
+                                    final unitLabel = unit?.toStringAsFixed(0) ?? '0';
+                                    return '$qtyLabel x $unitLabel FCFA';
+                                  })(),
                                   style: TextStyle(
                                     color: Colors.grey.shade600,
                                     fontSize: 12,
@@ -589,7 +674,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                             ),
                           ),
                           Text(
-                            '${item['total_price']?.toStringAsFixed(0)} FCFA',
+                            '${(((item is Map ? item['total_price'] : null) as num?) ?? 0).toStringAsFixed(0)} FCFA',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -599,13 +684,34 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                     const Divider(height: 30),
                     
                     // Totals
-                    _buildDetailRow('Sous-total', '${order['subtotal']?.toStringAsFixed(0)} FCFA'),
-                    _buildDetailRow('Livraison', '${order['shipping_cost']?.toStringAsFixed(0)} FCFA'),
-                    const SizedBox(height: 10),
-                    _buildDetailRow(
-                      'Total',
-                      '${order['total_amount']?.toStringAsFixed(0)} FCFA',
-                      isTotal: true,
+                    Builder(
+                      builder: (context) {
+                        final totalAmount = (order['total_amount'] as num?) ?? 0;
+                        final shippingFee = (order['shipping_fee'] as num?) ?? 0;
+                        final computedSubtotal = (totalAmount - shippingFee) < 0 ? 0 : (totalAmount - shippingFee);
+                        return Column(
+                          children: [
+                            _buildDetailRow(
+                              'Sous-total',
+                              '${computedSubtotal.toStringAsFixed(0)} FCFA',
+                            ),
+                            _buildDetailRow(
+                              'Livraison',
+                              '${shippingFee.toStringAsFixed(0)} FCFA',
+                            ),
+                            const SizedBox(height: 10),
+                            _buildDetailRow(
+                              'Total',
+                              '${totalAmount.toStringAsFixed(0)} FCFA',
+                              isTotal: true,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -635,6 +741,11 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   Widget _buildDetailRow(String label, String? value, {bool isTotal = false}) {
+    final normalized = value?.toString().trim();
+    if (!isTotal && (normalized == null || normalized.isEmpty || normalized.toLowerCase() == 'n/a')) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
@@ -649,7 +760,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
             ),
           ),
           Text(
-            value ?? 'N/A',
+            normalized ?? 'N/A',
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
               fontSize: isTotal ? 16 : 14,

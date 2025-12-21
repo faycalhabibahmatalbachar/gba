@@ -55,6 +55,8 @@ function Products() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewProduct, setViewProduct] = useState(null);
   const { enqueueSnackbar } = useSnackbar();
 
   // Charger les données depuis Supabase
@@ -144,6 +146,11 @@ function Products() {
   const handleEditProduct = (product) => {
     setSelectedProduct(product);
     setDialogOpen(true);
+  };
+
+  const handleViewProduct = (product) => {
+    setViewProduct(product);
+    setViewDialogOpen(true);
   };
 
   const handleDeleteProduct = async (id) => {
@@ -244,7 +251,7 @@ function Products() {
     },
     {
       field: 'name',
-      headerName: 'Product Name',
+      headerName: 'Nom du produit',
       width: 200,
       renderCell: (params) => (
         <Box display="flex" alignItems="center" gap={1}>
@@ -255,13 +262,13 @@ function Products() {
     },
     { 
       field: 'price', 
-      headerName: 'Price', 
+      headerName: 'Prix', 
       width: 120,
       renderCell: (params) => `$${params.value}`
     },
     { 
       field: 'category', 
-      headerName: 'Category', 
+      headerName: 'Catégorie', 
       width: 130,
       renderCell: (params) => (
         <Chip label={params.value} size="small" color="primary" variant="outlined" />
@@ -281,7 +288,7 @@ function Products() {
     },
     {
       field: 'status',
-      headerName: 'Status',
+      headerName: 'Statut',
       width: 120,
       renderCell: (params) => (
         <Chip
@@ -304,7 +311,7 @@ function Products() {
           <IconButton size="small" onClick={() => handleDeleteProduct(params.row.id)}>
             <DeleteIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small">
+          <IconButton size="small" onClick={() => handleViewProduct(params.row)}>
             <ViewIcon fontSize="small" />
           </IconButton>
         </Box>
@@ -334,10 +341,10 @@ function Products() {
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Box>
             <Typography variant="h4" fontWeight="bold" gutterBottom>
-              Products Management
+              Gestion des produits
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Manage your product inventory
+              Gérez votre inventaire de produits
             </Typography>
           </Box>
           <Box display="flex" gap={2}>
@@ -353,13 +360,13 @@ function Products() {
               variant="outlined"
               startIcon={<UploadIcon />}
             >
-              Import
+              Importer
             </Button>
             <Button
               variant="outlined"
               startIcon={<DownloadIcon />}
             >
-              Export
+              Exporter
             </Button>
             <Button
               variant="contained"
@@ -369,7 +376,7 @@ function Products() {
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               }}
             >
-              Add Product
+              Ajouter un produit
             </Button>
           </Box>
         </Box>
@@ -378,7 +385,7 @@ function Products() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <TextField
-            placeholder="Search products..."
+            placeholder="Rechercher des produits..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             size="small"
@@ -396,13 +403,13 @@ function Products() {
               variant={viewMode === 'grid' ? 'contained' : 'outlined'}
               onClick={() => setViewMode('grid')}
             >
-              Grid View
+              Vue grille
             </Button>
             <Button
               variant={viewMode === 'table' ? 'contained' : 'outlined'}
               onClick={() => setViewMode('table')}
             >
-              Table View
+              Vue tableau
             </Button>
           </Box>
         </Box>
@@ -453,10 +460,14 @@ function Products() {
                   <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <CardMedia
                       component="img"
-                      height="200"
                       image={product.image}
                       alt={product.name}
-                      sx={{ objectFit: 'cover' }}
+                      sx={{ 
+                        height: 200,
+                        objectFit: 'contain',
+                        bgcolor: 'grey.100',
+                        p: 1
+                      }}
                     />
                     <CardContent sx={{ flexGrow: 1 }}>
                       <Typography gutterBottom variant="h6" component="div">
@@ -495,8 +506,8 @@ function Products() {
                         <DeleteIcon />
                       </IconButton>
                       <Box flexGrow={1} />
-                      <IconButton size="small">
-                        <MoreVertIcon />
+                      <IconButton size="small" onClick={() => handleViewProduct(product)}>
+                        <ViewIcon />
                       </IconButton>
                     </CardActions>
                   </Card>
@@ -517,6 +528,68 @@ function Products() {
         categories={categories}
         onSave={handleSaveProduct}
       />
+
+      <Dialog
+        open={viewDialogOpen && !!viewProduct}
+        onClose={() => {
+          setViewDialogOpen(false);
+          setViewProduct(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Détails du produit</DialogTitle>
+        <DialogContent dividers>
+          {viewProduct && (
+            <Box>
+              <Box mb={2} display="flex" justifyContent="center">
+                <CardMedia
+                  component="img"
+                  image={viewProduct.image}
+                  alt={viewProduct.name}
+                  sx={{ maxHeight: 260, objectFit: 'contain', bgcolor: 'grey.100', p: 1, borderRadius: 1 }}
+                />
+              </Box>
+              <Typography variant="h6" gutterBottom>
+                {viewProduct.name}
+              </Typography>
+              <Typography variant="subtitle1" color="primary" gutterBottom>
+                Prix: {viewProduct.price}
+              </Typography>
+              <Box display="flex" gap={1} mb={2} flexWrap="wrap">
+                <Chip label={viewProduct.category} size="small" color="primary" variant="outlined" />
+                <Chip label={`Stock: ${viewProduct.stock}`} size="small" color={viewProduct.stock > 10 ? 'success' : 'warning'} />
+                <Chip label={viewProduct.status} size="small" color={viewProduct.status === 'active' ? 'success' : 'warning'} />
+              </Box>
+              {viewProduct.brand && (
+                <Typography variant="body2" gutterBottom>
+                  Marque: {viewProduct.brand}
+                </Typography>
+              )}
+              {viewProduct.sku && (
+                <Typography variant="body2" gutterBottom>
+                  SKU: {viewProduct.sku}
+                </Typography>
+              )}
+              {viewProduct.description && (
+                <Typography variant="body2" sx={{ mt: 2 }}>
+                  {viewProduct.description}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setViewDialogOpen(false);
+              setViewProduct(null);
+            }}
+          >
+            Fermer
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Fab
         color="primary"

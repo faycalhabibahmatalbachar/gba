@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/animated_route.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/register_screen.dart';
 import '../screens/home_screen_premium.dart';
 import '../screens/product/product_detail_screen.dart';
 // import '../screens/product/product_search_screen.dart'; // Fichier n'existe pas encore
@@ -12,7 +12,8 @@ import '../screens/orders/my_orders_screen.dart';
 import '../screens/favorites_screen_premium.dart';
 import '../screens/categories_screen_premium.dart';
 import '../screens/cart_screen_premium.dart';
-import '../screens/profile_screen_premium.dart';
+import '../screens/profile_screen_ultra.dart';
+import '../screens/settings_screen_premium.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/chat/conversations_list_screen.dart';
 import '../screens/chat/admin_chat_screen.dart';
@@ -21,6 +22,71 @@ import '../screens/bloc_screen.dart';
 class AppRoutes {
   static final router = GoRouter(
     initialLocation: '/',
+    errorBuilder: (context, state) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF667eea),
+                Color(0xFF764ba2),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.travel_explore, size: 72, color: Colors.white),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Page introuvable',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Aucune route pour: ${state.uri}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/home'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF667eea),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.home),
+                      label: const Text(
+                        'Retour à l\'accueil',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
     redirect: (context, state) async {
       final supabase = Supabase.instance.client;
       final session = supabase.auth.currentSession;
@@ -72,11 +138,7 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => Scaffold(
-          body: Center(
-            child: Text('Register Screen - À implémenter'),
-          ),
-        ),
+        builder: (context, state) => const RegisterScreen(),
       ),
       GoRoute(
         path: '/home',
@@ -105,6 +167,10 @@ class AppRoutes {
       GoRoute(
         path: '/checkout',
         builder: (context, state) => const UltraCheckoutScreen(),
+      ),
+      GoRoute(
+        path: '/orders',
+        builder: (context, state) => const MyOrdersScreen(),
       ),
       GoRoute(
         path: '/categories',
@@ -159,7 +225,7 @@ class AppRoutes {
       GoRoute(
         path: '/profile',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const ProfileScreenPremium(),
+          child: const ProfileScreenUltra(),
           transitionDuration: const Duration(milliseconds: 900),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             // Animation Parallax + Zoom spectaculaire
@@ -230,6 +296,10 @@ class AppRoutes {
             );
           },
         ),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreenPremium(),
       ),
       GoRoute(
         path: '/product/:id',

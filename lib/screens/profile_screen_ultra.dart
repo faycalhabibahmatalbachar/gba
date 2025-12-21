@@ -639,44 +639,49 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildAnimatedStats(Map<String, dynamic> stats) {
-    return GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 2.5,
-        children: [
-          _buildStatCard(
-            icon: FontAwesomeIcons.bagShopping,
-            label: 'Commandes',
-            value: stats['orders'].toString(),
-            color: Colors.blue,
-            delay: 0,
-          ),
-          _buildStatCard(
-            icon: FontAwesomeIcons.heart,
-            label: 'Favoris',
-            value: stats['favorites'].toString(),
-            color: Colors.red,
-            delay: 100,
-          ),
-          _buildStatCard(
-            icon: FontAwesomeIcons.star,
-            label: 'Avis',
-            value: stats['reviews'].toString(),
-            color: Colors.amber,
-            delay: 200,
-          ),
-          _buildStatCard(
-            icon: FontAwesomeIcons.coins,
-            label: 'Points',
-            value: stats['points'].toString(),
-            color: Colors.green,
-            delay: 300,
-          ),
-        ],
-      );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 380;
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: isNarrow ? 2.05 : 2.3,
+          children: [
+            _buildStatCard(
+              icon: FontAwesomeIcons.bagShopping,
+              label: 'Commandes',
+              value: stats['orders'].toString(),
+              color: Colors.blue,
+              delay: 0,
+            ),
+            _buildStatCard(
+              icon: FontAwesomeIcons.heart,
+              label: 'Favoris',
+              value: stats['favorites'].toString(),
+              color: Colors.red,
+              delay: 100,
+            ),
+            _buildStatCard(
+              icon: FontAwesomeIcons.star,
+              label: 'Avis',
+              value: stats['reviews'].toString(),
+              color: Colors.amber,
+              delay: 200,
+            ),
+            _buildStatCard(
+              icon: FontAwesomeIcons.coins,
+              label: 'Points',
+              value: stats['points'].toString(),
+              color: Colors.green,
+              delay: 300,
+            ),
+          ],
+        );
+      },
+    );
   }
   
   Widget _buildStatCard({
@@ -694,7 +699,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
         return Transform.scale(
           scale: animValue,
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
@@ -717,26 +722,33 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                   child: Icon(icon, color: color, size: 20),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
                       ),
-                    ),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -843,20 +855,62 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
         ),
         if (profile?.bio != null && profile!.bio!.isNotEmpty) ...[
           const SizedBox(height: 16),
-          _buildInfoCard(
-            title: 'Bio',
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  profile.bio!,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    height: 1.5,
-                  ),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
                 ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF667eea).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      FontAwesomeIcons.comment,
+                      size: 18,
+                      color: Color(0xFF667eea),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Bio',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          profile.bio!,
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ],
@@ -1086,33 +1140,38 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           ),
         ),
         const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 1,
-          children: [
-            _buildActionCard(
-              icon: FontAwesomeIcons.bagShopping,
-              label: 'Mes commandes',
-              color: Colors.blue,
-              onTap: () => context.push('/orders'),
-            ),
-            _buildActionCard(
-              icon: FontAwesomeIcons.heart,
-              label: 'Favoris',
-              color: Colors.red,
-              onTap: () => context.push('/favorites'),
-            ),
-            _buildActionCard(
-              icon: FontAwesomeIcons.gear,
-              label: 'Paramètres',
-              color: Colors.grey,
-              onTap: () => context.push('/settings'),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final crossAxisCount = constraints.maxWidth < 360 ? 2 : 3;
+            return GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 1,
+              children: [
+                _buildActionCard(
+                  icon: FontAwesomeIcons.bagShopping,
+                  label: 'Mes commandes',
+                  color: Colors.blue,
+                  onTap: () => context.push('/orders'),
+                ),
+                _buildActionCard(
+                  icon: FontAwesomeIcons.heart,
+                  label: 'Favoris',
+                  color: Colors.red,
+                  onTap: () => context.push('/favorites'),
+                ),
+                _buildActionCard(
+                  icon: FontAwesomeIcons.gear,
+                  label: 'Paramètres',
+                  color: Colors.grey,
+                  onTap: () => context.push('/settings'),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );

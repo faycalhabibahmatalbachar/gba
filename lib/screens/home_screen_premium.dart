@@ -6,6 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:badges/badges.dart' as badges;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/cart_provider.dart';
 import '../providers/categories_provider.dart';
 import '../providers/product_provider.dart';
@@ -21,8 +22,8 @@ class HomeScreenPremium extends StatefulWidget {
   State<HomeScreenPremium> createState() => _HomeScreenPremiumState();
 }
 
-class _HomeScreenPremiumState extends State<HomeScreenPremium> 
-    with TickerProviderStateMixin {
+class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProviderStateMixin {
+  static const bool _debugImageLogs = false;
   String? selectedCategoryId;
   int _currentIndex = 0;
   late AnimationController _fabAnimationController;
@@ -697,12 +698,16 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium>
                           String imageUrl = product.mainImage!;
                           if (imageUrl.contains('/products/products/')) {
                             imageUrl = imageUrl.replaceAll('/products/products/', '/products/');
-                            print('🔧 URL corrigée de double products');
+                            if (_debugImageLogs) {
+                              print('🔧 URL corrigée de double products');
+                            }
                           }
                           
                           // Log de l'URL finale
-                          print('🗼️ Tentative de chargement image pour ${product.name}');
-                          print('🔗 URL finale: $imageUrl');
+                          if (_debugImageLogs) {
+                            print('🗼️ Tentative de chargement image pour ${product.name}');
+                            print('🔗 URL finale: $imageUrl');
+                          }
                           
                           return ClipRRect(
                             borderRadius: const BorderRadius.vertical(
@@ -714,11 +719,13 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium>
                               width: double.infinity,
                               height: double.infinity,
                               errorBuilder: (context, error, stackTrace) {
-                                print('❌ ERREUR chargement image pour ${product.name}');
-                                print('   🔗 URL tentée: $imageUrl');
-                                print('   ⚠️ Type erreur: ${error.runtimeType}');
-                                print('   📝 Message: $error');
-                                print('   🔍 Stack trace: ${stackTrace.toString().split('\n').take(3).join('\n')}');
+                                if (_debugImageLogs) {
+                                  print('❌ ERREUR chargement image pour ${product.name}');
+                                  print('   🔗 URL tentée: $imageUrl');
+                                  print('   ⚠️ Type erreur: ${error.runtimeType}');
+                                  print('   📝 Message: $error');
+                                  print('   🔍 Stack trace: ${stackTrace.toString().split('\n').take(3).join('\n')}');
+                                }
                                 return Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -913,33 +920,57 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium>
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(50),
-                          onTap: () {
+                          onTap: () async {
                             HapticFeedback.mediumImpact();
-                            Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    const Icon(FontAwesomeIcons.checkCircle, color: Colors.white, size: 20),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        '${product.name} ajouté au panier',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
+
+                            // Vérifier que l'utilisateur est connecté avant d'ajouter au panier
+                            final user = Supabase.instance.client.auth.currentUser;
+                            if (user == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Veuillez vous connecter pour ajouter au panier'),
+                                  backgroundColor: Colors.red,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              return;
+                            }
+
+                            try {
+                              await Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(FontAwesomeIcons.checkCircle, color: Colors.white, size: 20),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          '${product.name} ajouté au panier',
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                  backgroundColor: const Color(0xFF4ECDC4),
+                                  // Laisser le SnackBar en mode fixe pour éviter l'erreur "Floating SnackBar presented off screen"
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 0,
                                 ),
-                                duration: const Duration(seconds: 2),
-                                backgroundColor: const Color(0xFF4ECDC4),
-                                behavior: SnackBarBehavior.floating,
-                                margin: const EdgeInsets.all(20),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Erreur ajout au panier: $e'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 2),
                                 ),
-                                elevation: 0,
-                              ),
-                            );
+                              );
+                            }
                           },
                           child: Container(
                             width: 32,
