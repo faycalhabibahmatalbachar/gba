@@ -49,8 +49,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _init();
   }
 
+  Future<void> refreshProfile() async {
+    await _loadProfile();
+  }
+
   void _log(String message) {
     debugPrint('[Auth] $message');
+  }
+
+  String _normalizeEmail(String email) {
+    return email
+        .trim()
+        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+        .toLowerCase();
+  }
+
+  Map<String, String?> _splitFullName(String fullName) {
+    final normalized = fullName.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.isEmpty) {
+      return {'first_name': null, 'last_name': null};
+    }
+
+    final parts = normalized.split(' ');
+    if (parts.length == 1) {
+      return {'first_name': parts[0], 'last_name': null};
+    }
+
+    return {
+      'first_name': parts.first,
+      'last_name': parts.sublist(1).join(' '),
+    };
   }
 
   void _init() {
@@ -89,9 +117,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final fullName = (user.userMetadata?['full_name'] ?? user.userMetadata?['name'])?.toString();
         _log('Attempting profile recovery upsert: userId=${user.id}, fullName=$fullName');
         try {
+          final nameParts = _splitFullName(fullName ?? '');
           await SupabaseService.updateUserProfile({
             'email': user.email,
-            if (fullName != null && fullName.trim().isNotEmpty) 'full_name': fullName.trim(),
+            if (nameParts['first_name'] != null) 'first_name': nameParts['first_name'],
+            if (nameParts['last_name'] != null) 'last_name': nameParts['last_name'],
           });
           _log('Profile recovery upsert: OK');
           final recoveredProfile = await SupabaseService.getUserProfile();
@@ -107,11 +137,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signIn(String email, String password) async {
-    _log('signIn start: email=$email');
+    final normalizedEmail = _normalizeEmail(email);
+    _log('signIn start: email=$normalizedEmail');
     state = state.copyWith(isLoading: true, error: null, errorCode: null);
     try {
       final response = await Supabase.instance.client.auth.signInWithPassword(
-        email: email,
+        email: normalizedEmail,
         password: password,
       );
       
@@ -135,6 +166,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           message =
               'Connexion refusée. Vérifie le mot de passe OU confirme ton email (regarde ta boîte mail).';
         }
+        if (e.code == 'email_address_invalid') {
+          message =
+              'Email invalide. Retape l\'email (sans espaces/caractères invisibles) et réessaie.';
+        }
       }
 
       state = state.copyWith(isLoading: false, error: message, errorCode: code);
@@ -142,13 +177,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signUp(String email, String password, String fullName) async {
-    _log('signUp start: email=$email, fullName=$fullName');
+    final normalizedEmail = _normalizeEmail(email);
+    final normalizedFullName = fullName.trim();
+    _log('signUp start: email=$normalizedEmail, fullName=$normalizedFullName');
     state = state.copyWith(isLoading: true, error: null, errorCode: null);
     try {
       final response = await Supabase.instance.client.auth.signUp(
-        email: email,
+        email: normalizedEmail,
         password: password,
-        data: {'full_name': fullName},
+        data: {'full_name': normalizedFullName},
       );
       
       final createdUserId = response.user?.id;
@@ -171,9 +208,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       try {
+        final nameParts = _splitFullName(normalizedFullName);
         await SupabaseService.updateUserProfile({
-          'full_name': fullName,
-          'email': email,
+          'email': normalizedEmail,
+          if (nameParts['first_name'] != null) 'first_name': nameParts['first_name'],
+          if (nameParts['last_name'] != null) 'last_name': nameParts['last_name'],
         });
         _log('Profile upsert after signUp: OK');
       } catch (e) {
@@ -190,6 +229,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (e is AuthApiException) {
         code = e.code;
         _log('signUp AuthApiException: statusCode=${e.statusCode}, code=${e.code}, message=${e.message}');
+        if (e.code == 'email_address_invalid') {
+          message =
+              'Email invalide. Retape l\'email (sans espaces/caractères invisibles) et réessaie.';
+        }
       }
 
       state = state.copyWith(isLoading: false, error: message, errorCode: code);
@@ -214,11 +257,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> resendEmailConfirmation(String email) async {
-    _log('resendEmailConfirmation start: email=$email');
+    final normalizedEmail = _normalizeEmail(email);
+    _log('resendEmailConfirmation start: email=$normalizedEmail');
     try {
       await Supabase.instance.client.auth.resend(
         type: OtpType.signup,
-        email: email,
+        email: normalizedEmail,
       );
       _log('resendEmailConfirmation success');
     } catch (e) {

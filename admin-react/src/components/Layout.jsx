@@ -42,6 +42,8 @@ import {
   ShoppingBasket as BasketIcon,
   TrendingUp as TrendingIcon,
   Message as MessageIcon,
+  LocalShipping as LocalShippingIcon,
+  Map as MapIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -61,6 +63,10 @@ const menuItems = [
     ]
   },
   { title: 'Commandes', path: '/orders', icon: <ShoppingCartIcon />, badge: 5 },
+  { title: 'Livraisons (GPS)', path: '/deliveries', icon: <LocalShippingIcon /> },
+  { title: 'Livreurs', path: '/drivers', icon: <PeopleIcon /> },
+  { title: 'Tracking GPS Live', path: '/delivery-tracking', icon: <MapIcon /> },
+  { title: 'Bannières', path: '/banners', icon: <LocalOfferIcon /> },
   { 
     title: 'Monitoring', 
     path: '/monitoring', 

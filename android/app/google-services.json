@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "113996075487",
+    "project_id": "globalbusinessamdaradir-fba45",
+    "storage_bucket": "globalbusinessamdaradir-fba45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:113996075487:android:68af91a28947f55cb7b46a",
+        "android_client_info": {
+          "package_name": "com.gba.admin_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAy7cHyAZF9hPDzkhs1fPOTbEeJayruh7w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:113996075487:android:6a2b439637153419b7b46a",
+        "android_client_info": {
+          "package_name": "com.gba.client_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAy7cHyAZF9hPDzkhs1fPOTbEeJayruh7w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:113996075487:android:2bac369101f3c820b7b46a",
+        "android_client_info": {
+          "package_name": "com.gba.ecommerce_client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAy7cHyAZF9hPDzkhs1fPOTbEeJayruh7w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

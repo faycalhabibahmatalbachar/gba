@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -23,6 +24,7 @@ class PremiumProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final hasDiscount = product.compareAtPrice != null && 
                         product.compareAtPrice! > product.price;
     final discountPercentage = hasDiscount
@@ -34,11 +36,15 @@ class PremiumProductCard extends StatelessWidget {
       child: Container(
         width: width,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: scheme.primary.withOpacity(0.12),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: scheme.primary.withOpacity(0.08),
               blurRadius: 20,
               offset: const Offset(0, 10),
               spreadRadius: -5,
@@ -52,11 +58,11 @@ class PremiumProductCard extends StatelessWidget {
             Stack(
               children: [
                 AspectRatio(
-                  aspectRatio: 0.75,
+                  aspectRatio: 1,
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20),
+                        top: Radius.circular(24),
                       ),
                       gradient: LinearGradient(
                         colors: [
@@ -69,12 +75,14 @@ class PremiumProductCard extends StatelessWidget {
                     ),
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20),
+                        top: Radius.circular(24),
                       ),
                       child: product.mainImage != null
                           ? CachedNetworkImage(
-                              imageUrl: product.mainImage!,
-                              fit: BoxFit.contain,
+                              imageUrl: product.mainImage!.contains('/products/products/')
+                                  ? product.mainImage!.replaceAll('/products/products/', '/products/')
+                                  : product.mainImage!,
+                              fit: BoxFit.cover,
                               width: double.infinity,
                             placeholder: (context, url) => Container(
                               color: Colors.grey.shade100,
@@ -125,7 +133,7 @@ class PremiumProductCard extends StatelessWidget {
                             gradient: const LinearGradient(
                               colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
                             ),
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.orange.withOpacity(0.3),
@@ -162,7 +170,7 @@ class PremiumProductCard extends StatelessWidget {
                             gradient: const LinearGradient(
                               colors: [Color(0xFFFF4757), Color(0xFFFF6348)],
                             ),
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.red.withOpacity(0.3),
@@ -190,7 +198,7 @@ class PremiumProductCard extends StatelessWidget {
                   right: 12,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.95),
+                      color: scheme.surface.withOpacity(0.95),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -203,9 +211,10 @@ class PremiumProductCard extends StatelessWidget {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                         onTap: () {
-                          Provider.of<FavoritesProvider>(context, listen: false).toggleFavorite(product.id);
+                          Provider.of<FavoritesProvider>(context, listen: false)
+                              .toggleFavorite(product.id, productName: product.name);
                         },
                         child: Consumer<FavoritesProvider>(
                           builder: (context, favoritesProvider, child) {
@@ -241,7 +250,7 @@ class PremiumProductCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: Colors.red.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                       ),
                       child: const Text(
                         'Rupture de stock',
@@ -260,142 +269,264 @@ class PremiumProductCard extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Category & Brand
-                    if (product.brand != null)
-                      Text(
-                        product.brand!.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: theme.primaryColor,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    
-                    const SizedBox(height: 4),
-                    
-                    // Product Name
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2C3E50),
-                        height: 1.2,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Rating (if available)
-                    if (product.rating != null)
-                      Row(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxHeight < 110;
+
+                    if (isCompact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          ...List.generate(5, (index) => Icon(
-                          index < 4 ? Icons.star : Icons.star_border,
-                          size: 12,
-                          color: Colors.amber,
-                        )),
-                        const SizedBox(width: 4),
-                        Text(
-                          '(4.5)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
+                          Text(
+                            product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2C3E50),
+                              height: 1.1,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    
-                    const Spacer(),
-                    
-                    // Price Section
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              if (hasDiscount)
-                                Text(
-                                  '${product.compareAtPrice!.toStringAsFixed(0)} FCFA',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade500,
-                                    decoration: TextDecoration.lineThrough,
-                                  ),
-                                ),
-                              Text(
-                                '${product.price.toStringAsFixed(0)} FCFA',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.primaryColor,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (hasDiscount)
+                                      Text(
+                                        '${product.compareAtPrice!.toStringAsFixed(0)} FCFA',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey.shade500,
+                                          decoration: TextDecoration.lineThrough,
+                                        ),
+                                      ),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '${product.price.toStringAsFixed(0)} FCFA',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.primaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
+                              if (showQuickActions && product.quantity > 0)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        theme.primaryColor,
+                                        theme.primaryColor.withOpacity(0.8),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: theme.primaryColor.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: () {
+                                        Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('${product.name} ajouté au panier'),
+                                            duration: const Duration(seconds: 2),
+                                            backgroundColor: Colors.green,
+                                            behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: FaIcon(
+                                          FontAwesomeIcons.cartPlus,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ).animate().fadeIn(duration: 300.ms).scale(delay: 100.ms),
                             ],
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Category & Brand
+                        if (product.brand != null)
+                          Text(
+                            product.brand!.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: theme.primaryColor,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        
+                        const SizedBox(height: 4),
+                        
+                        // Product Name
+                        Text(
+                          product.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                            height: 1.2,
                           ),
                         ),
                         
-                        // Quick Add to Cart Button
-                        if (showQuickActions && product.quantity > 0)
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  theme.primaryColor,
-                                  theme.primaryColor.withOpacity(0.8),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme.primaryColor.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                        const SizedBox(height: 8),
+                        
+                        // Rating (if available)
+                        if (product.rating > 0)
+                          Row(
+                            children: [
+                              ...List.generate(
+                                5,
+                                (index) => Icon(
+                                  index < product.rating.round()
+                                      ? Icons.star
+                                      : Icons.star_border,
+                                  size: 12,
+                                  color: Colors.amber,
                                 ),
-                              ],
+                              ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '(${product.reviewsCount})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: scheme.onSurface.withOpacity(0.7),
+                              ),
                             ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('${product.name} ajouté au panier'),
-                                      duration: const Duration(seconds: 2),
-                                      backgroundColor: Colors.green,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
+                          ],
+                        ),
+                        
+                        const Spacer(),
+                        
+                        // Price Section
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (hasDiscount)
+                                    Text(
+                                      '${product.compareAtPrice!.toStringAsFixed(0)} FCFA',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade500,
+                                        decoration: TextDecoration.lineThrough,
                                       ),
                                     ),
-                                  );
-                                },
-                                child: const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: FaIcon(
-                                    FontAwesomeIcons.cartPlus,
-                                    color: Colors.white,
-                                    size: 18,
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${product.price.toStringAsFixed(0)} FCFA',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.primaryColor,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
-                          ).animate()
-                            .fadeIn(duration: 300.ms)
-                            .scale(delay: 100.ms),
+
+                            const SizedBox(width: 10),
+
+                            // Quick Add to Cart Button
+                            if (showQuickActions && product.quantity > 0)
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      theme.primaryColor,
+                                      theme.primaryColor.withOpacity(0.8),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: theme.primaryColor.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () {
+                                      Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('${product.name} ajouté au panier'),
+                                          duration: const Duration(seconds: 2),
+                                          backgroundColor: Colors.green,
+                                          behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
+                                          margin: kIsWeb ? null : const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: FaIcon(
+                                        FontAwesomeIcons.cartPlus,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ).animate()
+                                .fadeIn(duration: 300.ms)
+                                .scale(delay: 100.ms),
+                          ],
+                        ),
                       ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),

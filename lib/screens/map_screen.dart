@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -21,7 +22,7 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     mapController = MapController();
-    _getCurrentLocation();
+    isLoading = false;
   }
 
   @override
@@ -31,28 +32,39 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
-    // Request location permission
-    final permission = await Permission.location.request();
-    
-    if (permission.isGranted) {
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-        
-        setState(() {
-          currentLocation = LatLng(position.latitude, position.longitude);
-          isLoading = false;
-        });
-        
-        // Move map to current location
-        mapController.move(currentLocation!, 13.0);
-      } catch (e) {
-        setState(() {
-          isLoading = false;
-        });
+    setState(() => isLoading = true);
+    try {
+      if (kIsWeb) {
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          setState(() => isLoading = false);
+          return;
+        }
+      } else {
+        final permission = await Permission.location.request();
+        if (!permission.isGranted) {
+          setState(() => isLoading = false);
+          return;
+        }
       }
-    } else {
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+        
+      setState(() {
+        currentLocation = LatLng(position.latitude, position.longitude);
+        isLoading = false;
+      });
+        
+      // Move map to current location
+      mapController.move(currentLocation!, 13.0);
+    } catch (e) {
       setState(() {
         isLoading = false;
       });

@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,11 +8,13 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/profile.dart';
 import '../services/profile_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
-import '../widgets/bottom_nav_bar.dart';
+import '../routes/app_routes.dart';
+import '../widgets/adaptive_scaffold.dart';
 import 'settings_screen_premium.dart';
 
 class ProfileScreenUltra extends StatefulWidget {
@@ -37,6 +40,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   bool _isEditing = false;
   bool _isUploadingPhoto = false;
   Profile? _profile;
+  String? _coverUrl;
   bool _isLoadingProfile = true;
   Map<String, dynamic> _stats = {'orders': 0, 'favorites': 0, 'reviews': 0, 'points': 0};
   int _selectedTab = 0;
@@ -51,6 +55,24 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _countryController = TextEditingController(text: 'France');
+
+  String _effectiveEmail(Profile? profile) {
+    final p = (profile?.email ?? '').trim();
+    if (p.isNotEmpty) return p;
+    return (Supabase.instance.client.auth.currentUser?.email ?? '').trim();
+  }
+
+  double _profileCompletionRatio(Profile? profile) {
+    const total = 6;
+    var filled = 0;
+    if ((profile?.firstName ?? '').trim().isNotEmpty) filled++;
+    if ((profile?.lastName ?? '').trim().isNotEmpty) filled++;
+    if (_effectiveEmail(profile).isNotEmpty) filled++;
+    if ((profile?.phone ?? '').trim().isNotEmpty) filled++;
+    if ((profile?.address ?? '').trim().isNotEmpty) filled++;
+    if ((profile?.city ?? '').trim().isNotEmpty) filled++;
+    return filled / total;
+  }
   
   @override
   void initState() {
@@ -105,10 +127,103 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     _scaleController.forward();
     _pulseController.repeat(reverse: true);
   }
+
+  Widget _buildProfileCompletionCard(Profile? profile) {
+    final ratio = _profileCompletionRatio(profile);
+    final percent = (ratio * 100).round();
+    final isComplete = ratio >= 0.999;
+
+    if (isComplete) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Complétion du profil',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+                Text(
+                  '$percent%',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF667eea),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 10,
+              ),
+            ),
+            if (!isComplete) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Complète ton profil pour accélérer le checkout.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () => context.push('/onboarding'),
+                icon: const Icon(Icons.auto_fix_high_rounded),
+                label: const Text('Compléter maintenant'),
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
   
   Future<void> _loadProfile() async {
     setState(() => _isLoadingProfile = true);
     try {
+      final cached = await _profileService.getCachedUserProfile();
+      if (mounted && cached != null) {
+        setState(() {
+          _profile = cached;
+          _isLoadingProfile = false;
+          _firstNameController.text = cached.firstName ?? '';
+          _lastNameController.text = cached.lastName ?? '';
+          _emailController.text = _effectiveEmail(cached);
+          _phoneController.text = cached.phone ?? '';
+          _bioController.text = cached.bio ?? '';
+          _addressController.text = cached.address ?? '';
+          _cityController.text = cached.city ?? '';
+          _postalCodeController.text = cached.postalCode ?? '';
+        });
+      }
+
       final profile = await _profileService.getCurrentUserProfile();
       if (mounted) {
         setState(() {
@@ -117,6 +232,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           if (profile != null) {
             _firstNameController.text = profile.firstName ?? '';
             _lastNameController.text = profile.lastName ?? '';
+            _emailController.text = _effectiveEmail(profile);
             _phoneController.text = profile.phone ?? '';
             _bioController.text = profile.bio ?? '';
             _addressController.text = profile.address ?? '';
@@ -124,6 +240,16 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
             _postalCodeController.text = profile.postalCode ?? '';
           }
         });
+      }
+
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        try {
+          final url = await _profileService.getCoverUrl(userId);
+          if (mounted) setState(() => _coverUrl = url);
+        } catch (_) {}
+
+        await _loadStats();
       }
     } catch (e) {
       print('Error loading profile: $e');
@@ -134,18 +260,20 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Future<void> _loadStats() async {
-    // Simulate loading stats - in production, load from API
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) {
-      setState(() {
-        _stats = {
-          'orders': 12,
-          'favorites': 8,
-          'reviews': 15,
-          'points': 250,
-        };
-      });
-    }
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    final stats = await _profileService.getProfileStats(userId);
+    final points = _profile?.loyaltyPoints ?? 0;
+    if (!mounted) return;
+    setState(() {
+      _stats = {
+        'orders': stats['orders'] ?? 0,
+        'favorites': stats['favorites'] ?? 0,
+        'reviews': stats['reviews'] ?? 0,
+        'points': points,
+      };
+    });
   }
   
   @override
@@ -164,6 +292,267 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     _postalCodeController.dispose();
     _countryController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showImageViewer({required String title, required String imageUrl}) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: InteractiveViewer(
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAvatarActions() async {
+    final avatarUrl = _profile?.avatarUrl;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.visibility),
+                  title: const Text('Voir'),
+                  enabled: avatarUrl != null && avatarUrl.trim().isNotEmpty,
+                  onTap: avatarUrl == null || avatarUrl.trim().isEmpty
+                      ? null
+                      : () => Navigator.pop(context, 'view'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera),
+                  title: const Text('Modifier'),
+                  onTap: () => Navigator.pop(context, 'change'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
+                  title: Text('Supprimer', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  enabled: avatarUrl != null && avatarUrl.trim().isNotEmpty,
+                  onTap: avatarUrl == null || avatarUrl.trim().isEmpty
+                      ? null
+                      : () => Navigator.pop(context, 'delete'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (action == null) return;
+
+    if (action == 'view' && avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+      await _showImageViewer(title: 'Photo de profil', imageUrl: avatarUrl);
+      return;
+    }
+    if (action == 'change') {
+      await _pickImage();
+      return;
+    }
+    if (action == 'delete') {
+      setState(() => _isUploadingPhoto = true);
+      try {
+        await _profileService.deleteAvatar();
+        await _loadProfile();
+      } finally {
+        if (mounted) setState(() => _isUploadingPhoto = false);
+      }
+    }
+  }
+
+  Future<void> _showCoverActions() async {
+    final coverUrl = _coverUrl;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.visibility),
+                  title: const Text('Voir'),
+                  enabled: coverUrl != null && coverUrl.trim().isNotEmpty,
+                  onTap: coverUrl == null || coverUrl.trim().isEmpty
+                      ? null
+                      : () => Navigator.pop(context, 'view'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo),
+                  title: const Text('Modifier'),
+                  onTap: () => Navigator.pop(context, 'change'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
+                  title: Text('Supprimer', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  enabled: coverUrl != null && coverUrl.trim().isNotEmpty,
+                  onTap: coverUrl == null || coverUrl.trim().isEmpty
+                      ? null
+                      : () => Navigator.pop(context, 'delete'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (action == null) return;
+
+    if (action == 'view' && coverUrl != null && coverUrl.trim().isNotEmpty) {
+      await _showImageViewer(title: 'Photo de couverture', imageUrl: coverUrl);
+      return;
+    }
+    if (action == 'change') {
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Choisir une couverture',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildImageSourceOption(
+                    icon: FontAwesomeIcons.camera,
+                    label: 'Caméra',
+                    onTap: () => Navigator.pop(context, ImageSource.camera),
+                  ),
+                  _buildImageSourceOption(
+                    icon: FontAwesomeIcons.images,
+                    label: 'Galerie',
+                    onTap: () => Navigator.pop(context, ImageSource.gallery),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      );
+
+      if (source == null) return;
+      final image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1800,
+        maxHeight: 900,
+        imageQuality: 85,
+      );
+      if (image == null) return;
+
+      setState(() => _isUploadingPhoto = true);
+      try {
+        final url = await _profileService.uploadCover(image);
+        if (mounted) setState(() => _coverUrl = url);
+      } finally {
+        if (mounted) setState(() => _isUploadingPhoto = false);
+      }
+      return;
+    }
+    if (action == 'delete') {
+      setState(() => _isUploadingPhoto = true);
+      try {
+        await _profileService.deleteCover();
+        if (mounted) setState(() => _coverUrl = null);
+      } finally {
+        if (mounted) setState(() => _isUploadingPhoto = false);
+      }
+    }
   }
   
   Future<void> _pickImage() async {
@@ -250,13 +639,16 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     required String label,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: theme.brightness == Brightness.dark
+              ? theme.colorScheme.surface
+              : Colors.grey[100],
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -278,6 +670,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     final updatedProfile = profile.copyWith(
       firstName: _firstNameController.text,
       lastName: _lastNameController.text,
+      email: _emailController.text.trim().isEmpty ? _effectiveEmail(profile) : _emailController.text.trim(),
       phone: _phoneController.text,
       bio: _bioController.text,
       address: _addressController.text,
@@ -299,7 +692,8 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
       _showErrorMessage('Veuillez remplir tous les champs obligatoires');
       return false;
     }
-    if (_phoneController.text.isNotEmpty && !RegExp(r'^\+?[0-9]{10,}$').hasMatch(_phoneController.text)) {
+    final phoneDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (phoneDigits.isNotEmpty && phoneDigits.length < 8) {
       _showErrorMessage('Numéro de téléphone invalide');
       return false;
     }
@@ -311,7 +705,10 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   void _showSuccessMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger =
+        ScaffoldMessenger.maybeOf(context) ?? AppRoutes.scaffoldMessengerKey.currentState;
+    if (messenger == null) return;
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
@@ -321,14 +718,17 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           ],
         ),
         backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
+        behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
   
   void _showErrorMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger =
+        ScaffoldMessenger.maybeOf(context) ?? AppRoutes.scaffoldMessengerKey.currentState;
+    if (messenger == null) return;
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
@@ -338,7 +738,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           ],
         ),
         backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
+        behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
@@ -362,7 +762,8 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
       return _buildErrorState();
     }
     
-    return Scaffold(
+    return AdaptiveScaffold(
+      currentIndex: 4,
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
@@ -405,6 +806,8 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
+                          _buildProfileCompletionCard(profile),
+                          const SizedBox(height: 18),
                           _buildAnimatedStats(stats),
                           const SizedBox(height: 32),
                           _buildTabSelector(),
@@ -428,7 +831,6 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           ),
         ],
       ),
-      bottomNavigationBar: const BottomNavBar(currentIndex: 4),
     );
   }
   
@@ -473,22 +875,39 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildModernHeader(Profile? profile) {
+    final ratio = _profileCompletionRatio(profile);
+    final isComplete = ratio >= 0.999;
+    final email = _effectiveEmail(profile);
+
     return FlexibleSpaceBar(
       background: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF667eea),
-                  const Color(0xFF764ba2),
-                ],
-              ),
-            ),
-          ),
+          _coverUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: _coverUrl!,
+                  fit: BoxFit.cover,
+                  errorWidget: (context, url, error) {
+                    return Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                    ),
+                  ),
+                ),
           
           Positioned(
             right: -100,
@@ -503,133 +922,162 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
             ),
           ),
           
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _showCoverActions,
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+
           SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 130,
-                          height: 130,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                                Theme.of(context).colorScheme.surface.withOpacity(0.6),
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 20,
-                                spreadRadius: 5,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ScaleTransition(
+                      scale: _scaleAnimation,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (isComplete)
+                            SizedBox(
+                              width: 146,
+                              height: 146,
+                              child: CircularProgressIndicator(
+                                value: 1,
+                                strokeWidth: 7,
+                                color: const Color(0xFF00C853),
+                                backgroundColor: Colors.white.withOpacity(0.25),
                               ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: ClipOval(
-                            child: profile?.avatarUrl != null
-                                ? CachedNetworkImage(
-                                    imageUrl: profile!.avatarUrl!,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.purple.shade200,
-                                          Colors.blue.shade200,
-                                        ],
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      FontAwesomeIcons.userLarge,
-                                      size: 50,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: AnimatedScale(
-                            scale: _isUploadingPhoto ? 1.2 : 1.0,
-                            duration: const Duration(milliseconds: 200),
+                            ),
+                          GestureDetector(
+                            onTap: _showAvatarActions,
                             child: Container(
+                              width: 130,
+                              height: 130,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Theme.of(context).colorScheme.surface,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                                    Theme.of(context).colorScheme.surface.withOpacity(0.6),
+                                  ],
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 10,
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
                                   ),
                                 ],
                               ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: _isUploadingPhoto ? null : _pickImage,
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: _isUploadingPhoto
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
+                              padding: const EdgeInsets.all(4),
+                              child: ClipOval(
+                                child: profile?.avatarUrl != null
+                                    ? CachedNetworkImage(
+                                        imageUrl: profile!.avatarUrl!,
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => Container(
+                                          color: Colors.grey[200],
+                                          child: const Center(
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
                                             ),
-                                          )
-                                        : const Icon(
-                                            FontAwesomeIcons.camera,
-                                            size: 20,
-                                            color: Color(0xFF667eea),
                                           ),
+                                        ),
+                                      )
+                                    : Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.purple.shade200,
+                                              Colors.blue.shade200,
+                                            ],
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          FontAwesomeIcons.userLarge,
+                                          size: 50,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: AnimatedScale(
+                              scale: _isUploadingPhoto ? 1.2 : 1.0,
+                              duration: const Duration(milliseconds: 200),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Theme.of(context).colorScheme.surface,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: _isUploadingPhoto ? null : _showAvatarActions,
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: _isUploadingPhoto
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              FontAwesomeIcons.camera,
+                                              size: 20,
+                                              color: Color(0xFF667eea),
+                                            ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    if (email.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        email,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
+                          fontSize: 15,
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  Text(
-                    '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    profile?.email ?? '',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -696,6 +1144,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
       duration: Duration(milliseconds: 500 + delay),
       curve: Curves.easeOutBack,
       builder: (context, animValue, child) {
+        final theme = Theme.of(context);
         return Transform.scale(
           scale: animValue,
           child: Container(
@@ -735,7 +1184,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                         style: TextStyle(
                           fontSize: 19,
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       Text(
@@ -744,7 +1193,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -759,10 +1208,12 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildTabSelector() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: isDark ? theme.colorScheme.surface : Colors.grey[100],
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -790,7 +1241,9 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                     'Informations',
                     style: TextStyle(
                       fontWeight: _selectedTab == 0 ? FontWeight.bold : FontWeight.normal,
-                      color: _selectedTab == 0 ? const Color(0xFF667eea) : Colors.grey[600],
+                      color: _selectedTab == 0
+                          ? const Color(0xFF667eea)
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -820,7 +1273,9 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                     'Modifier',
                     style: TextStyle(
                       fontWeight: _selectedTab == 1 ? FontWeight.bold : FontWeight.normal,
-                      color: _selectedTab == 1 ? const Color(0xFF667eea) : Colors.grey[600],
+                      color: _selectedTab == 1
+                          ? const Color(0xFF667eea)
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -833,6 +1288,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildProfileInfo(Profile? profile) {
+    final email = _effectiveEmail(profile);
     return Column(
       key: const ValueKey('info'),
       children: [
@@ -840,7 +1296,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           title: 'Informations personnelles',
           children: [
             _buildInfoRow(FontAwesomeIcons.user, 'Nom complet', '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}'),
-            _buildInfoRow(FontAwesomeIcons.envelope, 'Email', profile?.email ?? ''),
+            _buildInfoRow(FontAwesomeIcons.envelope, 'Email', email.isEmpty ? 'Non renseigné' : email),
             _buildInfoRow(FontAwesomeIcons.phone, 'Téléphone', profile?.phone ?? 'Non renseigné'),
           ],
         ),
@@ -901,7 +1357,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                         Text(
                           profile.bio!,
                           style: TextStyle(
-                            color: Colors.grey[700],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             height: 1.5,
                           ),
                         ),
@@ -918,9 +1374,10 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildInfoCard({required String title, required List<Widget> children}) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -937,9 +1394,10 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
             padding: const EdgeInsets.all(20),
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
@@ -950,11 +1408,12 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.grey[600]),
+          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -964,15 +1423,16 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -984,6 +1444,8 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildEditForm(Profile? profile) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       key: const ValueKey('form'),
       padding: const EdgeInsets.all(20),
@@ -1068,8 +1530,8 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 child: ElevatedButton(
                   onPressed: () => setState(() => _selectedTab = 0),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
-                    foregroundColor: Colors.grey[700],
+                    backgroundColor: isDark ? theme.colorScheme.surface : Colors.grey[200],
+                    foregroundColor: isDark ? theme.colorScheme.onSurface : Colors.grey[700],
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1107,6 +1569,8 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     TextInputType? keyboardType,
     int maxLines = 1,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
@@ -1123,7 +1587,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           borderSide: const BorderSide(color: Color(0xFF667eea), width: 2),
         ),
         filled: true,
-        fillColor: Colors.grey[50],
+        fillColor: isDark ? theme.colorScheme.surface : Colors.grey[50],
       ),
     );
   }
@@ -1132,12 +1596,11 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Actions rapides',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
@@ -1153,7 +1616,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               children: [
                 _buildActionCard(
                   icon: FontAwesomeIcons.bagShopping,
-                  label: 'Mes commandes',
+                  label: 'Commandes',
                   color: Colors.blue,
                   onTap: () => context.push('/orders'),
                 ),
@@ -1162,6 +1625,18 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                   label: 'Favoris',
                   color: Colors.red,
                   onTap: () => context.push('/favorites'),
+                ),
+                _buildActionCard(
+                  icon: FontAwesomeIcons.bell,
+                  label: 'Notifications',
+                  color: Colors.deepPurple,
+                  onTap: () => context.push('/settings/notifications'),
+                ),
+                _buildActionCard(
+                  icon: FontAwesomeIcons.lock,
+                  label: 'Mot de passe',
+                  color: Colors.orange,
+                  onTap: () => context.push('/settings/change-password'),
                 ),
                 _buildActionCard(
                   icon: FontAwesomeIcons.gear,
@@ -1183,12 +1658,16 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     required Color color,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: isDark
+              ? theme.colorScheme.surface
+              : color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -1202,7 +1681,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: color,
+                color: isDark ? theme.colorScheme.onSurface : color,
               ),
             ),
           ],

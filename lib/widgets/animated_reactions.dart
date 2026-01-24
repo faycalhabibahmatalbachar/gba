@@ -434,12 +434,12 @@ class _AddToCartReactionState extends State<_AddToCartReaction>
     
     _jumpAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 0, end: -30)
+        tween: Tween(begin: 0.0, end: -30.0)
             .chain(CurveTween(curve: Curves.easeOut)),
         weight: 40,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: -30, end: 0)
+        tween: Tween(begin: -30.0, end: 0.0)
             .chain(CurveTween(curve: Curves.bounceOut)),
         weight: 60,
       ),

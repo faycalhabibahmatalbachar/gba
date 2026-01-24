@@ -11,7 +11,7 @@ import '../models/category.dart';
 import '../models/product.dart';
 import '../providers/categories_provider.dart';
 import '../providers/products_provider.dart' as prod_provider;
-import '../widgets/bottom_nav_bar.dart';
+import '../widgets/adaptive_scaffold.dart';
 import '../services/supabase_service.dart';
 import '../localization/app_localizations.dart';
 import 'products_by_category_screen.dart';
@@ -34,6 +34,8 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
   late Animation<double> _pulseAnimation;
   String _selectedFilter = 'all';
   final Map<String, bool> _hoveredCategories = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -73,6 +75,12 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
 
     _fadeController.forward();
     _scaleController.forward();
+
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.trim().toLowerCase();
+      });
+    });
   }
 
   @override
@@ -81,6 +89,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     _scaleController.dispose();
     _rotationController.dispose();
     _pulseController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -192,10 +201,18 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    final filteredCategories = _searchQuery.isEmpty
+        ? categories
+        : categories.where((c) {
+            final name = (c['name'] ?? '').toString().toLowerCase();
+            final desc = (c['description'] ?? '').toString().toLowerCase();
+            return name.contains(_searchQuery) || desc.contains(_searchQuery);
+          }).toList();
+
+    return AdaptiveScaffold(
+      currentIndex: 1,
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context, localizations),
-      bottomNavigationBar: const BottomNavBar(currentIndex: 1),
       body: Stack(
         children: [
           // Animated gradient background
@@ -204,9 +221,107 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
           SafeArea(
             child: categoriesProvider.isLoading
                 ? _buildLoadingState()
-                : categories.isEmpty
-                    ? _buildEmptyState(localizations)
-                    : _buildCategoriesGrid(categories, localizations, theme),
+                : (categoriesProvider.error != null)
+                    ? _buildErrorState(categoriesProvider.error!, localizations, categoriesProvider)
+                    : RefreshIndicator(
+                        onRefresh: () => categoriesProvider.loadCategories(),
+                        child: categories.isEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  const SizedBox(height: 80),
+                                  _buildEmptyState(localizations),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  _buildSearchBar(theme),
+                                  Expanded(
+                                    child: filteredCategories.isEmpty
+                                        ? ListView(
+                                            physics: const AlwaysScrollableScrollPhysics(),
+                                            padding: const EdgeInsets.all(24),
+                                            children: [
+                                              const SizedBox(height: 40),
+                                              _buildNoResultsState(localizations),
+                                            ],
+                                          )
+                                        : _buildCategoriesGrid(filteredCategories, localizations, theme),
+                                  ),
+                                ],
+                              ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withOpacity(0.35)),
+            ),
+            child: Row(
+              children: [
+                const Icon(FontAwesomeIcons.magnifyingGlass, size: 16),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Rechercher une catégorie…',
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                if (_searchQuery.isNotEmpty)
+                  IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                    },
+                    icon: const Icon(Icons.close),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoResultsState(AppLocalizations localizations) {
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade50,
+            ),
+            child: Icon(FontAwesomeIcons.magnifyingGlass, size: 34, color: Colors.grey.shade500),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Aucun résultat',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Essaie un autre mot-clé.',
+            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -805,7 +920,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     );
   }
 
-  Widget _buildErrorState(Object error, AppLocalizations localizations) {
+  Widget _buildErrorState(String error, AppLocalizations localizations, CategoriesProvider provider) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -834,7 +949,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
             ),
             const SizedBox(height: 8),
             Text(
-              error.toString(),
+              error,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -844,7 +959,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                // TODO: Refresh categories
+                provider.loadCategories();
               },
               icon: const Icon(FontAwesomeIcons.arrowRotateRight, size: 16),
               label: const Text('Réessayer'),

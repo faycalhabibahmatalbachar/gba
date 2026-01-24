@@ -1,24 +1,79 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/conversation.dart';
 
 class MessagingService extends ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
+
+  static const String _conversationsCachePrefix = 'cache_chat_conversations_v1_';
+  static const String _messagesCachePrefix = 'cache_chat_messages_v1_';
   
   // Streams et subscriptions
   StreamSubscription? _messagesSubscription;
   StreamSubscription? _conversationsSubscription;
   StreamController<Message> _newMessageController = StreamController.broadcast();
+
+  bool _realtimeInitialized = false;
   
   // Cache local
   List<Conversation> _conversations = [];
   Map<String, List<Message>> _messagesCache = {};
   Map<String, bool> _typingIndicators = {};
+
+  Future<void> _hydrateConversationsFromPrefs(String userId) async {
+    if (_conversations.isNotEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_conversationsCachePrefix$userId');
+      if (raw == null || raw.trim().isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+      _conversations = decoded
+          .whereType<Map>()
+          .map((e) => Conversation.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (_) {}
+  }
+
+  Future<void> _persistConversationsToPrefs(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = jsonEncode(_conversations.map((c) => c.toJson()).toList());
+      await prefs.setString('$_conversationsCachePrefix$userId', raw);
+    } catch (_) {}
+  }
+
+  Future<void> _hydrateMessagesFromPrefs(String userId, String conversationId) async {
+    if (_messagesCache.containsKey(conversationId)) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_messagesCachePrefix$userId:$conversationId');
+      if (raw == null || raw.trim().isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+      _messagesCache[conversationId] = decoded
+          .whereType<Map>()
+          .map((e) => Message.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (_) {}
+  }
+
+  Future<void> _persistMessagesToPrefs(String userId, String conversationId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final messages = _messagesCache[conversationId] ?? const <Message>[];
+      final raw = jsonEncode(messages.map((m) => m.toJson()).toList());
+      await prefs.setString('$_messagesCachePrefix$userId:$conversationId', raw);
+    } catch (_) {}
+  }
   
   // Getters
   List<Conversation> get conversations => _conversations;
+  int get unreadCount => _conversations.where((c) => c.unreadCount > 0).length;
   Stream<Message> get newMessageStream => _newMessageController.stream;
   
   // Logging robuste
@@ -39,13 +94,24 @@ class MessagingService extends ChangeNotifier {
     _log('Initialisation du service de messagerie');
     
     try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null) {
+        await _hydrateConversationsFromPrefs(userId);
+        if (_conversations.isNotEmpty) notifyListeners();
+      }
       await loadConversations();
-      _initializeRealtimeListeners();
+      _ensureRealtimeListeners();
       _log('Service de messagerie initialisé avec succès', level: 'SUCCESS');
     } catch (e, stackTrace) {
       _log('Erreur initialisation: $e\n$stackTrace', level: 'ERROR');
       rethrow;
     }
+  }
+
+  void _ensureRealtimeListeners() {
+    if (_realtimeInitialized) return;
+    _realtimeInitialized = true;
+    _initializeRealtimeListeners();
   }
 
   // Charger les conversations
@@ -56,13 +122,24 @@ class MessagingService extends ChangeNotifier {
       return;
     }
 
+    await _hydrateConversationsFromPrefs(userId);
+    if (_conversations.isNotEmpty) notifyListeners();
+
+    _ensureRealtimeListeners();
+
     try {
       _log('Chargement des conversations pour user: $userId');
       _log('Table utilisée: chat_conversations');
       _log('Colonnes demandées: id, user_id, admin_id, status, created_at, updated_at');
+
+      final DateTime? lastUpdated = _conversations.isEmpty
+          ? null
+          : _conversations
+              .map((c) => c.updatedAt)
+              .reduce((a, b) => a.isAfter(b) ? a : b);
       
       // Requête simplifiée pour éviter les erreurs de colonnes
-      final response = await _supabase
+      var query = _supabase
           .from('chat_conversations')
           .select('''
             id,
@@ -72,25 +149,41 @@ class MessagingService extends ChangeNotifier {
             created_at,
             updated_at
           ''')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
+          .eq('user_id', userId);
+
+      if (lastUpdated != null) {
+        query = query.gt('updated_at', lastUpdated.toIso8601String());
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       _log('Réponse reçue: ${response.runtimeType}');
       
       if (response == null) {
         _log('Réponse nulle reçue de Supabase', level: 'WARNING');
-        _conversations = [];
+        _conversations = _conversations;
       } else {
         _log('Nombre d\'éléments reçus: ${(response as List).length}');
-        _conversations = (response as List)
+
+        final incoming = (response as List)
             .map((data) {
               _log('Parsing conversation: ${data['id']}');
               return Conversation.fromJson(data);
             })
             .toList();
+
+        final byId = <String, Conversation>{
+          for (final c in _conversations) c.id: c,
+        };
+        for (final c in incoming) {
+          byId[c.id] = c;
+        }
+        _conversations = byId.values.toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       }
       
       _log('${_conversations.length} conversations chargées', level: 'SUCCESS');
+      await _persistConversationsToPrefs(userId);
       notifyListeners();
     } catch (e, stackTrace) {
       _log('Erreur chargement conversations: $e', level: 'ERROR');
@@ -99,8 +192,6 @@ class MessagingService extends ChangeNotifier {
         _log('Erreur PostgreSQL détectée - vérifier le schéma de la table', level: 'ERROR');
       }
       _log('Stack trace: $stackTrace', level: 'ERROR');
-      _conversations = []; // Initialiser liste vide en cas d'erreur
-      notifyListeners();
       rethrow;
     }
   }
@@ -173,18 +264,27 @@ class MessagingService extends ChangeNotifier {
     try {
       _log('Chargement messages pour conversation: $conversationId');
       _log('Table utilisée: chat_messages');
+
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null) {
+        await _hydrateMessagesFromPrefs(userId, conversationId);
+      }
       
       // Vérifier le cache
       if (_messagesCache.containsKey(conversationId)) {
-        _log('Messages trouvés dans le cache');
-        return _messagesCache[conversationId]!;
+        _log('Messages trouvés dans le cache (peut être complété incrémentalement)');
       }
+
+      final existing = _messagesCache[conversationId] ?? <Message>[];
+      final DateTime? lastCreatedAt = existing.isEmpty
+          ? null
+          : existing.map((m) => m.createdAt).reduce((a, b) => a.isAfter(b) ? a : b);
 
       _log('Requête des messages depuis Supabase');
       _log('Colonnes demandées: id, conversation_id, sender_id, message, is_read, created_at');
       
       // Requête simplifiée pour éviter les erreurs
-      final response = await _supabase
+      var query = _supabase
           .from('chat_messages')
           .select('''
             id,
@@ -194,14 +294,19 @@ class MessagingService extends ChangeNotifier {
             is_read,
             created_at
           ''')
-          .eq('conversation_id', conversationId)
-          .order('created_at', ascending: true);
+          .eq('conversation_id', conversationId);
+
+      if (lastCreatedAt != null) {
+        query = query.gt('created_at', lastCreatedAt.toIso8601String());
+      }
+
+      final response = await query.order('created_at', ascending: true);
 
       _log('Réponse reçue: ${response.runtimeType}');
       
       if (response == null) {
         _log('Réponse nulle reçue', level: 'WARNING');
-        return [];
+        return existing;
       }
       
       final messages = (response as List)
@@ -211,11 +316,22 @@ class MessagingService extends ChangeNotifier {
           })
           .toList();
       
-      // Mettre en cache
-      _messagesCache[conversationId] = messages;
+      // Mettre en cache (merge)
+      final byId = <String, Message>{
+        for (final m in existing) m.id: m,
+      };
+      for (final m in messages) {
+        byId[m.id] = m;
+      }
+      final merged = byId.values.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      _messagesCache[conversationId] = merged;
+
+      if (userId != null) {
+        await _persistMessagesToPrefs(userId, conversationId);
+      }
       
-      _log('${messages.length} messages chargés', level: 'SUCCESS');
-      return messages;
+      _log('${_messagesCache[conversationId]!.length} messages chargés', level: 'SUCCESS');
+      return _messagesCache[conversationId]!;
     } catch (e, stackTrace) {
       _log('Erreur chargement messages: $e', level: 'ERROR');
       _log('Type d\'erreur: ${e.runtimeType}', level: 'ERROR');
@@ -223,7 +339,7 @@ class MessagingService extends ChangeNotifier {
         _log('Erreur PostgreSQL détectée', level: 'ERROR');
       }
       _log('Stack trace: $stackTrace', level: 'ERROR');
-      return [];
+      return _messagesCache[conversationId] ?? <Message>[];
     }
   }
 
@@ -285,7 +401,15 @@ class MessagingService extends ChangeNotifier {
 
       // Mettre à jour le cache - NE PAS émettre l'événement ici
       // car le listener realtime va le faire
-      _messagesCache[conversationId]?.add(newMessage);
+      _messagesCache.putIfAbsent(conversationId, () => <Message>[]);
+      if (_messagesCache[conversationId]!.indexWhere((m) => m.id == newMessage.id) == -1) {
+        _messagesCache[conversationId]!.add(newMessage);
+        _messagesCache[conversationId]!.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      }
+
+      if (userId != null) {
+        await _persistMessagesToPrefs(userId, conversationId);
+      }
       
       _log('Message envoyé avec succès: ${newMessage.id}', level: 'SUCCESS');
       notifyListeners();
@@ -312,7 +436,7 @@ class MessagingService extends ChangeNotifier {
       await _supabase
           .from('chat_messages')
           .update({'is_read': true})
-          .filter('id', 'in', '(${messageIds.join(',')})');
+          .inFilter('id', messageIds);
       
       _log('Messages marqués comme lus', level: 'SUCCESS');
     } catch (e) {
@@ -334,7 +458,7 @@ class MessagingService extends ChangeNotifier {
       _log('Configuration listener pour chat_messages');
       
       // Listener pour nouveaux messages
-      _supabase
+      _messagesSubscription = _supabase
           .from('chat_messages')
           .stream(primaryKey: ['id'])
           .listen((List<Map<String, dynamic>> data) {
@@ -352,8 +476,15 @@ class MessagingService extends ChangeNotifier {
               
               if (existingIndex == -1) {
                 _messagesCache[conversationId]!.add(message);
+                _messagesCache[conversationId]!
+                    .sort((a, b) => a.createdAt.compareTo(b.createdAt));
                 _newMessageController.add(message);
                 _log('Nouveau message ajouté: ${message.id}', level: 'SUCCESS');
+
+                final uid = _supabase.auth.currentUser?.id;
+                if (uid != null) {
+                  _persistMessagesToPrefs(uid, conversationId);
+                }
               }
             }
           } catch (e) {
@@ -362,7 +493,7 @@ class MessagingService extends ChangeNotifier {
         }
         
         notifyListeners();
-      }).onError((error) {
+      }, onError: (error) {
         _log('Erreur listener messages: $error', level: 'ERROR');
         _log('Détails erreur: ${error.runtimeType}', level: 'ERROR');
       });
@@ -370,14 +501,14 @@ class MessagingService extends ChangeNotifier {
       _log('Configuration listener pour chat_conversations');
       
       // Listener pour changements dans les conversations  
-      _supabase
+      _conversationsSubscription = _supabase
           .from('chat_conversations')
           .stream(primaryKey: ['id'])
           .eq('user_id', userId)
           .listen((List<Map<String, dynamic>> data) {
         _log('Mise à jour conversations: ${data.length} conversations');
         loadConversations();
-      }).onError((error) {
+      }, onError: (error) {
         _log('Erreur listener conversations: $error', level: 'ERROR');
         _log('Détails erreur: ${error.runtimeType}', level: 'ERROR');
       });
@@ -394,6 +525,37 @@ class MessagingService extends ChangeNotifier {
     _typingIndicators[conversationId] = isTyping;
     _log('Indicateur frappe - ConvId: $conversationId, Typing: $isTyping');
     notifyListeners();
+  }
+
+  Future<String?> uploadChatImage({
+    required String conversationId,
+    required XFile imageFile,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('Non connecté');
+
+    try {
+      final bytes = await imageFile.readAsBytes();
+
+      final name = imageFile.name.trim().isEmpty ? 'image.jpg' : imageFile.name.trim();
+      final dot = name.lastIndexOf('.');
+      final ext = (dot >= 0 && dot < name.length - 1) ? name.substring(dot + 1).toLowerCase() : 'jpg';
+      final safeExt = (ext.length <= 5) ? ext : 'jpg';
+
+      final objectPath = '$userId/$conversationId/${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      await _supabase.storage.from('chat').uploadBinary(
+            objectPath,
+            bytes,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: true,
+            ),
+          );
+      return _supabase.storage.from('chat').getPublicUrl(objectPath);
+    } catch (e, stackTrace) {
+      _log('Erreur upload image chat: $e\n$stackTrace', level: 'ERROR');
+      return null;
+    }
   }
 
   bool isUserTyping(String conversationId) {

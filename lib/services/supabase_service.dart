@@ -292,13 +292,17 @@ class SupabaseService {
     if (!isAuthenticated) throw Exception('User not authenticated');
     
     try {
+      final safeUpdates = <String, dynamic>{
+        ...updates,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      safeUpdates.removeWhere((key, value) => key == 'id');
+
       await client
           .from('profiles')
-          .upsert({
-            'id': currentUser!.id,
-            ...updates,
-            'updated_at': DateTime.now().toIso8601String(),
-          });
+          .update(safeUpdates)
+          .eq('id', currentUser!.id);
     } catch (e) {
       print('Error updating profile: $e');
       throw e;

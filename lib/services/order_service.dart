@@ -1,9 +1,45 @@
 import 'dart:convert';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OrderService {
   final _supabase = Supabase.instance.client;
+  static const String _cacheKeyPrefix = 'cache_orders_v1_';
+  static const String _cacheAtKeyPrefix = 'cache_orders_v1_at_';
+
+  Future<void> _persistOrdersCache(String userId, List<Map<String, dynamic>> orders) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_cacheKeyPrefix$userId', jsonEncode(orders));
+      await prefs.setInt(
+        '$_cacheAtKeyPrefix$userId',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (e) {
+      print('Erreur cache commandes (persist): $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedUserOrders() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_cacheKeyPrefix$userId');
+      if (raw == null || raw.trim().isEmpty) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (e) {
+      print('Erreur cache commandes (hydrate): $e');
+      return [];
+    }
+  }
 
   // Créer une nouvelle commande
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> orderData) async {
@@ -21,11 +57,13 @@ class OrderService {
         'user_id': orderData['user_id'],
         'status': orderData['status'] ?? 'pending',
         'total_amount': orderData['total_amount'],
+        'currency': orderData['currency'],
         'shipping_fee': orderData['shipping_fee'],
         'tax_amount': orderData['tax_amount'],
         'discount_amount': orderData['discount_amount'],
         'payment_method': orderData['payment_method'],
         'payment_status': orderData['payment_status'] ?? 'pending',
+        'payment_provider': orderData['payment_provider'],
         'customer_name': orderData['customer_name'],
         'customer_phone': orderData['customer_phone'],
         'customer_email': orderData['customer_email'],
@@ -33,6 +71,10 @@ class OrderService {
         'shipping_city': orderData['shipping_city'],
         'shipping_district': orderData['shipping_district'],
         'shipping_address': orderData['shipping_address'],
+        'delivery_lat': orderData['delivery_lat'],
+        'delivery_lng': orderData['delivery_lng'],
+        'delivery_accuracy': orderData['delivery_accuracy'],
+        'delivery_captured_at': orderData['delivery_captured_at'],
         'notes': orderData['notes'],
       };
 
@@ -133,7 +175,9 @@ class OrderService {
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response);
+      final orders = List<Map<String, dynamic>>.from(response);
+      await _persistOrdersCache(userId, orders);
+      return orders;
     } catch (e) {
       print('Erreur récupération commandes: $e');
       return [];

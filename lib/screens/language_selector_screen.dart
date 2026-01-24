@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../localization/app_localizations.dart';
+import '../providers/language_provider.dart';
 
 class LanguageSelectorScreen extends StatefulWidget {
   const LanguageSelectorScreen({super.key});
@@ -14,7 +16,7 @@ class _LanguageSelectorScreenState extends State<LanguageSelectorScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedLanguage = Localizations.localeOf(context).languageCode;
+    _selectedLanguage = 'fr';
   }
 
   void _changeLanguage(String? languageCode) {
@@ -22,14 +24,18 @@ class _LanguageSelectorScreenState extends State<LanguageSelectorScreen> {
     setState(() {
       _selectedLanguage = languageCode;
     });
-    
-    // TODO: Implement language change functionality
-    // This would typically involve updating the app's locale
+
+    final provider = Provider.of<LanguageProvider>(context, listen: false);
+    provider.setLocale(Locale(languageCode, ''));
   }
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
+    final current = Provider.of<LanguageProvider>(context).locale.languageCode;
+    if (current != _selectedLanguage) {
+      _selectedLanguage = current;
+    }
     
     return Scaffold(
       appBar: AppBar(

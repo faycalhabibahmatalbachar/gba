@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -6,9 +7,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../providers/favorites_provider.dart';
+import '../providers/product_provider.dart';
 import '../models/product.dart';
 import '../localization/app_localizations.dart';
-import '../widgets/bottom_nav_bar.dart';
+import '../widgets/adaptive_scaffold.dart';
 import 'product/product_detail_screen.dart';
 
 class FavoritesScreenPremium extends StatefulWidget {
@@ -141,36 +143,117 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
   @override
   Widget build(BuildContext context) {
     final favoritesProvider = Provider.of<FavoritesProvider>(context);
-    final favorites = <Product>[];  // TODO: Load favorites from provider
+    final productsProvider = Provider.of<ProductProvider>(context);
+    final favoriteIds = favoritesProvider.favoriteIds;
+
+    final productsById = <String, Product>{
+      for (final p in productsProvider.products) p.id: p,
+    };
+
+    final favorites = <Product>[
+      for (final id in favoriteIds.reversed)
+        if (productsById[id] != null) productsById[id]!,
+    ];
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context);
 
-    return Scaffold(
+    return AdaptiveScaffold(
+      currentIndex: 3,
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context, localizations),
-      bottomNavigationBar: const BottomNavBar(currentIndex: 3),
       body: Stack(
         children: [
           // Animated gradient background
           _buildAnimatedBackground(),
           // Main content
           SafeArea(
-            child: favorites.isEmpty
-                ? _buildEmptyFavorites(localizations)
-                : Column(
-                    children: [
-                      // Stats and filters header
-                      _buildHeaderSection(favorites.length),
-                      // View toggle and sort
-                      _buildControlsSection(),
-                      // Favorites list/grid
-                      Expanded(
-                        child: _selectedView == 'grid'
-                            ? _buildGridView(favorites, favoritesProvider, theme)
-                            : _buildListView(favorites, favoritesProvider, theme),
+            child: Builder(
+              builder: (context) {
+                if (productsProvider.isLoading && productsProvider.products.isEmpty) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                if (productsProvider.error != null && productsProvider.products.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.wifi_off, size: 56, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          const Text('Erreur de chargement'),
+                          const SizedBox(height: 8),
+                          Text(
+                            productsProvider.error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              productsProvider.loadProducts(force: true);
+                            },
+                            child: const Text('Réessayer'),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  );
+                }
+
+                if (favoriteIds.isEmpty) {
+                  return _buildEmptyFavorites(localizations);
+                }
+
+                if (favorites.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.search_off, size: 56, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          const Text('Produits favoris introuvables'),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Recharge la liste des produits.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              productsProvider.loadProducts(force: true);
+                            },
+                            child: const Text('Rafraîchir'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final sortedFavorites = _sortFavorites(List<Product>.from(favorites));
+
+                return Column(
+                  children: [
+                    _buildHeaderSection(sortedFavorites.length),
+                    _buildControlsSection(),
+                    Expanded(
+                      child: _selectedView == 'grid'
+                          ? _buildGridView(sortedFavorites, favoritesProvider, theme)
+                          : _buildListView(sortedFavorites, favoritesProvider, theme),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -839,7 +922,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     return GestureDetector(
       onTap: () {
         HapticFeedback.mediumImpact();
-        notifier.toggleFavorite(product.id);
+        notifier.toggleFavorite(product.id, productName: product.name);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -850,7 +933,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
               ],
             ),
             backgroundColor: Colors.red.shade600,
-            behavior: SnackBarBehavior.floating,
+            behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),

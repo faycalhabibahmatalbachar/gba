@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -9,7 +10,7 @@ import 'dart:math' as math;
 import '../providers/cart_provider.dart';
 import '../models/cart_item.dart';
 import '../localization/app_localizations.dart';
-import '../widgets/bottom_nav_bar.dart';
+import '../widgets/adaptive_scaffold.dart';
 
 class CartScreenPremium extends StatefulWidget {
   const CartScreenPremium({super.key});
@@ -105,55 +106,155 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
 
   @override
   Widget build(BuildContext context) {
-    final cartProvider = Provider.of<CartProvider>(context);
-    final cartItems = cartProvider.items;
-    final totalAmount = cartProvider.totalAmount;
     final localizations = AppLocalizations.of(context);
-    final total = cartItems.fold(0.0, (sum, item) => sum + ((item.product?.price ?? 0) * item.quantity));
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return AdaptiveScaffold(
+      currentIndex: 2,
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context, localizations),
-      bottomNavigationBar: const BottomNavBar(currentIndex: 2),
       body: Stack(
         children: [
           // Animated gradient background
           _buildAnimatedBackground(),
           // Main content
           SafeArea(
-            child: cartItems.isEmpty
-                ? _buildEmptyCart(localizations)
-                : Padding(
-                    padding: const EdgeInsets.only(top: kToolbarHeight + 8),
-                    child: Column(
+            child: Consumer<CartProvider>(
+              builder: (context, cartProvider, _) {
+                final cartItems = cartProvider.items;
+                final total = cartItems.fold(
+                  0.0,
+                  (sum, item) => sum + ((item.product?.price ?? 0) * item.quantity),
+                );
+
+                if (cartProvider.isLoading) {
+                  return _buildLoadingState();
+                }
+
+                if (cartProvider.error != null) {
+                  return _buildErrorState(cartProvider.error!, localizations, cartProvider);
+                }
+
+                if (cartItems.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: () => cartProvider.loadCart(),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        // Cart summary card
-                        _buildCartSummary(cartItems.length, total, theme),
-                        // Cart items list
-                        Expanded(
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.7,
+                          child: _buildEmptyCart(localizations),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(top: kToolbarHeight + 8),
+                  child: Column(
+                    children: [
+                      _buildCartSummary(cartProvider.itemCount, total, theme),
+                      Expanded(
+                        child: RefreshIndicator(
+                          onRefresh: () => cartProvider.loadCart(),
                           child: ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             itemCount: cartItems.length,
                             itemBuilder: (context, index) {
                               final item = cartItems[index];
-                              return SlideTransition(
-                                position: _slideAnimation,
-                                child: FadeTransition(
-                                  opacity: _fadeAnimation,
-                                  child: _buildCartItem(item, cartProvider, theme),
+                              return KeyedSubtree(
+                                key: ValueKey(item.id),
+                                child: SlideTransition(
+                                  position: _slideAnimation,
+                                  child: FadeTransition(
+                                    opacity: _fadeAnimation,
+                                    child: _buildCartItem(item, cartProvider, theme),
+                                  ),
                                 ),
                               );
                             },
                           ),
                         ),
-                        // Checkout section
-                        _buildCheckoutSection(total, localizations, theme),
-                      ],
-                    ),
+                      ),
+                      _buildCheckoutSection(total, localizations, theme),
+                    ],
                   ),
+                );
+              },
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.blue.shade300,
+                  Colors.purple.shade300,
+                ],
+              ),
+            ),
+            child: const CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 3,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Chargement du panier…',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String error, AppLocalizations localizations, CartProvider cartProvider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              FontAwesomeIcons.triangleExclamation,
+              size: 54,
+              color: Colors.red.shade400,
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Erreur de chargement',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: TextStyle(color: Colors.grey.shade700),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              onPressed: () => cartProvider.loadCart(),
+              icon: const Icon(FontAwesomeIcons.arrowsRotate, size: 16),
+              label: const Text('Réessayer'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -452,7 +553,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                             ],
                           ),
                           backgroundColor: Colors.red.shade600,
-                          behavior: SnackBarBehavior.floating,
+                          behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -609,10 +710,14 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                                   onPressed: () {
                                     HapticFeedback.selectionClick();
                                     if (item.quantity > 1) {
-                                      cartProvider.updateQuantity(item.id, item.quantity - 1);
+                                      Future.microtask(() {
+                                        cartProvider.updateQuantity(item.id, item.quantity - 1);
+                                      });
                                     } else {
                                       deleteController.forward().then((_) {
-                                        cartProvider.removeItem(item.id);
+                                        Future.microtask(() {
+                                          cartProvider.removeItem(item.id);
+                                        });
                                       });
                                     }
                                   },
@@ -632,7 +737,9 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                                   icon: FontAwesomeIcons.plus,
                                   onPressed: () {
                                     HapticFeedback.selectionClick();
-                                    cartProvider.updateQuantity(item.id, item.quantity + 1);
+                                    Future.microtask(() {
+                                      cartProvider.updateQuantity(item.id, item.quantity + 1);
+                                    });
                                   },
                                   enabled: item.quantity < 99,
                                 ),

@@ -185,7 +185,7 @@ class _BottomNavBarState extends State<BottomNavBar>
                   duration: const Duration(milliseconds: 300),
                   padding: EdgeInsets.symmetric(
                     horizontal: isActive ? 16 : 12,
-                    vertical: isActive ? 8 : 6,
+                    vertical: isActive ? 7 : 5,
                   ),
                   decoration: BoxDecoration(
                     gradient: isActive
@@ -245,7 +245,7 @@ class _BottomNavBarState extends State<BottomNavBar>
                               : Colors.grey.shade600,
                         ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 300),
                   style: TextStyle(
@@ -255,7 +255,10 @@ class _BottomNavBarState extends State<BottomNavBar>
                         ? const Color(0xFF667eea)
                         : Colors.grey.shade600,
                   ),
-                  child: Text(label),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(label, maxLines: 1),
+                  ),
                 ),
               ],
             ),

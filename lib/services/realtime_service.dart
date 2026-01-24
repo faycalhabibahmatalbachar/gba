@@ -86,37 +86,3 @@ class RealtimeService {
 
 // Provider pour le service temps réel
 final realtimeServiceProvider = Provider((ref) => RealtimeService());
-
-// Provider pour gérer les souscriptions
-final realtimeSubscriptionsProvider = Provider((ref) {
-  final service = ref.watch(realtimeServiceProvider);
-  final userId = Supabase.instance.client.auth.currentUser?.id;
-  
-  if (userId != null) {
-    service.startAllSubscriptions(
-      userId,
-      onCartUpdate: () {
-        // Rafraîchir le panier
-        ref.invalidate(cartProvider);
-      },
-      onFavoritesUpdate: () {
-        // Rafraîchir les favoris
-        ref.invalidate(favoritesProvider);
-      },
-      onProfileUpdate: () {
-        // Rafraîchir le profil
-        ref.invalidate(profileProvider);
-      },
-      onProductsUpdate: () {
-        // Rafraîchir les produits
-        ref.invalidate(productsProvider);
-      },
-    );
-  }
-  
-  ref.onDispose(() {
-    service.stopAllSubscriptions();
-  });
-  
-  return service;
-});

@@ -4,7 +4,7 @@ import { supabase } from '../config/supabase';
 import { useSnackbar } from 'notistack';
 
 // Mode développement pour contourner les problèmes Supabase temporairement
-const DEV_MODE = true;
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
 const DEV_USERS = [
   { email: 'faycalhabibahmat@gmail.com', password: 'faycalhabibahmat@gmail.com', name: 'Faycal Admin' },
   { email: 'admin@test.com', password: 'admin123', name: 'Test Admin' }

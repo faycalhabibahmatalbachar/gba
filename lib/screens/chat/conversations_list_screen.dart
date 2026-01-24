@@ -68,16 +68,22 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: _isLoading
-                    ? _buildLoadingState()
-                    : _buildConversationsList(),
-              ),
-            ],
-          ),
+          child: _isLoading
+              ? CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildHeader()),
+                    _buildLoadingState(),
+                  ],
+                )
+              : FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildHeader()),
+                      _buildConversationsList(),
+                    ],
+                  ),
+                ),
         ),
       ),
       floatingActionButton: _buildFAB(),
@@ -179,13 +185,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: TextField(
               decoration: InputDecoration(
@@ -208,25 +207,29 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
   }
 
   Widget _buildLoadingState() {
-    return ListView.builder(
+    return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: 5,
-      itemBuilder: (context, index) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Shimmer.fromColors(
-            baseColor: Colors.grey[300]!,
-            highlightColor: Colors.grey[100]!,
-            child: Container(
-              height: 90,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  height: 90,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      },
+            );
+          },
+          childCount: 5,
+        ),
+      ),
     );
   }
 
@@ -235,10 +238,10 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
       builder: (context) {
         final service = Provider.of<MessagingService>(context);
         final conversations = service.conversations;
-        
+
         if (conversations.isEmpty) {
-          return FadeTransition(
-            opacity: _fadeAnimation,
+          return SliverFillRemaining(
+            hasScrollBody: false,
             child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -276,16 +279,17 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
             ),
           );
         }
-        
-        return FadeTransition(
-          opacity: _fadeAnimation,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: conversations.length,
-            itemBuilder: (context, index) {
-              final conversation = conversations[index];
-              return _buildConversationTile(conversation);
-            },
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final conversation = conversations[index];
+                return _buildConversationTile(conversation);
+              },
+              childCount: conversations.length,
+            ),
           ),
         );
       },

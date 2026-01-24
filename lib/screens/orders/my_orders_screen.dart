@@ -6,7 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:ui';
 import '../../services/order_service.dart';
-import '../../widgets/bottom_nav_bar.dart';
+import '../../widgets/adaptive_scaffold.dart';
 
 class MyOrdersScreen extends ConsumerStatefulWidget {
   const MyOrdersScreen({super.key});
@@ -113,6 +113,14 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   Future<void> _loadOrders() async {
     setState(() => _isLoading = true);
     try {
+      final cached = await _orderService.getCachedUserOrders();
+      if (mounted && cached.isNotEmpty) {
+        setState(() {
+          _orders = cached;
+          _isLoading = false;
+        });
+      }
+
       final orders = await _orderService.getUserOrders();
       setState(() {
         _orders = orders;
@@ -132,7 +140,8 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Scaffold(
+    return AdaptiveScaffold(
+      currentIndex: 4,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -163,7 +172,6 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
           ),
         ),
       ),
-      bottomNavigationBar: const BottomNavBar(currentIndex: 3),
     );
   }
 

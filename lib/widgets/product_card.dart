@@ -5,8 +5,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:provider/provider.dart' as provider;
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
+import '../providers/favorites_provider.dart';
 import '../providers/auth_provider.dart';
 
 class ProductCard extends ConsumerWidget {
@@ -20,13 +22,15 @@ class ProductCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final authState = ref.watch(authProvider);
+    final favoritesProvider = provider.Provider.of<FavoritesProvider>(context);
     
     return GestureDetector(
       onTap: () => context.push('/product/${product.id}'),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -110,7 +114,7 @@ class ProductCard extends ConsumerWidget {
                   right: 8,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: scheme.surface,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -121,12 +125,19 @@ class ProductCard extends ConsumerWidget {
                     ),
                     child: IconButton(
                       icon: Icon(
-                        Icons.favorite_border_rounded,
-                        color: theme.colorScheme.primary,
+                        favoritesProvider.isFavorite(product.id)
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: favoritesProvider.isFavorite(product.id)
+                            ? Colors.red
+                            : scheme.primary,
                         size: 20,
                       ),
                       onPressed: () {
-                        // TODO: Add to favorites
+                        favoritesProvider.toggleFavorite(
+                          product.id,
+                          productName: product.name,
+                        );
                       },
                       padding: const EdgeInsets.all(8),
                       constraints: const BoxConstraints(),
@@ -161,6 +172,7 @@ class ProductCard extends ConsumerWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
+                      color: scheme.onSurface,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -207,7 +219,7 @@ class ProductCard extends ConsumerWidget {
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
+                                color: scheme.primary,
                               ),
                             ),
                             if (product.compareAtPrice != null &&
@@ -227,7 +239,7 @@ class ProductCard extends ConsumerWidget {
                       // Add to cart button
                       Container(
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
+                          color: scheme.primary,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: IconButton(
@@ -238,16 +250,19 @@ class ProductCard extends ConsumerWidget {
                           ),
                           onPressed: authState.user != null
                               ? () async {
-                                  await ref.read(cartProvider.notifier)
-                                      .addItem(product, 1);
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final router = GoRouter.of(context);
+                                  final cartProvider = provider.Provider.of<CartProvider>(context, listen: false);
+
+                                  await cartProvider.addItem(product, 1);
                                   
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  messenger.showSnackBar(
                                     SnackBar(
                                       content: Text('${product.name} ajouté au panier'),
                                       duration: const Duration(seconds: 2),
                                       action: SnackBarAction(
                                         label: 'Voir panier',
-                                        onPressed: () => context.push('/cart'),
+                                        onPressed: () => router.push('/cart'),
                                       ),
                                     ),
                                   );

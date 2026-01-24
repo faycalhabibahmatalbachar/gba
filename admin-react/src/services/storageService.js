@@ -57,6 +57,74 @@ export const StorageService = {
     }
   },
 
+  async deleteBannerImage(imagePath) {
+    try {
+      let path = imagePath;
+      if (imagePath.includes('supabase.co/storage')) {
+        path = imagePath.split('/storage/v1/object/public/banners/')[1];
+        if (!path) {
+          throw new Error('Chemin d\'image invalide');
+        }
+      }
+
+      const { error } = await supabase.storage
+        .from('banners')
+        .remove([path]);
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur suppression bannière:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async uploadBannerImage(file, bannerId) {
+    try {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+      if (!validTypes.includes(file.type)) {
+        throw new Error('Format d\'image non supporté. Utilisez JPG, PNG, WEBP ou GIF.');
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('L\'image ne doit pas dépasser 5MB');
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${bannerId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = fileName;
+
+      const { error } = await supabase.storage
+        .from('banners')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('banners')
+        .getPublicUrl(filePath);
+
+      return {
+        success: true,
+        url: publicUrl,
+        path: filePath
+      };
+    } catch (error) {
+      console.error('Erreur upload bannière:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
   /**
    * Upload multiple images
    */

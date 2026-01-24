@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import '../widgets/animated_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/forgot_password_screen.dart';
+import '../screens/auth/reset_password_screen.dart';
+import '../screens/auth/change_password_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/home_screen_premium.dart';
 import '../screens/product/product_detail_screen.dart';
@@ -14,13 +17,30 @@ import '../screens/categories_screen_premium.dart';
 import '../screens/cart_screen_premium.dart';
 import '../screens/profile_screen_ultra.dart';
 import '../screens/settings_screen_premium.dart';
+import '../screens/promotions_screen_premium.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/chat/conversations_list_screen.dart';
 import '../screens/chat/admin_chat_screen.dart';
+import '../screens/checkout/checkout_cancel_screen.dart';
+import '../screens/checkout/checkout_success_screen.dart';
+import '../screens/checkout/flutterwave_return_screen.dart';
 import '../screens/bloc_screen.dart';
+import '../screens/special_order_screen.dart';
+import '../screens/special_orders/my_special_orders_screen.dart';
+import '../screens/special_orders/special_order_details_screen.dart';
+import '../screens/legal/terms_of_service_screen.dart';
+import '../screens/legal/privacy_policy_screen.dart';
+import '../screens/settings/notification_preferences_screen.dart';
+import '../screens/onboarding_flow_screen.dart';
+import '../services/onboarding_service.dart';
 
 class AppRoutes {
+  static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
   static final router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     errorBuilder: (context, state) {
       return Scaffold(
@@ -91,8 +111,13 @@ class AppRoutes {
       final supabase = Supabase.instance.client;
       final session = supabase.auth.currentSession;
       final isLoggedIn = session != null;
-      final isAuthRoute = state.matchedLocation == '/login' || 
-                         state.matchedLocation == '/register';
+      final isAuthRoute = state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register' ||
+          state.matchedLocation == '/forgot-password' ||
+          state.matchedLocation == '/reset-password' ||
+          state.matchedLocation == '/legal/terms' ||
+          state.matchedLocation == '/legal/privacy';
+      final isOnboardingRoute = state.matchedLocation == '/onboarding';
       final isBlockedRoute = state.matchedLocation == '/blocked';
       
       // Si connecté, vérifier si l'utilisateur est bloqué
@@ -119,9 +144,29 @@ class AppRoutes {
       if (!isLoggedIn && !isAuthRoute && !isBlockedRoute) {
         return '/login';
       }
+
+      // If logged in but onboarding not completed, force onboarding
+      if (isLoggedIn && !isBlockedRoute && !isAuthRoute && !isOnboardingRoute) {
+        try {
+          final userId = supabase.auth.currentUser?.id;
+          if (userId != null) {
+            final completed = await OnboardingService().isCompleted(userId: userId);
+            if (!completed) {
+              return '/onboarding';
+            }
+          }
+        } catch (_) {}
+      }
       
       // If logged in and trying to access auth routes
       if (isLoggedIn && isAuthRoute) {
+        try {
+          final userId = supabase.auth.currentUser?.id;
+          if (userId != null) {
+            final completed = await OnboardingService().isCompleted(userId: userId);
+            if (!completed) return '/onboarding';
+          }
+        } catch (_) {}
         return '/home';
       }
       
@@ -137,8 +182,20 @@ class AppRoutes {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => const ResetPasswordScreen(),
+      ),
+      GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingFlowScreen(),
       ),
       GoRoute(
         path: '/home',
@@ -169,8 +226,66 @@ class AppRoutes {
         builder: (context, state) => const UltraCheckoutScreen(),
       ),
       GoRoute(
+        path: '/checkout/success',
+        builder: (context, state) {
+          final orderId = state.uri.queryParameters['order_id'];
+          return CheckoutSuccessScreen(orderId: orderId);
+        },
+      ),
+      GoRoute(
+        path: '/checkout/cancel',
+        builder: (context, state) {
+          final orderId = state.uri.queryParameters['order_id'];
+          return CheckoutCancelScreen(orderId: orderId);
+        },
+      ),
+      GoRoute(
+        path: '/checkout/flutterwave-return',
+        builder: (context, state) => const FlutterwaveReturnScreen(),
+      ),
+      GoRoute(
         path: '/orders',
         builder: (context, state) => const MyOrdersScreen(),
+      ),
+      GoRoute(
+        path: '/special-order',
+        builder: (context, state) => const SpecialOrderScreen(),
+      ),
+      GoRoute(
+        path: '/special-orders',
+        builder: (context, state) => const MySpecialOrdersScreen(),
+      ),
+      GoRoute(
+        path: '/special-order/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return SpecialOrderDetailsScreen(specialOrderId: id);
+        },
+      ),
+      GoRoute(
+        path: '/promotions',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const PromotionsScreenPremium(),
+          transitionDuration: const Duration(milliseconds: 500),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: const Interval(0.2, 1.0),
+                ),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/categories',
@@ -300,6 +415,22 @@ class AppRoutes {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreenPremium(),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (context, state) => const NotificationPreferencesScreen(),
+      ),
+      GoRoute(
+        path: '/settings/change-password',
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: '/legal/terms',
+        builder: (context, state) => const TermsOfServiceScreen(),
+      ),
+      GoRoute(
+        path: '/legal/privacy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
       ),
       GoRoute(
         path: '/product/:id',

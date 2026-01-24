@@ -1,30 +1,43 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/cart_item.dart';
 import '../models/product.dart';
 import '../services/activity_tracking_service.dart';
 
+final cartProvider = ChangeNotifierProvider<CartProvider>((ref) {
+  return CartProvider();
+});
+
 class CartProvider extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
   List<CartItem> _items = [];
   bool _isLoading = false;
+  String? _error;
   
   List<CartItem> get items => _items;
-  int get itemCount => _items.length;
+  int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
   bool get isLoading => _isLoading;
+  String? get error => _error;
   double get totalAmount => _items.fold(0, (sum, item) => sum + ((item.product?.price ?? 0) * item.quantity));
   
   CartProvider() {
     loadCart();
   }
 
-  Future<void> loadCart() async {
-    _isLoading = true;
-    notifyListeners();
+  Future<void> loadCart({bool silent = false}) async {
+    if (!silent) {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    }
     
     try {
       final user = _supabase.auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        _items = [];
+        return;
+      }
       
       final response = await _supabase
           .from('cart_items')
@@ -90,9 +103,12 @@ class CartProvider extends ChangeNotifier {
       }).toList();
       
     } catch (e) {
+      _error = e.toString();
       print('Erreur chargement panier: $e');
     } finally {
-      _isLoading = false;
+      if (!silent) {
+        _isLoading = false;
+      }
       notifyListeners();
     }
   }
@@ -103,6 +119,8 @@ class CartProvider extends ChangeNotifier {
       if (user == null) {
         throw Exception('User not authenticated');
       }
+
+      _error = null;
       
       // Track activity
       await ActivityTrackingService().trackCartAdd(
@@ -111,53 +129,96 @@ class CartProvider extends ChangeNotifier {
         quantity,
       );
       
-      // Check if item exists
-      final existing = _items.firstWhere(
-        (item) => item.product?.id == product.id,
-        orElse: () => CartItem(
-          id: '', 
-          userId: user.id,
-          productId: product.id,
-          product: product, 
-          quantity: 0
-        ),
-      );
-      
-      if (existing.id.isNotEmpty) {
-        // Update quantity
+      final existingIndex = _items.indexWhere((item) => item.product?.id == product.id);
+
+      if (existingIndex >= 0) {
+        final existing = _items[existingIndex];
+
+        _items[existingIndex] = CartItem(
+          id: existing.id,
+          userId: existing.userId,
+          productId: existing.productId,
+          quantity: existing.quantity + quantity,
+          product: existing.product,
+          createdAt: existing.createdAt,
+          updatedAt: existing.updatedAt,
+        );
+        notifyListeners();
+
         await _supabase
             .from('cart_items')
             .update({'quantity': existing.quantity + quantity})
             .eq('id', existing.id);
       } else {
-        // Add new item
-        await _supabase
+        final temp = CartItem(
+          id: 'temp_${product.id}',
+          userId: user.id,
+          productId: product.id,
+          quantity: quantity,
+          product: product,
+        );
+        _items = [temp, ..._items];
+        notifyListeners();
+
+        final inserted = await _supabase
             .from('cart_items')
             .insert({
               'user_id': user.id,
               'product_id': product.id,
               'quantity': quantity,
               'price': product.price,
-            });
+            })
+            .select()
+            .single();
+
+        final tempIndex = _items.indexWhere((i) => i.id == temp.id);
+        if (tempIndex >= 0) {
+          _items[tempIndex] = CartItem(
+            id: inserted['id'].toString(),
+            userId: inserted['user_id'] as String,
+            productId: inserted['product_id'] as String,
+            quantity: inserted['quantity'] as int,
+            product: product,
+            createdAt: inserted['created_at'] != null
+                ? DateTime.parse(inserted['created_at'])
+                : null,
+            updatedAt: inserted['updated_at'] != null
+                ? DateTime.parse(inserted['updated_at'])
+                : null,
+          );
+          notifyListeners();
+        }
       }
-      
-      await loadCart();
+
+      await loadCart(silent: true);
     } catch (e) {
       print('Erreur ajout au panier: $e');
+      _error = e.toString();
+      notifyListeners();
       throw e;
     }
   }
 
   Future<void> removeItem(String cartItemId) async {
     try {
+      _error = null;
+
+      final index = _items.indexWhere((i) => i.id == cartItemId);
+      if (index >= 0) {
+        _items = List<CartItem>.from(_items)..removeAt(index);
+        notifyListeners();
+      }
+
       await _supabase
           .from('cart_items')
           .delete()
           .eq('id', cartItemId);
-      
-      await loadCart();
+
+      await loadCart(silent: true);
     } catch (e) {
       print('Erreur suppression: $e');
+      _error = e.toString();
+      notifyListeners();
     }
   }
 
@@ -168,14 +229,34 @@ class CartProvider extends ChangeNotifier {
     }
     
     try {
+      _error = null;
+
+      final index = _items.indexWhere((i) => i.id == cartItemId);
+      if (index >= 0) {
+        final existing = _items[index];
+        _items[index] = CartItem(
+          id: existing.id,
+          userId: existing.userId,
+          productId: existing.productId,
+          quantity: quantity,
+          product: existing.product,
+          createdAt: existing.createdAt,
+          updatedAt: existing.updatedAt,
+        );
+        notifyListeners();
+      }
+
       await _supabase
           .from('cart_items')
           .update({'quantity': quantity})
           .eq('id', cartItemId);
-      
-      await loadCart();
+
+      await loadCart(silent: true);
     } catch (e) {
       print('Erreur mise à jour quantité: $e');
+      _error = e.toString();
+      await loadCart(silent: true);
+      notifyListeners();
     }
   }
 

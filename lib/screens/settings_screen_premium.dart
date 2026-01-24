@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
+import '../providers/notification_preferences_provider.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../localization/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../services/supabase_service.dart';
+import 'package:go_router/go_router.dart';
 
 class SettingsScreenPremium extends StatefulWidget {
   const SettingsScreenPremium({Key? key}) : super(key: key);
@@ -240,6 +243,18 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
               setState(() => _notificationsEnabled = value);
               _saveSetting('notifications', value);
               HapticFeedback.selectionClick();
+              Provider.of<NotificationPreferencesProvider>(context, listen: false)
+                  .setPushEnabled(value);
+            },
+          ),
+          const Divider(height: 1),
+          _buildListTile(
+            icon: FontAwesomeIcons.sliders,
+            title: 'Préférences notifications',
+            subtitle: 'Choisir les catégories',
+            onTap: () {
+              HapticFeedback.selectionClick();
+              context.push('/settings/notifications');
             },
           ),
           const Divider(height: 1),
@@ -378,6 +393,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
             subtitle: 'Modifier votre mot de passe',
             onTap: () {
               HapticFeedback.selectionClick();
+              context.push('/settings/change-password');
             },
           ),
           const Divider(height: 1),
@@ -387,6 +403,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
             subtitle: 'Comment nous protégeons vos données',
             onTap: () {
               HapticFeedback.selectionClick();
+              context.push('/legal/privacy');
             },
           ),
           const Divider(height: 1),
@@ -396,6 +413,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
             subtitle: 'Lire les CGU',
             onTap: () {
               HapticFeedback.selectionClick();
+              context.push('/legal/terms');
             },
           ),
         ],
@@ -455,7 +473,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
                     ],
                   ),
                   backgroundColor: Colors.green.shade600,
-                  behavior: SnackBarBehavior.floating,
+                  behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

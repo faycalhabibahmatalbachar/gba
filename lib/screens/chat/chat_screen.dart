@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../services/messaging_service.dart';
 import '../../widgets/app_drawer.dart';
 import '../../models/conversation.dart';
@@ -50,6 +53,35 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _messageController.addListener(_onTypingChanged);
   }
 
+  Future<void> _shareUrl(String url) async {
+    try {
+      await Share.share(url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossible de partager: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lien copié')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossible de copier: $e')),
+        );
+      }
+    }
+  }
+
   void _initAnimations() {
     _sendButtonController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -87,6 +119,130 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _launchExternal(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final ok = await launchUrl(
+        uri,
+        mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+      );
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
+  }
+
+  void _openImageFullScreen(String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (context) {
+        return Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            appBar: AppBar(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              title: const Text('Image'),
+              actions: [
+                IconButton(
+                  tooltip: 'Télécharger',
+                  icon: const Icon(Icons.download_rounded),
+                  onPressed: () => _launchExternal(imageUrl),
+                ),
+                IconButton(
+                  tooltip: 'Partager',
+                  icon: const Icon(Icons.share_rounded),
+                  onPressed: () => _shareUrl(imageUrl),
+                ),
+              ],
+            ),
+            body: Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.contain,
+                  placeholder: (context, _) => const Center(
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    ),
+                  ),
+                  errorWidget: (context, _, __) => const Center(
+                    child: Icon(Icons.broken_image_outlined, color: Colors.white70, size: 44),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showImageActions(String imageUrl) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.fullscreen_rounded),
+                title: const Text('Voir en plein écran'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openImageFullScreen(imageUrl);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.download_rounded),
+                title: const Text('Télécharger'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _launchExternal(imageUrl);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share_rounded),
+                title: const Text('Partager'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _shareUrl(imageUrl);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy_rounded),
+                title: const Text('Copier le lien'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _copyToClipboard(imageUrl);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _loadConversation() async {
     try {
       final messagingService = context.read<MessagingService>();
@@ -106,7 +262,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       _messages = await messagingService.loadMessages(_conversation!.id);
       
       // Marquer comme lus
-      await messagingService.markMessagesAsRead([_conversation!.id]);
+      final toRead = _messages
+          .where((m) => !m.isRead && m.senderType != 'customer')
+          .map((m) => m.id)
+          .toList();
+      await messagingService.markMessagesAsRead(toRead);
       
       if (mounted) {
         setState(() {
@@ -193,13 +353,47 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     
     if (image != null) {
-      // TODO: Upload image to Supabase Storage and send as attachment
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Envoi d\'images bientôt disponible'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      if (_conversation == null) return;
+
+      if (mounted) {
+        setState(() {
+          _isSending = true;
+        });
+      }
+
+      try {
+        final messagingService = Provider.of<MessagingService>(context, listen: false);
+        final imageUrl = await messagingService.uploadChatImage(
+          conversationId: _conversation!.id,
+          imageFile: image,
+        );
+
+        if (imageUrl == null || imageUrl.trim().isEmpty) {
+          throw Exception('Upload image échoué');
+        }
+
+        await messagingService.sendMessage(
+          conversationId: _conversation!.id,
+          content: imageUrl,
+          messageType: 'image',
+          attachmentUrls: [imageUrl],
+        );
+
+        _focusNode.requestFocus();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur envoi image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSending = false;
+          });
+        }
+      }
     }
   }
 
@@ -357,6 +551,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMessageBubble(Message message, bool isMe) {
+    final contentText = (message.content ?? message.message).trim();
+    final isImage = contentText.startsWith('http') &&
+        (contentText.contains('/storage/v1/object/public/chat/') ||
+            contentText.endsWith('.jpg') ||
+            contentText.endsWith('.jpeg') ||
+            contentText.endsWith('.png') ||
+            contentText.endsWith('.webp') ||
+            contentText.endsWith('.gif'));
+
     return Padding(
       padding: EdgeInsets.only(
         left: isMe ? 50 : 0,
@@ -382,45 +585,102 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           Flexible(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
+              padding: isImage
+                  ? const EdgeInsets.all(0)
+                  : const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
               decoration: BoxDecoration(
-                gradient: isMe
-                    ? LinearGradient(
-                        colors: [
-                          Theme.of(context).primaryColor,
-                          Theme.of(context).primaryColor.withOpacity(0.9),
-                        ],
-                      )
-                    : null,
-                color: isMe ? null : Colors.grey[100],
+                gradient: isImage
+                    ? null
+                    : (isMe
+                        ? LinearGradient(
+                            colors: [
+                              Theme.of(context).primaryColor,
+                              Theme.of(context).primaryColor.withOpacity(0.9),
+                            ],
+                          )
+                        : null),
+                color: isImage ? Colors.transparent : (isMe ? null : Colors.grey[100]),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
                   bottomLeft: Radius.circular(isMe ? 20 : 4),
                   bottomRight: Radius.circular(isMe ? 4 : 20),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: isImage
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 5,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.content ?? message.message,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: isMe ? Colors.white : Colors.black87,
-                      height: 1.4,
+                  if (isImage)
+                    GestureDetector(
+                      onTap: () => _openImageFullScreen(contentText),
+                      onLongPress: () => _showImageActions(contentText),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.black.withOpacity(0.12),
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          color: Colors.white,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(13),
+                          child: CachedNetworkImage(
+                            imageUrl: contentText,
+                            width: 220,
+                            height: 220,
+                            fit: BoxFit.cover,
+                            placeholder: (context, _) => Container(
+                              width: 220,
+                              height: 220,
+                              color: Colors.black.withOpacity(0.06),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, _, __) => Container(
+                              width: 220,
+                              height: 220,
+                              color: Colors.black.withOpacity(0.06),
+                              child: const Center(
+                                child: Icon(Icons.broken_image_outlined),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Text(
+                      contentText,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: isMe ? Colors.white : Colors.black87,
+                        height: 1.4,
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -429,9 +689,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         DateFormat('HH:mm').format(message.createdAt),
                         style: TextStyle(
                           fontSize: 11,
-                          color: isMe 
-                              ? Colors.white.withOpacity(0.7)
-                              : Colors.grey[600],
+                          color: isImage
+                              ? Colors.grey[600]
+                              : (isMe ? Colors.white.withOpacity(0.7) : Colors.grey[600]),
                         ),
                       ),
                       if (isMe) ...[
@@ -441,9 +701,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                               ? Icons.done_all 
                               : Icons.done,
                           size: 14,
-                          color: message.isRead
-                              ? Colors.blue[300]
-                              : Colors.white.withOpacity(0.7),
+                          color: isImage
+                              ? (message.isRead ? Colors.blue[300] : Colors.grey[600])
+                              : (message.isRead ? Colors.blue[300] : Colors.white.withOpacity(0.7)),
                         ),
                       ],
                     ],

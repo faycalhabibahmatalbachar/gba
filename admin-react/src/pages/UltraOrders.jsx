@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
   Paper, 
@@ -56,6 +56,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../config/supabase';
 import { useSnackbar } from 'notistack';
+import { useLocation } from 'react-router-dom';
 
 const statusColors = {
   pending: '#FFA726',
@@ -241,6 +242,8 @@ function UltraOrders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const location = useLocation();
+  const deepLinkHandledRef = useRef(false);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -300,12 +303,26 @@ function UltraOrders() {
         ...orderRow,
         items: items || []
       });
+      setDetailsOpen(true);
     } catch (e) {
       enqueueSnackbar('Erreur chargement détails', { variant: 'error' });
     } finally {
       setDetailsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+
+    const params = new URLSearchParams(location.search || '');
+    const orderId = params.get('orderId');
+    if (!orderId) return;
+
+    deepLinkHandledRef.current = true;
+    setSelectedOrderId(orderId);
+    fetchOrderDetails(orderId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   const fetchOrders = async () => {
     try {

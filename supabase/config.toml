@@ -1,0 +1,7 @@
+[functions]
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.flutterwave-webhook]
+verify_jwt = false

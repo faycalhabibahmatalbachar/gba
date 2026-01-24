@@ -17,6 +17,10 @@ import MonitoringFavorites from './pages/MonitoringFavorites';
 import MonitoringProducts from './pages/MonitoringProducts';
 import Layout from './components/Layout';
 import SimpleAdminChat from './components/messaging/SimpleAdminChat';
+import Banners from './pages/Banners';
+import Deliveries from './pages/Deliveries';
+import Drivers from './pages/Drivers';
+import DeliveryTracking from './pages/DeliveryTracking';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -59,6 +63,7 @@ function App() {
         <Route path="users" element={<Users />} />
         <Route path="user-tracking/:userId" element={<UserTracking />} />
         <Route path="analytics" element={<UltraAnalytics />} />
+        <Route path="banners" element={<Banners />} />
         <Route path="settings" element={<Settings />} />
         <Route path="settings/monitoring" element={<Monitoring />} />
         <Route path="settings/security" element={<Settings />} />
@@ -67,6 +72,9 @@ function App() {
         <Route path="monitoring/favorites" element={<MonitoringFavorites />} />
         <Route path="monitoring/products" element={<MonitoringProducts />} />
         <Route path="messages" element={<SimpleAdminChat />} />
+        <Route path="deliveries" element={<Deliveries />} />
+        <Route path="drivers" element={<Drivers />} />
+        <Route path="delivery-tracking" element={<DeliveryTracking />} />
       </Route>
     </Routes>
   );

@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart' as classic_provider;
 import '../../providers/cart_provider.dart';
-import '../../services/cart_service.dart';
+import '../../models/product.dart';
 import '../../services/favorites_service.dart';
+import '../../services/review_service.dart';
+import '../../services/activity_tracking_service.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -23,8 +26,9 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   final supabase = Supabase.instance.client;
   final PageController _pageController = PageController();
-  final CartService _cartService = CartService();
   final FavoritesService _favoritesService = FavoritesService();
+  final ReviewService _reviewService = ReviewService();
+  final ActivityTrackingService _tracking = ActivityTrackingService();
   
   Map<String, dynamic>? product;
   List<String> images = [];
@@ -33,11 +37,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   int quantity = 1;
   List<Map<String, dynamic>> similarProducts = [];
 
+  bool _isLoadingReviews = true;
+  List<Map<String, dynamic>> _reviews = [];
+  Map<String, dynamic>? _myReview;
+
   @override
   void initState() {
     super.initState();
     _loadProduct();
     _checkFavoriteStatus();
+    _loadReviews();
   }
 
   @override
@@ -154,21 +163,177 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     }
   }
 
+  Future<void> _loadReviews() async {
+    try {
+      setState(() => _isLoadingReviews = true);
+      final items = await _reviewService.getProductReviews(productId: widget.productId);
+      final mine = await _reviewService.getMyReview(productId: widget.productId);
+      if (!mounted) return;
+      setState(() {
+        _reviews = items;
+        _myReview = mine;
+        _isLoadingReviews = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingReviews = false);
+    }
+  }
+
+  Future<void> _refreshProductReviewCounters() async {
+    try {
+      final res = await supabase
+          .from('products')
+          .select('rating, reviews_count')
+          .eq('id', widget.productId)
+          .single();
+      if (!mounted || product == null) return;
+      setState(() {
+        product = {
+          ...product!,
+          'rating': res['rating'],
+          'reviews_count': res['reviews_count'],
+        };
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openReviewComposer() async {
+    final initialRating = (_myReview?['rating'] is num)
+        ? (_myReview!['rating'] as num).toDouble()
+        : 5.0;
+    final controller = TextEditingController(
+      text: (_myReview?['comment']?.toString() ?? ''),
+    );
+
+    double selectedRating = initialRating;
+
+    final submitted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _myReview == null ? 'Laisser un avis' : 'Modifier mon avis',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              RatingBar.builder(
+                initialRating: initialRating,
+                minRating: 1,
+                allowHalfRating: false,
+                itemSize: 30,
+                itemPadding: const EdgeInsets.symmetric(horizontal: 2),
+                itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+                onRatingUpdate: (value) => selectedRating = value,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Commentaire (optionnel)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Envoyer'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (submitted != true) return;
+
+    try {
+      await _reviewService.upsertMyReview(
+        productId: widget.productId,
+        rating: selectedRating.toInt(),
+        comment: controller.text,
+      );
+
+      final productName = product?['name']?.toString() ?? '';
+      if (productName.trim().isNotEmpty) {
+        await _tracking.trackReviewPosted(widget.productId, productName, selectedRating.toInt());
+      }
+
+      await Future.wait([
+        _loadReviews(),
+        _refreshProductReviewCounters(),
+      ]);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Avis envoyé. +5 points ajoutés')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur avis: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _addToCart() async {
     try {
-      // Récupérer le prix du produit depuis l'état
-      final productPrice = product?['price'] ?? 0.0;
-      await _cartService.addToCart(widget.productId, quantity, productPrice.toDouble());
-      
-      // Rafraîchir le provider du panier (Provider/ChangeNotifier)
-      try {
-        if (mounted) {
-          await classic_provider.Provider.of<CartProvider>(context, listen: false).loadCart();
-        }
-      } catch (e) {
-        // Éviter de casser l'ajout au panier si le rafraîchissement local échoue
-        debugPrint('Erreur lors du rafraîchissement du panier local: $e');
+      if (product == null) {
+        throw Exception('Produit non trouvé');
       }
+
+      final mapped = <String, dynamic>{
+        'id': product!['id']?.toString() ?? widget.productId,
+        'name': product!['name'] ?? '',
+        'slug': product!['slug'],
+        'description': product!['description'],
+        'price': (product!['price'] as num?)?.toDouble() ?? 0.0,
+        'compareAtPrice': (product!['compare_at_price'] as num?)?.toDouble(),
+        'sku': product!['sku'],
+        'quantity': product!['quantity'] ?? 0,
+        'trackQuantity': product!['track_quantity'] ?? true,
+        'categoryId': product!['category_id'],
+        'categoryName': (product!['categories'] is Map)
+            ? (product!['categories']['name']?.toString())
+            : null,
+        'brand': product!['brand'],
+        'mainImage': product!['main_image']?.toString(),
+        'images': (product!['images'] is List)
+            ? (product!['images'] as List).map((e) => e.toString()).toList()
+            : <String>[],
+        'specifications': product!['specifications'] ?? {},
+        'tags': (product!['tags'] is List)
+            ? (product!['tags'] as List).map((e) => e.toString()).toList()
+            : <String>[],
+        'rating': (product!['rating'] as num?)?.toDouble() ?? 0.0,
+        'reviewsCount': product!['reviews_count'] ?? 0,
+        'isFeatured': product!['is_featured'] ?? false,
+        'isActive': product!['is_active'] ?? true,
+        'createdAt': product!['created_at'],
+        'updatedAt': product!['updated_at'],
+      };
+
+      final p = Product.fromJson(mapped);
+      await classic_provider.Provider.of<CartProvider>(context, listen: false).addItem(p, quantity);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -345,6 +510,31 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: [
+                        RatingBarIndicator(
+                          rating: (product!['rating'] as num?)?.toDouble() ?? 0.0,
+                          itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+                          itemCount: 5,
+                          itemSize: 18,
+                          unratedColor: Colors.amber.withOpacity(0.25),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${(product!['reviews_count'] as num?)?.toInt() ?? 0})',
+                          style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w600),
+                        ),
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: _openReviewComposer,
+                          icon: const Icon(Icons.rate_review_outlined, size: 18),
+                          label: Text(_myReview == null ? 'Laisser un avis' : 'Modifier'),
+                        ),
+                      ],
+                    ),
                     
                     const SizedBox(height: 8),
                     
@@ -406,6 +596,78 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         color: Colors.black87,
                       ),
                     ),
+
+                    const SizedBox(height: 24),
+
+                    const Text(
+                      'Avis',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_isLoadingReviews)
+                      const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
+                    else if (_reviews.isEmpty)
+                      Text(
+                        'Aucun avis pour le moment',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      )
+                    else
+                      Column(
+                        children: _reviews.take(5).map((r) {
+                          final rating = (r['rating'] as num?)?.toDouble() ?? 0.0;
+                          final comment = r['comment']?.toString();
+                          final profiles = (r['profiles'] is Map)
+                              ? Map<String, dynamic>.from(r['profiles'])
+                              : null;
+                          final firstName = profiles?['first_name']?.toString();
+                          final lastName = profiles?['last_name']?.toString();
+                          final who = ((firstName ?? '').trim().isNotEmpty || (lastName ?? '').trim().isNotEmpty)
+                              ? '${(firstName ?? '').trim()} ${(lastName ?? '').trim()}'.trim()
+                              : 'Client';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.grey.withOpacity(0.15)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        who,
+                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                    RatingBarIndicator(
+                                      rating: rating,
+                                      itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+                                      itemCount: 5,
+                                      itemSize: 16,
+                                      unratedColor: Colors.amber.withOpacity(0.25),
+                                    ),
+                                  ],
+                                ),
+                                if (comment != null && comment.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    comment.trim(),
+                                    style: const TextStyle(height: 1.35),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     
                     const SizedBox(height: 24),
                     

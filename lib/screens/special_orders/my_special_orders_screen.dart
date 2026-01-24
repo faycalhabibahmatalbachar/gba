@@ -1,0 +1,273 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../services/special_order_service.dart';
+import '../../widgets/adaptive_scaffold.dart';
+
+class MySpecialOrdersScreen extends StatefulWidget {
+  const MySpecialOrdersScreen({super.key});
+
+  @override
+  State<MySpecialOrdersScreen> createState() => _MySpecialOrdersScreenState();
+}
+
+class _MySpecialOrdersScreenState extends State<MySpecialOrdersScreen> {
+  final SpecialOrderService _service = SpecialOrderService();
+
+  bool _loading = true;
+  List<Map<String, dynamic>> _orders = [];
+
+  void _showSnack(String message, {Color? backgroundColor}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
+        margin: kIsWeb ? null : const EdgeInsets.fromLTRB(16, 0, 16, 90),
+        backgroundColor: backgroundColor,
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      final orders = await _service.getUserSpecialOrders();
+      if (!mounted) return;
+      setState(() {
+        _orders = orders;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+      });
+      _showSnack('Erreur de chargement: ${e.toString()}', backgroundColor: Colors.red);
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'pending':
+        return Colors.orange;
+      case 'quoted':
+        return Colors.blue;
+      case 'countered':
+        return Colors.purple;
+      case 'accepted':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _shippingLabel(String method) {
+    return method == 'air' ? 'Avion' : 'Standard';
+  }
+
+  String _formatMoney(dynamic value, String currency) {
+    final numVal = (value is num) ? value : num.tryParse(value?.toString() ?? '') ?? 0;
+    if (currency.toUpperCase() == 'XOF') {
+      return '${numVal.toStringAsFixed(0)} FCFA';
+    }
+    return '${numVal.toStringAsFixed(2)} ${currency.toUpperCase()}';
+  }
+
+  String _formatDate(dynamic iso) {
+    if (iso == null) return '';
+    final dt = DateTime.tryParse(iso.toString());
+    if (dt == null) return '';
+    final local = dt.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AdaptiveScaffold(
+      currentIndex: 4,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Mes commandes spéciales',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _orders.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.auto_awesome, size: 54, color: Colors.grey),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'Aucune commande spéciale pour le moment',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 10),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () => context.go('/special-order'),
+                                    child: const Text('Créer une commande spéciale'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            itemCount: _orders.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final o = _orders[index];
+                              final id = o['id']?.toString() ?? '';
+                              final status = o['status']?.toString() ?? 'pending';
+                              final quoteStatus = o['quote_status']?.toString();
+                              final currency = (o['currency']?.toString() ?? 'XOF');
+                              final quoteTotal = o['quote_total'];
+                              final etaMin = o['eta_min_date'];
+                              final etaMax = o['eta_max_date'];
+
+                              final title = o['product_name']?.toString() ?? 'Commande spéciale';
+                              final qty = o['quantity']?.toString() ?? '';
+                              final shipping = _shippingLabel(o['shipping_method']?.toString() ?? 'other');
+
+                              return InkWell(
+                                onTap: () {
+                                  if (id.isEmpty) return;
+                                  context.push('/special-order/$id');
+                                },
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: Colors.grey.withOpacity(0.15)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              title,
+                                              style: const TextStyle(fontWeight: FontWeight.w800),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: _statusColor(status).withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(999),
+                                              border: Border.all(color: _statusColor(status).withOpacity(0.35)),
+                                            ),
+                                            child: Text(
+                                              (quoteStatus ?? status).toUpperCase(),
+                                              style: TextStyle(
+                                                color: _statusColor(status),
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Quantité: $qty  •  Livraison: $shipping',
+                                        style: TextStyle(color: Colors.grey.shade700),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (quoteTotal != null)
+                                        Text(
+                                          'Devis: ${_formatMoney(quoteTotal, currency)}',
+                                          style: const TextStyle(fontWeight: FontWeight.w800),
+                                        )
+                                      else
+                                        const Text(
+                                          'En attente de devis',
+                                          style: TextStyle(fontWeight: FontWeight.w700),
+                                        ),
+                                      if (etaMin != null || etaMax != null) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Arrivée estimée: ${_formatDate(etaMin)}${etaMax != null ? ' - ${_formatDate(etaMax)}' : ''}',
+                                          style: TextStyle(color: Colors.grey.shade700),
+                                        ),
+                                      ],
+                                      if (quoteStatus != null && quoteStatus != status) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Statut devis: ${quoteStatus.toUpperCase()}',
+                                          style: TextStyle(color: Colors.grey.shade700),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/cart_provider_simple.dart';
+import '../providers/cart_provider.dart';
 
 class HomeScreenPremium extends StatefulWidget {
   const HomeScreenPremium({super.key});

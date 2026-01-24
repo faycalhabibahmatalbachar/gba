@@ -244,7 +244,7 @@ class _CategoryCard extends ConsumerWidget {
                             width: 50,
                             height: 14,
                             child: LinearProgressIndicator(
-                              strokeWidth: 2,
+                              minHeight: 2,
                             ),
                           ),
                           error: (_, __) => const Text(

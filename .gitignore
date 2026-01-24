@@ -11,6 +11,8 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+supabase/.temp/
+tools/supabase-cli/supabase.exe
 
 # IntelliJ related
 *.iml
@@ -68,6 +70,7 @@ gba-mobile/android/gradle/*.zip
 # Environment files
 .env
 .env.local
+.env.supabasecli.bak
 .env.production
 .env.development
 
