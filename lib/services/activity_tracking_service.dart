@@ -94,12 +94,36 @@ class ActivityTrackingService {
         // Prefer the correct RPC name when available.
         await _supabase.rpc('log_user_activity', params: params);
       } catch (rpcError) {
-        // Best-effort fallback: do not block the app on tracking failures.
-        debugPrint('Fallback to direct insert for activity tracking: $rpcError');
         try {
-          await _supabase.from('user_activities').insert(data);
-        } catch (insertError) {
-          debugPrint('Error tracking activity: $insertError');
+          await _supabase.rpc('track_user_activity', params: params);
+        } catch (_) {
+          try {
+            await _supabase.rpc('log_user_activity', params: {
+              'p_user_id': userId,
+              'p_activity_type': actionType,
+              'p_activity_details': actionDetails ?? {},
+              'p_entity_id': entityId,
+              'p_entity_type': entityType,
+            });
+          } catch (_) {
+            // Best-effort fallback: do not block the app on tracking failures.
+            debugPrint('Fallback to direct insert for activity tracking: $rpcError');
+            try {
+              await _supabase.from('user_activities').insert(data);
+            } catch (_) {
+              try {
+                await _supabase.from('user_activities').insert({
+                  'user_id': userId,
+                  'activity_type': actionType,
+                  'activity_details': actionDetails ?? {},
+                  'entity_type': entityType,
+                  'entity_id': entityId,
+                });
+              } catch (insertError) {
+                debugPrint('Error tracking activity: $insertError');
+              }
+            }
+          }
         }
       }
       

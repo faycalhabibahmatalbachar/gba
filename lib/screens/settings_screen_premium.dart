@@ -5,11 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
+import '../providers/language_provider.dart';
 import '../providers/notification_preferences_provider.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../localization/app_localizations.dart';
-import '../providers/auth_provider.dart';
 import '../services/supabase_service.dart';
 import 'package:go_router/go_router.dart';
 
@@ -31,7 +31,6 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   bool _darkModeEnabled = false;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
-  String _selectedLanguage = 'fr';
 
   @override
   void initState() {
@@ -73,7 +72,6 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
       _darkModeEnabled = prefs.getBool('darkMode') ?? false;
       _soundEnabled = prefs.getBool('sound') ?? true;
       _vibrationEnabled = prefs.getBool('vibration') ?? true;
-      _selectedLanguage = prefs.getString('language') ?? 'fr';
     });
   }
 
@@ -315,6 +313,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   Widget _buildLanguageSettings() {
+    final languageProvider = Provider.of<LanguageProvider>(context);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -349,7 +349,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButton<String>(
-              value: _selectedLanguage,
+              value: languageProvider.locale.languageCode,
               isExpanded: true,
               underline: const SizedBox(),
               icon: const Icon(FontAwesomeIcons.chevronDown, size: 12),
@@ -360,8 +360,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
               ],
               onChanged: (value) {
                 if (value != null) {
-                  setState(() => _selectedLanguage = value);
-                  _saveSetting('language', value);
+                  Provider.of<LanguageProvider>(context, listen: false)
+                      .setLocale(Locale(value, ''));
                   HapticFeedback.selectionClick();
                 }
               },

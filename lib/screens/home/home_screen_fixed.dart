@@ -14,6 +14,7 @@ import '../../providers/products_provider.dart';
 import '../../providers/categories_provider.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/product_card_premium.dart';
+import '../../localization/app_localizations.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -30,23 +31,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   
   final List<Map<String, dynamic>> _adBanners = [
     {
-      'title': '🎯 MEGA SOLDES -50%',
-      'subtitle': 'Sur tous les smartphones',
+      'titleKey': 'ad_mega_sale_title',
+      'subtitleKey': 'ad_mega_sale_subtitle',
       'color': const Color(0xFF1976D2),
     },
     {
-      'title': '🚚 Livraison Gratuite',
-      'subtitle': 'Pour toute commande +100€',
+      'titleKey': 'ad_free_delivery_title',
+      'subtitleKey': 'ad_free_delivery_subtitle',
       'color': const Color(0xFF0D47A1),
     },
     {
-      'title': '⚡ Flash Deal',
-      'subtitle': 'Nouvelles offres chaque jour',
+      'titleKey': 'ad_flash_deal_title',
+      'subtitleKey': 'ad_flash_deal_subtitle',
       'color': const Color(0xFF01579B),
     },
     {
-      'title': '🎁 Code Promo: SAVE20',
-      'subtitle': '20% de réduction immédiate',
+      'titleKey': 'ad_promo_code_title',
+      'subtitleKey': 'ad_promo_code_subtitle',
       'color': const Color(0xFF006064),
     },
   ];
@@ -102,6 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
@@ -133,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               title: Text(
-                'GBA Store',
+                localizations.translate('store_name'),
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -166,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 controller: _searchController,
                 onSubmitted: _onSearchSubmitted,
                 decoration: InputDecoration(
-                  hintText: 'Rechercher des produits...',
+                  hintText: localizations.translate('search_products_hint'),
                   hintStyle: GoogleFonts.inter(
                     color: Colors.grey[400],
                     fontSize: 14,
@@ -225,22 +227,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           type: BottomNavigationBarType.fixed,
           selectedItemColor: const Color(0xFF667eea),
           unselectedItemColor: Colors.grey,
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'Accueil',
+              icon: const Icon(Icons.home_rounded),
+              label: localizations.translate('home'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.category_rounded),
-              label: 'Catégories',
+              icon: const Icon(Icons.category_rounded),
+              label: localizations.translate('categories'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart_rounded),
-              label: 'Panier',
+              icon: const Icon(Icons.shopping_cart_rounded),
+              label: localizations.translate('cart'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_rounded),
-              label: 'Compte',
+              icon: const Icon(Icons.person_rounded),
+              label: localizations.translate('profile'),
             ),
           ],
         ),
@@ -263,6 +265,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         itemBuilder: (context, index, realIndex) {
           final ad = _adBanners[index];
+          final localizations = AppLocalizations.of(context);
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
@@ -277,20 +280,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  ad['title'],
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                Flexible(
+                  child: Text(
+                    localizations.translate(ad['titleKey'] as String),
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  ad['subtitle'],
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 12,
+                Flexible(
+                  child: Text(
+                    localizations.translate(ad['subtitleKey'] as String),
+                    style: GoogleFonts.inter(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -316,7 +325,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Catégories',
+                AppLocalizations.of(context).translate('categories'),
                 style: GoogleFonts.poppins(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -461,7 +470,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Produits en vedette',
+                AppLocalizations.of(context).translate('featured'),
                 style: GoogleFonts.poppins(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -512,7 +521,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       onPressed: () {
                         ref.read(productsProvider.notifier).loadProducts(refresh: true);
                       },
-                      child: const Text('Réessayer'),
+                      child: Text(AppLocalizations.of(context).translate('retry')),
                     ),
                   ],
                 ),

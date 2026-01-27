@@ -203,10 +203,22 @@ class CartProvider extends ChangeNotifier {
     try {
       _error = null;
 
+      String? productId;
+      String? productName;
       final index = _items.indexWhere((i) => i.id == cartItemId);
       if (index >= 0) {
+        final item = _items[index];
+        productId = item.productId;
+        productName = item.product?.name;
         _items = List<CartItem>.from(_items)..removeAt(index);
         notifyListeners();
+      }
+
+      if (productId != null && productId.isNotEmpty) {
+        await ActivityTrackingService().trackCartRemove(
+          productId,
+          productName ?? productId,
+        );
       }
 
       await _supabase

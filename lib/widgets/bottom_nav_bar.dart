@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/cart_provider.dart';
+import '../localization/app_localizations.dart';
+import '../animations/app_animations.dart';
+import 'app_animation.dart';
 
 class BottomNavBar extends StatefulWidget {
   final int currentIndex;
@@ -23,6 +26,7 @@ class _BottomNavBarState extends State<BottomNavBar>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+  bool _isDisposed = false;
   
   @override
   void initState() {
@@ -42,6 +46,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   
   @override
   void dispose() {
+    _isDisposed = true;
     _animationController.dispose();
     super.dispose();
   }
@@ -49,6 +54,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   void _onItemTapped(int index) {
     HapticFeedback.lightImpact();
     _animationController.forward().then((_) {
+      if (_isDisposed || !mounted) return;
       _animationController.reverse();
     });
     
@@ -75,6 +81,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
     final cartItemCount = cartProvider.itemCount;
+    final localizations = AppLocalizations.of(context);
     
     return Container(
       decoration: BoxDecoration(
@@ -118,21 +125,21 @@ class _BottomNavBarState extends State<BottomNavBar>
                       index: 0,
                       icon: FontAwesomeIcons.house,
                       activeIcon: FontAwesomeIcons.house,
-                      label: 'Accueil',
+                      label: localizations.translate('home'),
                       isActive: widget.currentIndex == 0,
                     ),
                     _buildNavItem(
                       index: 1,
                       icon: FontAwesomeIcons.grip,
                       activeIcon: FontAwesomeIcons.grip,
-                      label: 'Catégories',
+                      label: localizations.translate('categories'),
                       isActive: widget.currentIndex == 1,
                     ),
                     _buildNavItem(
                       index: 2,
                       icon: FontAwesomeIcons.cartShopping,
                       activeIcon: FontAwesomeIcons.bagShopping,
-                      label: 'Panier',
+                      label: localizations.translate('cart'),
                       isActive: widget.currentIndex == 2,
                       hasBadge: true,
                       badgeCount: cartItemCount,
@@ -141,14 +148,14 @@ class _BottomNavBarState extends State<BottomNavBar>
                       index: 3,
                       icon: FontAwesomeIcons.heart,
                       activeIcon: FontAwesomeIcons.solidHeart,
-                      label: 'Favoris',
+                      label: localizations.translate('favorites'),
                       isActive: widget.currentIndex == 3,
                     ),
                     _buildNavItem(
                       index: 4,
                       icon: FontAwesomeIcons.user,
                       activeIcon: FontAwesomeIcons.solidUser,
-                      label: 'Profil',
+                      label: localizations.translate('profile'),
                       isActive: widget.currentIndex == 4,
                     ),
                   ],
@@ -170,6 +177,40 @@ class _BottomNavBarState extends State<BottomNavBar>
     bool hasBadge = false,
     int badgeCount = 0,
   }) {
+    final iconWidget = hasBadge
+        ? badges.Badge(
+            position: badges.BadgePosition.topEnd(top: -8, end: -8),
+            showBadge: badgeCount > 0,
+            badgeAnimation: const badges.BadgeAnimation.scale(
+              animationDuration: Duration(milliseconds: 300),
+            ),
+            badgeContent: Text(
+              badgeCount.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            badgeStyle: badges.BadgeStyle(
+              badgeColor: const Color(0xFFFF6B6B),
+              elevation: 0,
+              badgeGradient: const badges.BadgeGradient.linear(
+                colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+              ),
+            ),
+            child: FaIcon(
+              isActive ? activeIcon : icon,
+              size: isActive ? 22 : 20,
+              color: isActive ? Colors.white : Colors.grey.shade600,
+            ),
+          )
+        : FaIcon(
+            isActive ? activeIcon : icon,
+            size: isActive ? 22 : 20,
+            color: isActive ? Colors.white : Colors.grey.shade600,
+          );
+
     return Expanded(
       child: ScaleTransition(
         scale: _scaleAnimation,
@@ -207,43 +248,34 @@ class _BottomNavBarState extends State<BottomNavBar>
                           ]
                         : [],
                   ),
-                  child: hasBadge
-                      ? badges.Badge(
-                          position: badges.BadgePosition.topEnd(top: -8, end: -8),
-                          showBadge: badgeCount > 0,
-                          badgeAnimation: const badges.BadgeAnimation.scale(
-                            animationDuration: Duration(milliseconds: 300),
-                          ),
-                          badgeContent: Text(
-                            badgeCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      if (isActive)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Center(
+                              child: OverflowBox(
+                                maxWidth: 56,
+                                maxHeight: 56,
+                                child: AppAnimation(
+                                  key: ValueKey(
+                                    '${AppAnimations.navActivePulse}-$index-${widget.currentIndex}',
+                                  ),
+                                  id: AppAnimations.navActivePulse,
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.contain,
+                                  fallback: const SizedBox.shrink(),
+                                ),
+                              ),
                             ),
                           ),
-                          badgeStyle: badges.BadgeStyle(
-                            badgeColor: const Color(0xFFFF6B6B),
-                            elevation: 0,
-                            badgeGradient: const badges.BadgeGradient.linear(
-                              colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                            ),
-                          ),
-                          child: FaIcon(
-                            isActive ? activeIcon : icon,
-                            size: isActive ? 22 : 20,
-                            color: isActive
-                                ? Colors.white
-                                : Colors.grey.shade600,
-                          ),
-                        )
-                      : FaIcon(
-                          isActive ? activeIcon : icon,
-                          size: isActive ? 22 : 20,
-                          color: isActive
-                              ? Colors.white
-                              : Colors.grey.shade600,
                         ),
+                      iconWidget,
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 3),
                 AnimatedDefaultTextStyle(

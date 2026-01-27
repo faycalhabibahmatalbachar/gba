@@ -8,15 +8,18 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/categories_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/banner_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../localization/app_localizations.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/product_card_premium.dart';
 import '../services/activity_tracking_service.dart';
 import '../services/messaging_service.dart';
+import '../services/recommendation_service.dart';
 
 class HomeScreenPremium extends StatefulWidget {
   const HomeScreenPremium({super.key});
@@ -35,6 +38,38 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
   final ScrollController _scrollController = ScrollController();
   bool _showBackToTop = false;
   int _unreadMessages = 0;
+
+  final RecommendationService _recommendationService = RecommendationService();
+  List<Product> _recommendedProducts = [];
+  bool _isLoadingRecommendations = false;
+  String? _recommendationsError;
+
+  Future<void> _loadRecommendations() async {
+    if (_isLoadingRecommendations) return;
+
+    setState(() {
+      _isLoadingRecommendations = true;
+      _recommendationsError = null;
+    });
+
+    try {
+      final items = await _recommendationService.getRecommendations(limit: 10);
+      if (!mounted) return;
+      setState(() {
+        _recommendedProducts = items;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _recommendationsError = e.toString();
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingRecommendations = false;
+      });
+    }
+  }
 
   Widget _promoBanner({
     required String title,
@@ -191,9 +226,15 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
     }
     Future.microtask(() {
       if (!mounted) return;
+      final localizations = AppLocalizations.of(this.context);
       ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(
-          content: Text('$label : bientôt disponible'),
+          content: Text(
+            localizations.translateParams(
+              'coming_soon',
+              {'label': label},
+            ),
+          ),
           behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
         ),
       );
@@ -201,14 +242,15 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
   }
 
   Widget _buildSideDrawer(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     return Drawer(
       child: SafeArea(
         child: Column(
           children: [
             ListTile(
               leading: const Icon(Icons.person, color: Color(0xFF667eea)),
-              title: const Text('Mon compte'),
-              subtitle: const Text('Navigation'),
+              title: Text(localizations.translate('my_account')),
+              subtitle: Text(localizations.translate('navigation')),
               onTap: () => _navigateFromDrawer(context, '/profile'),
             ),
             const Divider(height: 1),
@@ -218,60 +260,64 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                 children: [
                   ListTile(
                     leading: const Icon(Icons.home_outlined),
-                    title: const Text('Accueil'),
+                    title: Text(localizations.translate('home')),
                     onTap: () => _navigateFromDrawer(context, '/home'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.grid_view_outlined),
-                    title: const Text('Catégories'),
+                    title: Text(localizations.translate('categories')),
                     onTap: () => _navigateFromDrawer(context, '/categories'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.local_offer_outlined),
-                    title: const Text('Promotions'),
+                    title: Text(localizations.translate('promotions')),
                     onTap: () => _navigateFromDrawer(context, '/promotions'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.favorite_border),
-                    title: const Text('Favoris'),
+                    title: Text(localizations.translate('favorites')),
                     onTap: () => _navigateFromDrawer(context, '/favorites'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.shopping_cart_outlined),
-                    title: const Text('Panier'),
+                    title: Text(localizations.translate('cart')),
                     onTap: () => _navigateFromDrawer(context, '/cart'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.receipt_long_outlined),
-                    title: const Text('Mes commandes'),
+                    title: Text(localizations.translate('orders')),
                     onTap: () => _navigateFromDrawer(context, '/orders'),
                   ),
                   ExpansionTile(
                     leading: const Icon(Icons.auto_awesome),
-                    title: const Text('Commandes spéciales'),
+                    title: Text(localizations.translate('special_orders')),
                     children: [
                       ListTile(
-                        title: const Text('Nouvelle commande spéciale'),
+                        title: Text(localizations.translate('new_special_order')),
                         onTap: () => _navigateFromDrawer(context, '/special-order'),
                       ),
                       ListTile(
-                        title: const Text('Mes commandes spéciales'),
+                        title: Text(localizations.translate('my_special_orders')),
                         onTap: () => _navigateFromDrawer(context, '/special-orders'),
                       ),
                       ListTile(
-                        title: const Text('Personnalisation / Cadeau'),
-                        onTap: () => _showComingSoon(context, 'Personnalisation', closeDrawer: true),
+                        title: Text(localizations.translate('personalization_gift')),
+                        onTap: () => _showComingSoon(
+                          context,
+                          localizations.translate('personalization_gift'),
+                          closeDrawer: true,
+                        ),
                       ),
                     ],
                   ),
                   ListTile(
                     leading: const Icon(Icons.message_outlined),
-                    title: const Text('Messages'),
+                    title: Text(localizations.translate('messages')),
                     onTap: () => _navigateFromDrawer(context, '/messages'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.settings_outlined),
-                    title: const Text('Paramètres'),
+                    title: Text(localizations.translate('settings')),
                     onTap: () => _navigateFromDrawer(context, '/settings'),
                   ),
                 ],
@@ -299,6 +345,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
       vsync: this,
     )..repeat(reverse: true);
     _loadUnreadMessages();
+    _loadRecommendations();
     _scrollController.addListener(() {
       if (_scrollController.offset > 200 && !_showBackToTop) {
         setState(() => _showBackToTop = true);
@@ -335,6 +382,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
     final categoriesProvider = Provider.of<CategoriesProvider>(context);
     final productsProvider = Provider.of<ProductProvider>(context);
     final bannerProvider = Provider.of<BannerProvider>(context);
+    final localizations = AppLocalizations.of(context);
     final activeBanner = bannerProvider.activeBanner;
     final bannerImageUrl = activeBanner?.imageUrl?.trim();
     final hasBannerImage = bannerImageUrl != null && bannerImageUrl.isNotEmpty;
@@ -477,6 +525,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                 productsProvider.loadProducts(force: true),
                 categoriesProvider.loadCategories(),
                 bannerProvider.loadBanners(force: true),
+                _loadRecommendations(),
               ]);
             },
             child: CustomScrollView(
@@ -607,9 +656,9 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                                         borderRadius: BorderRadius.circular(16),
                                         color: Colors.white.withOpacity(0.18),
                                       ),
-                                      child: const Text(
-                                        'Découvrir',
-                                        style: TextStyle(
+                                      child: Text(
+                                        localizations.translate('discover'),
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -752,7 +801,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                     child: TextField(
                       onTap: () => HapticFeedback.selectionClick(),
                       decoration: InputDecoration(
-                        hintText: '🔍 Que recherchez-vous?',
+                        hintText: localizations.translate('search_products_hint'),
                         hintStyle: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 15,
@@ -852,6 +901,90 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
               );
             },
           ),
+
+          // Recommandations personnalisees
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      localizations.translate('recommended_for_you'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2D3436),
+                      ),
+                    ),
+                  ),
+                  if (_recommendedProducts.isNotEmpty)
+                    TextButton(
+                      onPressed: _isLoadingRecommendations ? null : _loadRecommendations,
+                      child: Text(
+                        localizations.translate('refresh'),
+                        style: const TextStyle(
+                          color: Color(0xFF667eea),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Builder(
+              builder: (context) {
+                if (_isLoadingRecommendations && _recommendedProducts.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Center(
+                      child: CircularProgressIndicator(color: Color(0xFF667eea)),
+                    ),
+                  );
+                }
+
+                if (_recommendationsError != null && _recommendedProducts.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _recommendationsError!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        TextButton(
+                          onPressed: _isLoadingRecommendations ? null : _loadRecommendations,
+                          child: Text(localizations.translate('retry')),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (_recommendedProducts.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return PremiumProductList(
+                  products: _recommendedProducts,
+                  height: 340,
+                );
+              },
+            ),
+          ),
           
           // Titre Produits
           SliverToBoxAdapter(
@@ -860,9 +993,9 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Nos Produits',
-                    style: TextStyle(
+                  Text(
+                    localizations.translate('our_products'),
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF2D3436),
@@ -875,9 +1008,9 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                           selectedCategoryId = null;
                         });
                       },
-                      child: const Text(
-                        'Effacer filtre',
-                        style: TextStyle(
+                      child: Text(
+                        localizations.translate('clear_filter'),
+                        style: const TextStyle(
                           color: Color(0xFFFF6B6B),
                           fontWeight: FontWeight.w600,
                         ),
@@ -912,7 +1045,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                       children: [
                         Icon(Icons.wifi_off, size: 56, color: Colors.grey),
                         const SizedBox(height: 16),
-                        const Text('Erreur de chargement'),
+                        Text(localizations.translate('error_loading')),
                         const SizedBox(height: 6),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -930,7 +1063,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                             productsProvider.loadProducts(force: true);
                           },
                           icon: const FaIcon(FontAwesomeIcons.arrowRotateRight, size: 16),
-                          label: const Text('Réessayer'),
+                          label: Text(localizations.translate('retry')),
                         ),
                       ],
                     ),
@@ -951,7 +1084,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Aucun produit disponible',
+                          localizations.translate('no_products_available'),
                           style: TextStyle(
                             fontSize: 18,
                             color: Colors.grey.shade500,
@@ -964,7 +1097,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                             productsProvider.loadProducts(force: true);
                           },
                           icon: const FaIcon(FontAwesomeIcons.arrowRotateRight, size: 16),
-                          label: const Text('Rafraîchir'),
+                          label: Text(localizations.translate('refresh')),
                         ),
                       ],
                     ),
@@ -989,8 +1122,8 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                         const SizedBox(height: 16),
                         Text(
                           selectedCategoryId != null
-                              ? 'Aucun produit dans cette catégorie'
-                              : 'Aucun produit disponible',
+                              ? localizations.translate('no_products_in_category')
+                              : localizations.translate('no_products_available'),
                           style: TextStyle(
                             fontSize: 18,
                             color: Colors.grey.shade500,

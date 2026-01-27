@@ -49,7 +49,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     debugPrint('[Register] submit: email=$email, fullName=$fullName');
 
-    await ref.read(authProvider.notifier).signUp(email, password, fullName);
+    final locale = Localizations.localeOf(context).languageCode;
+    await ref.read(authProvider.notifier).signUp(email, password, fullName, locale: locale);
 
     if (!mounted) return;
 

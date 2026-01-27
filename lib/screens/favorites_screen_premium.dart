@@ -184,7 +184,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                         children: [
                           const Icon(Icons.wifi_off, size: 56, color: Colors.grey),
                           const SizedBox(height: 16),
-                          const Text('Erreur de chargement'),
+                          Text(localizations.translate('error_loading')),
                           const SizedBox(height: 8),
                           Text(
                             productsProvider.error!,
@@ -197,7 +197,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                               HapticFeedback.lightImpact();
                               productsProvider.loadProducts(force: true);
                             },
-                            child: const Text('Réessayer'),
+                            child: Text(localizations.translate('retry')),
                           ),
                         ],
                       ),
@@ -218,12 +218,12 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                         children: [
                           const Icon(Icons.search_off, size: 56, color: Colors.grey),
                           const SizedBox(height: 16),
-                          const Text('Produits favoris introuvables'),
+                          Text(localizations.translate('favorites_not_found_title')),
                           const SizedBox(height: 8),
-                          const Text(
-                            'Recharge la liste des produits.',
+                          Text(
+                            localizations.translate('favorites_not_found_hint'),
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
@@ -231,7 +231,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                               HapticFeedback.lightImpact();
                               productsProvider.loadProducts(force: true);
                             },
-                            child: const Text('Rafraîchir'),
+                            child: Text(localizations.translate('refresh')),
                           ),
                         ],
                       ),
@@ -243,12 +243,12 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
 
                 return Column(
                   children: [
-                    _buildHeaderSection(sortedFavorites.length),
-                    _buildControlsSection(),
+                    _buildHeaderSection(sortedFavorites.length, localizations),
+                    _buildControlsSection(localizations),
                     Expanded(
                       child: _selectedView == 'grid'
                           ? _buildGridView(sortedFavorites, favoritesProvider, theme)
-                          : _buildListView(sortedFavorites, favoritesProvider, theme),
+                          : _buildListView(sortedFavorites, favoritesProvider, localizations, theme),
                     ),
                   ],
                 );
@@ -390,16 +390,16 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Aucun favori',
-              style: TextStyle(
+            Text(
+              localizations.translate('no_favorites'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Ajoutez vos produits préférés ici',
+              localizations.translate('favorites_empty_hint'),
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -409,7 +409,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
             _buildGlassmorphicButton(
               onPressed: () => Navigator.pop(context),
               icon: FontAwesomeIcons.magnifyingGlass,
-              label: 'Explorer les produits',
+              label: localizations.translate('explore_products'),
             ),
           ],
         ),
@@ -417,7 +417,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildHeaderSection(int count) {
+  Widget _buildHeaderSection(int count, AppLocalizations localizations) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -449,19 +449,19 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
               _buildStatCard(
                 icon: FontAwesomeIcons.heart,
                 value: count.toString(),
-                label: 'Favoris',
+                label: localizations.translate('favorites'),
                 color: Colors.red,
               ),
               _buildStatCard(
                 icon: FontAwesomeIcons.layerGroup,
                 value: '3',
-                label: 'Collections',
+                label: localizations.translate('collections'),
                 color: Colors.purple,
               ),
               _buildStatCard(
                 icon: FontAwesomeIcons.share,
                 value: '12',
-                label: 'Partagés',
+                label: localizations.translate('shared'),
                 color: Colors.blue,
               ),
             ],
@@ -513,7 +513,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildControlsSection() {
+  Widget _buildControlsSection(AppLocalizations localizations) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -556,11 +556,23 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
               underline: Container(),
               isDense: true,
               icon: const Icon(FontAwesomeIcons.sort, size: 14),
-              items: const [
-                DropdownMenuItem(value: 'recent', child: Text('Récents')),
-                DropdownMenuItem(value: 'name', child: Text('Nom')),
-                DropdownMenuItem(value: 'price_low', child: Text('Prix ↑')),
-                DropdownMenuItem(value: 'price_high', child: Text('Prix ↓')),
+              items: [
+                DropdownMenuItem(
+                  value: 'recent',
+                  child: Text(localizations.translate('sort_recent')),
+                ),
+                DropdownMenuItem(
+                  value: 'name',
+                  child: Text(localizations.translate('sort_name')),
+                ),
+                DropdownMenuItem(
+                  value: 'price_low',
+                  child: Text(localizations.translate('sort_price_asc')),
+                ),
+                DropdownMenuItem(
+                  value: 'price_high',
+                  child: Text(localizations.translate('sort_price_desc')),
+                ),
               ],
               onChanged: (value) {
                 setState(() => _selectedSort = value!);
@@ -619,7 +631,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildListView(List<Product> favorites, FavoritesProvider notifier, ThemeData theme) {
+  Widget _buildListView(List<Product> favorites, FavoritesProvider notifier, AppLocalizations localizations, ThemeData theme) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: favorites.length,
@@ -629,7 +641,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
           position: _slideAnimation,
           child: FadeTransition(
             opacity: _fadeAnimation,
-            child: _buildFavoriteListItem(product, notifier, theme),
+            child: _buildFavoriteListItem(product, notifier, localizations, theme),
           ),
         );
       },
@@ -803,7 +815,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildFavoriteListItem(Product product, FavoritesProvider notifier, ThemeData theme) {
+  Widget _buildFavoriteListItem(Product product, FavoritesProvider notifier, AppLocalizations localizations, ThemeData theme) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
@@ -891,7 +903,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      product.brand ?? 'No brand',
+                      product.brand ?? localizations.translate('no_brand'),
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: 14,
@@ -922,6 +934,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     return GestureDetector(
       onTap: () {
         HapticFeedback.mediumImpact();
+        final localizations = AppLocalizations.of(context);
         notifier.toggleFavorite(product.id, productName: product.name);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -929,7 +942,12 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
               children: [
                 const Icon(FontAwesomeIcons.heartCrack, color: Colors.white, size: 16),
                 const SizedBox(width: 12),
-                Text('${product.name} retiré des favoris'),
+                Text(
+                  localizations.translateParams(
+                    'removed_from_favorites',
+                    {'name': product.name},
+                  ),
+                ),
               ],
             ),
             backgroundColor: Colors.red.shade600,
@@ -1017,6 +1035,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
   }
 
   void _showCollectionsDialog() {
+    final localizations = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => BackdropFilter(
@@ -1040,22 +1059,22 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Mes Collections',
-                  style: TextStyle(
+                Text(
+                  localizations.translate('my_collections'),
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildCollectionItem('Été 2024', 8, Colors.orange),
-                _buildCollectionItem('Essentiels', 15, Colors.blue),
-                _buildCollectionItem('Cadeaux', 5, Colors.purple),
+                _buildCollectionItem(localizations.translate('collection_summer_2024'), 8, Colors.orange, localizations),
+                _buildCollectionItem(localizations.translate('collection_essentials'), 15, Colors.blue, localizations),
+                _buildCollectionItem(localizations.translate('collection_gifts'), 5, Colors.purple, localizations),
                 const SizedBox(height: 20),
                 _buildGlassmorphicButton(
                   onPressed: () => Navigator.pop(context),
                   icon: FontAwesomeIcons.plus,
-                  label: 'Créer une collection',
+                  label: localizations.translate('create_collection'),
                 ),
               ],
             ),
@@ -1065,7 +1084,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     );
   }
 
-  Widget _buildCollectionItem(String name, int count, Color color) {
+  Widget _buildCollectionItem(String name, int count, Color color, AppLocalizations localizations) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -1104,7 +1123,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                   ),
                 ),
                 Text(
-                  '$count articles',
+                  localizations.translateParams('items_count', {'count': count.toString()}),
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 14,

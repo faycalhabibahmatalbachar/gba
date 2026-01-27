@@ -6,6 +6,8 @@ class AppConfig {
 
   static const String _envSiteUrl = String.fromEnvironment('SITE_URL');
 
+  static const String _envBackendUrl = String.fromEnvironment('BACKEND_URL');
+
   static const String _envFirebaseVapidKey =
       String.fromEnvironment('FIREBASE_VAPID_KEY');
 
@@ -19,6 +21,8 @@ class AppConfig {
 
   static const String _fallbackSiteUrl = 'http://localhost:8080';
 
+  static const String _fallbackBackendUrl = 'http://localhost:8000';
+
   static String get supabaseUrl =>
       _envSupabaseUrl.isNotEmpty ? _envSupabaseUrl : _fallbackSupabaseUrl;
 
@@ -31,4 +35,13 @@ class AppConfig {
       : _fallbackFirebaseVapidKey;
 
   static String get siteUrl => _envSiteUrl.isNotEmpty ? _envSiteUrl : _fallbackSiteUrl;
+
+  static String get backendUrl {
+    final raw = _envBackendUrl.isNotEmpty ? _envBackendUrl : _fallbackBackendUrl;
+    final value = raw.trim();
+    if (value.endsWith('/')) {
+      return value.substring(0, value.length - 1);
+    }
+    return value;
+  }
 }

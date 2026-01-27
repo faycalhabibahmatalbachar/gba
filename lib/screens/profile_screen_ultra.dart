@@ -1627,12 +1627,6 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                   onTap: () => context.push('/favorites'),
                 ),
                 _buildActionCard(
-                  icon: FontAwesomeIcons.bell,
-                  label: 'Notifications',
-                  color: Colors.deepPurple,
-                  onTap: () => context.push('/settings/notifications'),
-                ),
-                _buildActionCard(
                   icon: FontAwesomeIcons.lock,
                   label: 'Mot de passe',
                   color: Colors.orange,

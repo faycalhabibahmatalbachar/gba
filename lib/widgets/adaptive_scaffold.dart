@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import 'bottom_nav_bar.dart';
+import '../localization/app_localizations.dart';
 
 class AdaptiveScaffold extends StatelessWidget {
   final int currentIndex;
@@ -56,6 +57,7 @@ class AdaptiveScaffold extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 900;
+        final localizations = AppLocalizations.of(context);
 
         if (!isWide) {
           return Scaffold(
@@ -100,31 +102,51 @@ class AdaptiveScaffold extends StatelessWidget {
                   color: Colors.grey.shade600,
                   fontWeight: FontWeight.w600,
                 ),
-                destinations: const [
+                destinations: [
                   NavigationRailDestination(
-                    icon: FaIcon(FontAwesomeIcons.house, size: 18),
-                    selectedIcon: FaIcon(FontAwesomeIcons.house, size: 18),
-                    label: Text('Accueil'),
+                    icon: const FaIcon(FontAwesomeIcons.house, size: 18),
+                    selectedIcon: const FaIcon(FontAwesomeIcons.house, size: 18),
+                    label: Text(
+                      localizations.translate('home'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   NavigationRailDestination(
-                    icon: FaIcon(FontAwesomeIcons.grip, size: 18),
-                    selectedIcon: FaIcon(FontAwesomeIcons.grip, size: 18),
-                    label: Text('Catégories'),
+                    icon: const FaIcon(FontAwesomeIcons.grip, size: 18),
+                    selectedIcon: const FaIcon(FontAwesomeIcons.grip, size: 18),
+                    label: Text(
+                      localizations.translate('categories'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   NavigationRailDestination(
-                    icon: FaIcon(FontAwesomeIcons.cartShopping, size: 18),
-                    selectedIcon: FaIcon(FontAwesomeIcons.bagShopping, size: 18),
-                    label: Text('Panier'),
+                    icon: const FaIcon(FontAwesomeIcons.cartShopping, size: 18),
+                    selectedIcon: const FaIcon(FontAwesomeIcons.bagShopping, size: 18),
+                    label: Text(
+                      localizations.translate('cart'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   NavigationRailDestination(
-                    icon: FaIcon(FontAwesomeIcons.heart, size: 18),
-                    selectedIcon: FaIcon(FontAwesomeIcons.solidHeart, size: 18),
-                    label: Text('Favoris'),
+                    icon: const FaIcon(FontAwesomeIcons.heart, size: 18),
+                    selectedIcon: const FaIcon(FontAwesomeIcons.solidHeart, size: 18),
+                    label: Text(
+                      localizations.translate('favorites'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   NavigationRailDestination(
-                    icon: FaIcon(FontAwesomeIcons.user, size: 18),
-                    selectedIcon: FaIcon(FontAwesomeIcons.solidUser, size: 18),
-                    label: Text('Profil'),
+                    icon: const FaIcon(FontAwesomeIcons.user, size: 18),
+                    selectedIcon: const FaIcon(FontAwesomeIcons.solidUser, size: 18),
+                    label: Text(
+                      localizations.translate('profile'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

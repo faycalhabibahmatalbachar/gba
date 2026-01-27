@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../localization/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,12 +59,18 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('❌ Erreur chargement données: $e');
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         setState(() {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur de chargement: $e'),
+            content: Text(
+              localizations.translateParams(
+                'error_loading_with_details',
+                {'error': e.toString()},
+              ),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -73,9 +80,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('GBA Store'),
+        title: Text(localizations.translate('store_name')),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         actions: [
@@ -97,13 +105,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: isLoading
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Chargement des produits...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(localizations.translate('loading_products')),
                 ],
               ),
             )
@@ -125,18 +133,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.store,
                               color: Colors.white,
                               size: 48,
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
-                              'Bienvenue chez GBA Store',
+                              localizations.translateParams(
+                                'welcome_to_store',
+                                {'store': localizations.translate('store_name')},
+                              ),
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 22,
@@ -144,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             Text(
-                              'Découvrez nos produits',
+                              localizations.translate('discover_products'),
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 14,
@@ -162,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: Text(
-                          'Catégories',
+                          localizations.translate('categories'),
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -217,7 +228,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Produits (${products.length})',
+                            localizations.translateParams(
+                              'products_count',
+                              {'count': products.length.toString()},
+                            ),
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -229,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   selectedCategoryId = null;
                                 });
                               },
-                              child: const Text('Voir tout'),
+                              child: Text(localizations.translate('see_all')),
                             ),
                         ],
                       ),
@@ -250,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'Aucun produit disponible',
+                                  localizations.translate('no_products_available'),
                                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                         color: Colors.grey,
                                       ),
@@ -259,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ElevatedButton.icon(
                                   onPressed: _loadData,
                                   icon: const Icon(Icons.refresh),
-                                  label: const Text('Recharger'),
+                                  label: Text(localizations.translate('refresh')),
                                 ),
                               ],
                             ),
@@ -302,7 +316,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildProductCard(Map<String, dynamic> product) {
-    final name = product['name'] ?? 'Produit sans nom';
+    final localizations = AppLocalizations.of(context);
+    final name = product['name'] ?? localizations.translate('unnamed_product');
     final price = product['price']?.toString() ?? '0';
     final imageUrl = product['main_image'] ?? '';
     
@@ -395,7 +410,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('$name ajouté au panier'),
+                                  content: Text(
+                                    localizations.translateParams(
+                                      'added_to_cart',
+                                      {'name': name},
+                                    ),
+                                  ),
                                   duration: const Duration(seconds: 1),
                                   backgroundColor: Colors.green,
                                 ),

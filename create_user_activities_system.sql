@@ -112,6 +112,8 @@ CREATE INDEX IF NOT EXISTS idx_user_activities_user_id ON user_activities(user_i
 CREATE INDEX IF NOT EXISTS idx_user_activities_action_type ON user_activities(action_type);
 CREATE INDEX IF NOT EXISTS idx_user_activities_created_at ON user_activities(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_activities_entity ON user_activities(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_user_activities_entity_type_action_type_created_at ON user_activities(entity_type, action_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_user_activities_product_positive ON user_activities(user_id, entity_id, created_at) WHERE entity_type = 'product' AND action_type IN ('favorite_add','cart_add','product_view');
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_session_id ON user_sessions(session_id);
 CREATE INDEX IF NOT EXISTS idx_user_activity_metrics_user_id ON user_activity_metrics(user_id, period_type);
@@ -250,6 +252,76 @@ GROUP BY entity_id, entity_name
 ORDER BY view_count DESC
 LIMIT 50;
 
+CREATE OR REPLACE VIEW product_similar_products AS
+WITH interactions AS (
+    SELECT
+        ua.user_id,
+        p.id AS product_id,
+        MAX(
+            CASE ua.action_type
+                WHEN 'favorite_add' THEN 3
+                WHEN 'cart_add' THEN 2
+                WHEN 'product_view' THEN 1
+                ELSE 0
+            END
+        )::double precision AS w
+    FROM user_activities ua
+    JOIN products p ON p.id::text = ua.entity_id::text
+    WHERE ua.user_id IS NOT NULL
+    AND ua.entity_type = 'product'
+    AND ua.action_type IN ('favorite_add','cart_add','product_view')
+    AND ua.created_at >= NOW() - INTERVAL '90 days'
+    GROUP BY ua.user_id, p.id
+),
+norms AS (
+    SELECT
+        product_id,
+        SQRT(SUM(w*w))::double precision AS norm
+    FROM interactions
+    GROUP BY product_id
+),
+pairs AS (
+    SELECT
+        a.product_id AS product_id,
+        b.product_id AS similar_product_id,
+        COUNT(*)::int AS common_users,
+        SUM(a.w * b.w)::double precision AS dot
+    FROM interactions a
+    JOIN interactions b
+        ON a.user_id = b.user_id
+        AND a.product_id <> b.product_id
+    GROUP BY a.product_id, b.product_id
+),
+scored AS (
+    SELECT
+        pairs.product_id,
+        pairs.similar_product_id,
+        pairs.common_users,
+        CASE
+            WHEN n1.norm <= 0 OR n2.norm <= 0 THEN 0
+            ELSE (pairs.dot / (n1.norm * n2.norm))
+        END AS similarity
+    FROM pairs
+    JOIN norms n1 ON n1.product_id = pairs.product_id
+    JOIN norms n2 ON n2.product_id = pairs.similar_product_id
+    WHERE pairs.common_users >= 2
+)
+SELECT
+    product_id,
+    similar_product_id,
+    common_users,
+    similarity
+FROM (
+    SELECT
+        product_id,
+        similar_product_id,
+        common_users,
+        similarity,
+        ROW_NUMBER() OVER(PARTITION BY product_id ORDER BY similarity DESC, common_users DESC, similar_product_id) AS rn
+    FROM scored
+) ranked
+WHERE rn <= 50;
+
 -- 9. Vue pour les métriques de conversion
 CREATE OR REPLACE VIEW conversion_metrics AS
 WITH funnel AS (
@@ -304,6 +376,7 @@ CREATE POLICY "Admins can view all activities" ON user_activities
 
 -- Permissions pour les vues
 GRANT SELECT ON top_viewed_products TO authenticated;
+GRANT SELECT ON product_similar_products TO service_role;
 GRANT SELECT ON conversion_metrics TO authenticated;
 
 -- Notification pour rafraîchir le cache

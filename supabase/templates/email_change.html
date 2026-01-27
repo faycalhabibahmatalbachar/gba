@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0;padding:24px;background:#f6f9fc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:24px;">
+      {{ if eq .Data.locale "fr" }}
+      <h2 style="margin:0 0 12px 0;">Confirmer le changement d'email</h2>
+      <p style="margin:0 0 16px 0;">Clique sur le bouton ci-dessous pour confirmer le changement de ton adresse email.</p>
+      <p style="margin:0 0 24px 0;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:10px;">Confirmer le changement</a>
+      </p>
+      <p style="margin:0;font-size:12px;color:#475569;">Si tu n'as pas demandé ce changement, ignore cet email.</p>
+      {{ else if eq .Data.locale "ar" }}
+      <div dir="rtl" style="direction:rtl;text-align:right;">
+        <h2 style="margin:0 0 12px 0;">تأكيد تغيير البريد الإلكتروني</h2>
+        <p style="margin:0 0 16px 0;">اضغط على الزر أدناه لتأكيد تغيير بريدك الإلكتروني.</p>
+        <p style="margin:0 0 24px 0;">
+          <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:10px;">تأكيد تغيير البريد الإلكتروني</a>
+        </p>
+        <p style="margin:0;font-size:12px;color:#475569;">إذا لم تطلب هذا التغيير، يمكنك تجاهل هذا البريد.</p>
+      </div>
+      {{ else }}
+      <h2 style="margin:0 0 12px 0;">Confirm email change</h2>
+      <p style="margin:0 0 16px 0;">Click the button below to confirm your email change request.</p>
+      <p style="margin:0 0 24px 0;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:10px;">Confirm email change</a>
+      </p>
+      <p style="margin:0;font-size:12px;color:#475569;">If you didn't request this change, you can ignore this email.</p>
+      {{ end }}
+
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e2e8f0;" />
+      <p style="margin:0;font-size:12px;color:#64748b;">GBA Store • {{ .SiteURL }}</p>
+    </div>
+  </body>
+</html>

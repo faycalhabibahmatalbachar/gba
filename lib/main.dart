@@ -22,6 +22,7 @@ import 'providers/categories_provider.dart';
 import 'providers/notification_preferences_provider.dart';
 import 'services/messaging_service.dart';
 import 'services/notification_service.dart';
+import 'utils/i18n_audit.dart';
 
 const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
   apiKey: String.fromEnvironment(
@@ -53,6 +54,7 @@ const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  var firebaseReady = false;
   try {
     if (kIsWeb) {
       if (kDebugMode && _webFirebaseOptions.appId.contains(':android:')) {
@@ -65,7 +67,7 @@ void main() async {
     } else {
       await Firebase.initializeApp();
     }
-    await NotificationService().init(navigatorKey: AppRoutes.rootNavigatorKey);
+    firebaseReady = true;
   } catch (e) {
     debugPrint('[FCM] Firebase init skipped/failed: $e');
   }
@@ -75,6 +77,14 @@ void main() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
   );
+
+  if (firebaseReady) {
+    try {
+      await NotificationService().init(navigatorKey: AppRoutes.rootNavigatorKey);
+    } catch (e) {
+      debugPrint('[FCM] Notification init skipped/failed: $e');
+    }
+  }
   
   // Initialize activity tracking
   await ActivityTrackingService().initSession();
@@ -121,6 +131,13 @@ class MyApp extends StatelessWidget {
           ),
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           routerConfig: AppRoutes.router,
+          builder: (context, child) {
+            return I18nAuditOverlay(
+              navigatorKey: AppRoutes.rootNavigatorKey,
+              router: AppRoutes.router,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           locale: languageProvider.locale,
           localizationsDelegates: const [
             AppLocalizations.delegate,

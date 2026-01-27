@@ -1,52 +1,37 @@
-begin;
-
--- Extensions
 create extension if not exists pgcrypto;
 
--- Grants (after DROP/CREATE schema these may be lost)
-grant usage on schema public to postgres, anon, authenticated, service_role;
-grant all on all tables in schema public to postgres, anon, authenticated, service_role;
-grant all on all sequences in schema public to postgres, anon, authenticated, service_role;
-grant all on all functions in schema public to postgres, anon, authenticated, service_role;
-alter default privileges in schema public grant all on tables to postgres, anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to postgres, anon, authenticated, service_role;
-alter default privileges in schema public grant all on functions to postgres, anon, authenticated, service_role;
-
--- Utility: updated_at trigger
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
 as $$
 begin
   new.updated_at = now();
+
+  if tg_table_schema = 'public' and tg_table_name = 'profiles' then
+    new.last_updated = now();
+  end if;
+
   return new;
 end;
 $$;
 
--- =========================
--- PROFILES
--- =========================
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
   first_name text,
   last_name text,
   phone text,
+  avatar_url text,
   bio text,
-  date_of_birth date,
-  gender text,
   address text,
   city text,
-  postal_code text,
   country text,
-  avatar_url text,
-  total_orders integer not null default 0,
-  total_spent numeric(12,2) not null default 0,
+  postal_code text,
+  member_since timestamptz not null default now(),
   loyalty_points integer not null default 0,
   is_premium boolean not null default false,
+  notification_preferences jsonb not null default '{"email": true, "push": false, "sms": false}'::jsonb,
   language_preference text not null default 'fr',
-  notification_preferences jsonb not null default '{"email":true,"push":true,"sms":false}'::jsonb,
-  member_since timestamptz,
   last_updated timestamptz,
   is_active boolean not null default true,
   last_sign_in timestamptz,
@@ -468,6 +453,12 @@ create table if not exists public.special_orders (
 alter table public.special_orders add column if not exists eta_min_date timestamptz;
 alter table public.special_orders add column if not exists eta_max_date timestamptz;
 
+alter table public.special_orders
+  add column if not exists delivery_lat double precision,
+  add column if not exists delivery_lng double precision,
+  add column if not exists delivery_accuracy double precision,
+  add column if not exists delivery_captured_at timestamptz;
+
 create index if not exists idx_special_orders_user_id on public.special_orders(user_id);
 create index if not exists idx_special_orders_created_at on public.special_orders(created_at);
 
@@ -668,6 +659,7 @@ with check (
 );
 
 -- View: special_order_details_view (for Flutter + admin)
+drop view if exists public.special_order_details_view;
 create or replace view public.special_order_details_view with (security_invoker=true) as
 select
   so.*,
@@ -1116,6 +1108,12 @@ create table if not exists public.orders (
   updated_at timestamptz not null default now()
 );
 
+alter table public.orders
+  add column if not exists delivery_lat double precision,
+  add column if not exists delivery_lng double precision,
+  add column if not exists delivery_accuracy double precision,
+  add column if not exists delivery_captured_at timestamptz;
+
 create index if not exists idx_orders_user_id on public.orders(user_id);
 create index if not exists idx_orders_created_at on public.orders(created_at);
 
@@ -1190,6 +1188,7 @@ with check (
 );
 
 -- View: order_details_view (used by Flutter + admin)
+drop view if exists public.order_details_view;
 create or replace view public.order_details_view with (security_invoker=true) as
 select
   o.*,
@@ -1431,6 +1430,10 @@ create table if not exists public.user_activities (
 create index if not exists idx_user_activities_user_id on public.user_activities(user_id);
 create index if not exists idx_user_activities_created_at on public.user_activities(created_at);
 
+create index if not exists idx_user_activities_entity_id on public.user_activities(entity_id);
+create index if not exists idx_user_activities_entity_type_action_type_created_at on public.user_activities(entity_type, action_type, created_at);
+create index if not exists idx_user_activities_product_positive on public.user_activities(user_id, entity_id, created_at) where entity_type = 'product' and action_type in ('favorite_add','cart_add','product_view');
+
 alter table public.user_activities enable row level security;
 
 drop policy if exists "user_activities_owner_select" on public.user_activities;
@@ -1654,6 +1657,75 @@ join public.products p on p.id::text = ua.entity_id
 where ua.action_type = 'product_view'
 group by p.id, p.name, p.main_image
 order by view_count desc;
+
+create or replace view public.product_similar_products with (security_invoker=true) as
+with interactions as (
+  select
+    ua.user_id,
+    p.id as product_id,
+    max(
+      case ua.action_type
+        when 'favorite_add' then 3
+        when 'cart_add' then 2
+        when 'product_view' then 1
+        else 0
+      end
+    )::double precision as w
+  from public.user_activities ua
+  join public.products p on p.id::text = ua.entity_id
+  where ua.entity_type = 'product'
+    and ua.action_type in ('favorite_add','cart_add','product_view')
+    and ua.created_at >= now() - interval '90 days'
+  group by ua.user_id, p.id
+),
+norms as (
+  select
+    product_id,
+    sqrt(sum(w*w))::double precision as norm
+  from interactions
+  group by product_id
+),
+pairs as (
+  select
+    a.product_id as product_id,
+    b.product_id as similar_product_id,
+    count(*)::int as common_users,
+    sum(a.w * b.w)::double precision as dot
+  from interactions a
+  join interactions b
+    on a.user_id = b.user_id
+   and a.product_id <> b.product_id
+  group by a.product_id, b.product_id
+),
+scored as (
+  select
+    pairs.product_id,
+    pairs.similar_product_id,
+    pairs.common_users,
+    case
+      when n1.norm <= 0 or n2.norm <= 0 then 0
+      else (pairs.dot / (n1.norm * n2.norm))
+    end as similarity
+  from pairs
+  join norms n1 on n1.product_id = pairs.product_id
+  join norms n2 on n2.product_id = pairs.similar_product_id
+  where pairs.common_users >= 2
+)
+select
+  product_id,
+  similar_product_id,
+  common_users,
+  similarity
+from (
+  select
+    product_id,
+    similar_product_id,
+    common_users,
+    similarity,
+    row_number() over(partition by product_id order by similarity desc, common_users desc, similar_product_id) as rn
+  from scored
+) ranked
+where rn <= 50;
 
 create or replace view public.conversion_metrics with (security_invoker=true) as
 with daily as (

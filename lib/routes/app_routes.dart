@@ -33,6 +33,7 @@ import '../screens/legal/privacy_policy_screen.dart';
 import '../screens/settings/notification_preferences_screen.dart';
 import '../screens/onboarding_flow_screen.dart';
 import '../services/onboarding_service.dart';
+import '../localization/app_localizations.dart';
 
 class AppRoutes {
   static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -43,6 +44,7 @@ class AppRoutes {
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     errorBuilder: (context, state) {
+      final localizations = AppLocalizations.of(context);
       return Scaffold(
         body: Container(
           decoration: const BoxDecoration(
@@ -64,8 +66,8 @@ class AppRoutes {
                   children: [
                     const Icon(Icons.travel_explore, size: 72, color: Colors.white),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Page introuvable',
+                    Text(
+                      localizations.translate('page_not_found_title'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
@@ -75,7 +77,10 @@ class AppRoutes {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Aucune route pour: ${state.uri}',
+                      localizations.translateParams(
+                        'no_route_for',
+                        {'route': state.uri.toString()},
+                      ),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
@@ -94,8 +99,8 @@ class AppRoutes {
                         ),
                       ),
                       icon: const Icon(Icons.home),
-                      label: const Text(
-                        'Retour à l\'accueil',
+                      label: Text(
+                        localizations.translate('back_to_home'),
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),

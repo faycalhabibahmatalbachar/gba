@@ -7,8 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../localization/app_localizations.dart';
 import '../providers/notification_preferences_provider.dart';
 
 @pragma('vm:entry-point')
@@ -32,6 +35,8 @@ class NotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
+  String? _currentToken;
+
   final AndroidNotificationChannel _androidChannel = const AndroidNotificationChannel(
     'default_channel',
     'Notifications',
@@ -41,6 +46,16 @@ class NotificationService {
 
   bool _initialized = false;
   GlobalKey<NavigatorState>? _navigatorKey;
+
+  AppLocalizations? _localizations() {
+    final context = _navigatorKey?.currentContext;
+    if (context == null) return null;
+    try {
+      return AppLocalizations.of(context);
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> init({required GlobalKey<NavigatorState> navigatorKey}) async {
     if (_initialized) return;
@@ -138,7 +153,86 @@ class NotificationService {
       debugPrint('[FCM] token: $token');
     }
 
+    if (token != null && token.isNotEmpty) {
+      _currentToken = token;
+      await _upsertDeviceToken(token);
+    }
+
+    _messaging.onTokenRefresh.listen((newToken) async {
+      if (kDebugMode) {
+        debugPrint('[FCM] token refreshed: $newToken');
+      }
+      if (newToken.isEmpty) return;
+      _currentToken = newToken;
+      await _upsertDeviceToken(newToken);
+    });
+
+    try {
+      Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+        if (data.session?.user == null) return;
+        final tokenToSync = _currentToken;
+        if (tokenToSync == null || tokenToSync.isEmpty) return;
+        await _upsertDeviceToken(tokenToSync);
+      });
+    } catch (_) {}
+
     _initialized = true;
+  }
+
+  String _resolvePlatform() {
+    if (kIsWeb) return 'web';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'android';
+      case TargetPlatform.iOS:
+        return 'ios';
+      case TargetPlatform.macOS:
+        return 'macos';
+      case TargetPlatform.windows:
+        return 'windows';
+      case TargetPlatform.linux:
+        return 'linux';
+      case TargetPlatform.fuchsia:
+        return 'fuchsia';
+    }
+  }
+
+  Future<String> _resolveAppLocale() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString('app_locale');
+      if (stored != null && stored.trim().isNotEmpty) {
+        return stored.trim();
+      }
+    } catch (_) {}
+    return 'fr';
+  }
+
+  Future<void> _upsertDeviceToken(String token) async {
+    try {
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final locale = await _resolveAppLocale();
+      final now = DateTime.now().toIso8601String();
+
+      await client.from('device_tokens').upsert(
+        {
+          'user_id': userId,
+          'token': token,
+          'platform': _resolvePlatform(),
+          'locale': locale,
+          'last_seen_at': now,
+          'updated_at': now,
+        },
+        onConflict: 'token',
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[FCM] device_tokens upsert failed: $e');
+      }
+    }
   }
 
   String? _resolveCategory(Map<String, dynamic> data) {
@@ -170,30 +264,33 @@ class NotificationService {
   }
 
   (String title, String body) _resolveInAppContent(RemoteMessage message) {
+    final localizations = _localizations();
     final notification = message.notification;
     final title = notification?.title ?? _templateTitle(message.data);
     final body = notification?.body ?? _templateBody(message.data);
     return (
-      title ?? 'Notification',
+      title ?? (localizations?.translate('notification_default_title') ?? 'Notification'),
       body ?? '',
     );
   }
 
   String? _templateTitle(Map<String, dynamic> data) {
+    final localizations = _localizations();
     final template = data['template']?.toString();
     switch (template) {
       case 'order_status':
-        return 'Mise à jour commande';
+        return localizations?.translate('push_title_order_status') ?? 'Order update';
       case 'cart_abandoned':
-        return 'Panier en attente';
+        return localizations?.translate('push_title_cart_abandoned') ?? 'Cart reminder';
       case 'promotion':
-        return 'Promotion';
+        return localizations?.translate('push_title_promotion') ?? 'Promotion';
       default:
         return null;
     }
   }
 
   String? _templateBody(Map<String, dynamic> data) {
+    final localizations = _localizations();
     final template = data['template']?.toString();
     switch (template) {
       case 'order_status':
@@ -202,18 +299,38 @@ class NotificationService {
         final orderLabel = (orderNumber != null && orderNumber.isNotEmpty)
             ? ' $orderNumber'
             : '';
-        final statusLabel = (status != null && status.isNotEmpty) ? status : 'mise à jour';
-        return 'Commande$orderLabel: $statusLabel';
+        final normalizedStatus = status?.trim().toLowerCase();
+        final statusKey = (normalizedStatus != null && normalizedStatus.isNotEmpty)
+            ? 'order_status_$normalizedStatus'
+            : null;
+        final translatedStatus = (statusKey != null) ? localizations?.translate(statusKey) : null;
+        final statusLabel = (translatedStatus != null && statusKey != null && translatedStatus != statusKey)
+            ? translatedStatus
+            : (status != null && status.isNotEmpty)
+                ? status
+                : (localizations?.translate('push_order_status_default_status') ?? 'updated');
+        return localizations?.translateParams(
+              'push_body_order_status',
+              {
+                'orderLabel': orderLabel,
+                'status': statusLabel,
+              },
+            ) ??
+            'Order$orderLabel: $statusLabel';
       case 'cart_abandoned':
         final count = data['items_count']?.toString();
         if (count != null && count.isNotEmpty) {
-          return 'Tu as $count article(s) dans ton panier.';
+          return localizations?.translateParams(
+                'push_body_cart_abandoned_with_count',
+                {'count': count},
+              ) ??
+              'You have $count item(s) in your cart.';
         }
-        return 'Tu as des articles dans ton panier.';
+        return localizations?.translate('push_body_cart_abandoned') ?? 'You have items in your cart.';
       case 'promotion':
         final promo = data['promo']?.toString();
         if (promo != null && promo.isNotEmpty) return promo;
-        return 'Découvre nos offres.';
+        return localizations?.translate('push_body_promotion') ?? 'Discover our offers.';
       default:
         return null;
     }
@@ -227,6 +344,8 @@ class NotificationService {
     final context = _navigatorKey?.currentContext;
     if (context == null) return;
 
+    final actionLabel = _localizations()?.translate('open') ?? 'Open';
+
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) return;
 
@@ -237,7 +356,7 @@ class NotificationService {
         duration: const Duration(seconds: 4),
         action: (route != null && route.isNotEmpty)
             ? SnackBarAction(
-                label: 'Ouvrir',
+                label: actionLabel,
                 onPressed: () => _goTo(route),
               )
             : null,

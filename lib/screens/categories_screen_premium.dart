@@ -220,7 +220,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
           // Main content
           SafeArea(
             child: categoriesProvider.isLoading
-                ? _buildLoadingState()
+                ? _buildLoadingState(localizations)
                 : (categoriesProvider.error != null)
                     ? _buildErrorState(categoriesProvider.error!, localizations, categoriesProvider)
                     : RefreshIndicator(
@@ -235,7 +235,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                               )
                             : Column(
                                 children: [
-                                  _buildSearchBar(theme),
+                                  _buildSearchBar(theme, localizations),
                                   Expanded(
                                     child: filteredCategories.isEmpty
                                         ? ListView(
@@ -257,7 +257,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     );
   }
 
-  Widget _buildSearchBar(ThemeData theme) {
+  Widget _buildSearchBar(ThemeData theme, AppLocalizations localizations) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: ClipRRect(
@@ -278,8 +278,8 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Rechercher une catégorie…',
+                    decoration: InputDecoration(
+                      hintText: localizations.translate('search_category_hint'),
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -313,13 +313,13 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
             child: Icon(FontAwesomeIcons.magnifyingGlass, size: 34, color: Colors.grey.shade500),
           ),
           const SizedBox(height: 14),
-          const Text(
-            'Aucun résultat',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          Text(
+            localizations.translate('no_results'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Text(
-            'Essaie un autre mot-clé.',
+            localizations.translate('try_another_keyword'),
             style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
           ),
@@ -343,7 +343,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
         ],
       ),
       actions: [
-        _buildFilterButton(),
+        _buildFilterButton(localizations),
         const SizedBox(width: 16),
       ],
       flexibleSpace: ClipRect(
@@ -366,7 +366,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     );
   }
 
-  Widget _buildFilterButton() {
+  Widget _buildFilterButton(AppLocalizations localizations) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -398,7 +398,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                 const Icon(FontAwesomeIcons.filter, size: 14),
                 const SizedBox(width: 6),
                 Text(
-                  'Filtrer',
+                  localizations.translate('filter'),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -414,6 +414,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
   }
 
   void _showFilterDialog() {
+    final localizations = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => BackdropFilter(
@@ -437,25 +438,25 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Filtrer les catégories',
-                  style: TextStyle(
+                Text(
+                  localizations.translate('filter_categories'),
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildFilterOption('Toutes', 'all'),
-                _buildFilterOption('Populaires', 'popular'),
-                _buildFilterOption('Nouveautés', 'new'),
-                _buildFilterOption('Promotions', 'sale'),
+                _buildFilterOption(localizations.translate('all'), 'all'),
+                _buildFilterOption(localizations.translate('popular'), 'popular'),
+                _buildFilterOption(localizations.translate('new'), 'new'),
+                _buildFilterOption(localizations.translate('promotions'), 'sale'),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Annuler'),
+                      child: Text(localizations.translate('cancel')),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton(
@@ -469,7 +470,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Appliquer'),
+                      child: Text(localizations.translate('apply')),
                     ),
                   ],
                 ),
@@ -525,7 +526,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     return Column(
       children: [
         // Header with stats
-        _buildStatsHeader(categories.length),
+        _buildStatsHeader(categories.length, localizations),
         // Categories grid
         Expanded(
           child: GridView.builder(
@@ -552,6 +553,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                     isHovered,
                     categoryKey,
                     theme,
+                    localizations,
                   ),
                 ),
               );
@@ -562,7 +564,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     );
   }
 
-  Widget _buildStatsHeader(int totalCategories) {
+  Widget _buildStatsHeader(int totalCategories, AppLocalizations localizations) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -594,19 +596,19 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
               _buildStatItem(
                 icon: FontAwesomeIcons.boxOpen,
                 value: '$totalCategories',
-                label: 'Catégories',
+                label: localizations.translate('categories'),
                 color: Colors.blue,
               ),
               _buildStatItem(
                 icon: FontAwesomeIcons.fire,
                 value: '12',
-                label: 'Populaires',
+                label: localizations.translate('popular'),
                 color: Colors.orange,
               ),
               _buildStatItem(
                 icon: FontAwesomeIcons.star,
                 value: '5',
-                label: 'Nouveautés',
+                label: localizations.translate('new'),
                 color: Colors.purple,
               ),
             ],
@@ -672,6 +674,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     bool isHovered,
     String categoryKey,
     ThemeData theme,
+    AppLocalizations localizations,
   ) {
     final color = _getCategoryColor(index);
     // TODO: Load products by category
@@ -689,7 +692,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
           MaterialPageRoute(
             builder: (context) => ProductsByCategoryScreen(
               categoryId: category['id'].toString(),
-              categoryName: category['name'] ?? 'Catégorie',
+              categoryName: category['name'] ?? localizations.translate('category'),
             ),
           ),
         );
@@ -788,7 +791,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                     const SizedBox(height: 8),
                     // Category name
                     Text(
-                      category['name'] ?? 'Catégorie',
+                      category['name'] ?? localizations.translate('category'),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -806,7 +809,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '0 produits',  // TODO: Load actual count
+                        localizations.translateParams('products_count', {'count': '0'}),  // TODO: Load actual count
                         style: TextStyle(
                           fontSize: 12,
                           color: color,
@@ -842,7 +845,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     );
   }
 
-  Widget _buildLoadingState() {
+  Widget _buildLoadingState(AppLocalizations localizations) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -866,9 +869,9 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Chargement des catégories...',
-            style: TextStyle(
+          Text(
+            localizations.translate('loading_categories'),
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -898,16 +901,16 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Aucune catégorie',
-              style: TextStyle(
+            Text(
+              localizations.translate('no_categories'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Vous n\'avez aucune catégorie pour le moment.',
+              localizations.translate('no_categories_hint'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -940,9 +943,9 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Erreur de chargement',
-              style: TextStyle(
+            Text(
+              localizations.translate('error_loading'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -962,7 +965,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                 provider.loadCategories();
               },
               icon: const Icon(FontAwesomeIcons.arrowRotateRight, size: 16),
-              label: const Text('Réessayer'),
+              label: Text(localizations.translate('retry')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).primaryColor,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),

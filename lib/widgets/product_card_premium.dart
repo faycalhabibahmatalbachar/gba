@@ -3,11 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../localization/app_localizations.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../services/activity_tracking_service.dart';
 
 class PremiumProductCard extends StatelessWidget {
   final Product product;
@@ -25,33 +28,42 @@ class PremiumProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final localizations = AppLocalizations.of(context);
     final hasDiscount = product.compareAtPrice != null && 
                         product.compareAtPrice! > product.price;
     final discountPercentage = hasDiscount
         ? ((1 - product.price / product.compareAtPrice!) * 100).round()
         : 0;
 
-    return GestureDetector(
-      onTap: () => context.push('/product/${product.id}'),
-      child: Container(
-        width: width,
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: scheme.primary.withOpacity(0.12),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.primary.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-              spreadRadius: -5,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          ActivityTrackingService().trackProductView(product.id, product.name);
+          context.push('/product/${product.id}');
+        },
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          width: width,
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: scheme.primary.withOpacity(isDark ? 0.20 : 0.12),
+              width: 1,
             ),
-          ],
-        ),
-        child: Column(
+            boxShadow: [
+              BoxShadow(
+                color: (isDark ? Colors.black : scheme.primary)
+                    .withOpacity(isDark ? 0.35 : 0.08),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+                spreadRadius: -5,
+              ),
+            ],
+          ),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image Container avec badges
@@ -66,8 +78,13 @@ class PremiumProductCard extends StatelessWidget {
                       ),
                       gradient: LinearGradient(
                         colors: [
-                          Colors.grey.shade100,
-                          Colors.grey.shade200,
+                          if (isDark) ...[
+                            scheme.surfaceVariant.withOpacity(0.55),
+                            scheme.surfaceVariant.withOpacity(0.35),
+                          ] else ...[
+                            Colors.grey.shade100,
+                            Colors.grey.shade200,
+                          ],
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -85,7 +102,9 @@ class PremiumProductCard extends StatelessWidget {
                               fit: BoxFit.cover,
                               width: double.infinity,
                             placeholder: (context, url) => Container(
-                              color: Colors.grey.shade100,
+                              color: isDark
+                                  ? scheme.surfaceVariant.withOpacity(0.35)
+                                  : Colors.grey.shade100,
                               child: Center(
                                 child: CircularProgressIndicator(
                                   color: theme.primaryColor,
@@ -94,7 +113,9 @@ class PremiumProductCard extends StatelessWidget {
                               ),
                             ),
                             errorWidget: (context, url, error) => Container(
-                              color: Colors.grey.shade100,
+                              color: isDark
+                                  ? scheme.surfaceVariant.withOpacity(0.35)
+                                  : Colors.grey.shade100,
                               child: Icon(
                                 Icons.image_not_supported_outlined,
                                 size: 50,
@@ -103,7 +124,9 @@ class PremiumProductCard extends StatelessWidget {
                             ),
                             )
                           : Container(
-                              color: Colors.grey.shade100,
+                              color: isDark
+                                  ? scheme.surfaceVariant.withOpacity(0.35)
+                                  : Colors.grey.shade100,
                               child: Icon(
                                 Icons.shopping_bag_outlined,
                                 size: 50,
@@ -198,11 +221,11 @@ class PremiumProductCard extends StatelessWidget {
                   right: 12,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: scheme.surface.withOpacity(0.95),
+                      color: scheme.surface.withOpacity(isDark ? 0.85 : 0.95),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withOpacity(isDark ? 0.35 : 0.10),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -225,7 +248,9 @@ class PremiumProductCard extends StatelessWidget {
                                 isFavorite
                                     ? FontAwesomeIcons.solidHeart
                                     : FontAwesomeIcons.heart,
-                                color: isFavorite ? Colors.red : Colors.grey.shade600,
+                                color: isFavorite
+                                    ? Colors.red
+                                    : scheme.onSurface.withOpacity(0.6),
                                 size: 18,
                               ),
                             );
@@ -252,9 +277,9 @@ class PremiumProductCard extends StatelessWidget {
                         color: Colors.red.withOpacity(0.9),
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const Text(
-                        'Rupture de stock',
-                        style: TextStyle(
+                      child: Text(
+                        localizations.translate('out_of_stock'),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -282,14 +307,40 @@ class PremiumProductCard extends StatelessWidget {
                             product.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2C3E50),
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onSurface,
                               height: 1.1,
                             ),
                           ),
                           const SizedBox(height: 6),
+                          if (product.rating > 0) ...[
+                            Row(
+                              children: [
+                                RatingBarIndicator(
+                                  rating: product.rating.clamp(0.0, 5.0).toDouble(),
+                                  itemBuilder: (context, _) => const Icon(
+                                    Icons.star_rounded,
+                                    color: Colors.amber,
+                                  ),
+                                  itemCount: 5,
+                                  itemSize: 12,
+                                  unratedColor: Colors.amber.withOpacity(0.25),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '(${product.reviewsCount})',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: scheme.onSurface.withOpacity(0.65),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                          ],
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
@@ -413,24 +464,34 @@ class PremiumProductCard extends StatelessWidget {
                         if (product.rating > 0)
                           Row(
                             children: [
-                              ...List.generate(
-                                5,
-                                (index) => Icon(
-                                  index < product.rating.round()
-                                      ? Icons.star
-                                      : Icons.star_border,
-                                  size: 12,
+                              RatingBarIndicator(
+                                rating: product.rating.clamp(0.0, 5.0).toDouble(),
+                                itemBuilder: (context, _) => const Icon(
+                                  Icons.star_rounded,
                                   color: Colors.amber,
                                 ),
+                                itemCount: 5,
+                                itemSize: 14,
+                                unratedColor: Colors.amber.withOpacity(0.25),
                               ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '(${product.reviewsCount})',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: scheme.onSurface.withOpacity(0.7),
+                              const SizedBox(width: 6),
+                              Text(
+                                product.rating.toStringAsFixed(1),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: scheme.onSurface.withOpacity(0.85),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '(${product.reviewsCount})',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurface.withOpacity(0.65),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                           ],
                         ),
                         
@@ -531,11 +592,11 @@ class PremiumProductCard extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ).animate()
-        .fadeIn(duration: 500.ms)
-        .slideY(begin: 0.1, end: 0, duration: 500.ms),
-    );
+        ).animate()
+          .fadeIn(duration: 500.ms)
+          .slideY(begin: 0.1, end: 0, duration: 500.ms),
+      ),
+    ));
   }
 }
 

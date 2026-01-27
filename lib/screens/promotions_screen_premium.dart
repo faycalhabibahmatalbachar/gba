@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:badges/badges.dart' as badges;
+import '../localization/app_localizations.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
@@ -55,6 +56,7 @@ class _PromotionsScreenPremiumState extends State<PromotionsScreenPremium> {
   Widget build(BuildContext context) {
     final productProvider = Provider.of<ProductProvider>(context);
     final cartProvider = Provider.of<CartProvider>(context);
+    final localizations = AppLocalizations.of(context);
 
     final products = productProvider.products;
     final filtered = _filtered(products);
@@ -157,9 +159,9 @@ class _PromotionsScreenPremiumState extends State<PromotionsScreenPremium> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        const Text(
-                          'Promotions',
-                          style: TextStyle(
+                        Text(
+                          localizations.translate('promotions'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
@@ -167,7 +169,7 @@ class _PromotionsScreenPremiumState extends State<PromotionsScreenPremium> {
                           ),
                         ),
                         Text(
-                          'Offres limitées et réductions',
+                          localizations.translate('limited_offers_discounts'),
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 12,
@@ -186,19 +188,19 @@ class _PromotionsScreenPremiumState extends State<PromotionsScreenPremium> {
                 child: Row(
                   children: [
                     _TabChip(
-                      label: 'Promos',
+                      label: localizations.translate('promotions'),
                       isSelected: _selectedTab == 'promos',
                       onTap: () => setState(() => _selectedTab = 'promos'),
                     ),
                     const SizedBox(width: 10),
                     _TabChip(
-                      label: 'Vedettes',
+                      label: localizations.translate('featured'),
                       isSelected: _selectedTab == 'featured',
                       onTap: () => setState(() => _selectedTab = 'featured'),
                     ),
                     const SizedBox(width: 10),
                     _TabChip(
-                      label: 'Tout',
+                      label: localizations.translate('all'),
                       isSelected: _selectedTab == 'all',
                       onTap: () => setState(() => _selectedTab = 'all'),
                     ),
@@ -230,10 +232,10 @@ class _PromotionsScreenPremiumState extends State<PromotionsScreenPremium> {
                         const SizedBox(height: 14),
                         Text(
                           _selectedTab == 'featured'
-                              ? 'Aucune vedette pour le moment'
+                              ? localizations.translate('no_featured')
                               : _selectedTab == 'all'
-                                  ? 'Aucun produit disponible'
-                                  : 'Aucune promotion en cours',
+                                  ? localizations.translate('no_products_available')
+                                  : localizations.translate('no_promotions'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
@@ -243,7 +245,7 @@ class _PromotionsScreenPremiumState extends State<PromotionsScreenPremium> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Tire vers le bas pour rafraîchir',
+                          localizations.translate('pull_to_refresh'),
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey.shade500,

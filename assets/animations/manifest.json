@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "basePath": "assets/animations",
+  "animations": {
+    "navActivePulse": {
+      "format": "lottie",
+      "path": "lottie/navigation/nav_active_pulse_v1.json",
+      "loop": false,
+      "autoplay": true
+    }
+  }
+}

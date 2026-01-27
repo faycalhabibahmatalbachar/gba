@@ -176,16 +176,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> signUp(String email, String password, String fullName) async {
+  Future<void> signUp(String email, String password, String fullName, {String? locale}) async {
     final normalizedEmail = _normalizeEmail(email);
     final normalizedFullName = fullName.trim();
-    _log('signUp start: email=$normalizedEmail, fullName=$normalizedFullName');
+    final normalizedLocale = locale?.trim();
+    _log('signUp start: email=$normalizedEmail, fullName=$normalizedFullName, locale=$normalizedLocale');
     state = state.copyWith(isLoading: true, error: null, errorCode: null);
     try {
       final response = await Supabase.instance.client.auth.signUp(
         email: normalizedEmail,
         password: password,
-        data: {'full_name': normalizedFullName},
+        data: {
+          'full_name': normalizedFullName,
+          if (normalizedLocale != null && normalizedLocale.isNotEmpty) 'locale': normalizedLocale,
+        },
       );
       
       final createdUserId = response.user?.id;

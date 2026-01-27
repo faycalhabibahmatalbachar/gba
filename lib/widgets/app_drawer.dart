@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../localization/app_localizations.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -30,9 +32,9 @@ class AppDrawer extends StatelessWidget {
                   color: Colors.white,
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Menu',
-                  style: TextStyle(
+                Text(
+                  localizations.translate('menu'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -43,7 +45,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.home),
-            title: const Text('Accueil'),
+            title: Text(localizations.translate('home')),
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -52,7 +54,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.shopping_cart),
-            title: const Text('Panier'),
+            title: Text(localizations.translate('cart')),
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -61,7 +63,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.favorite),
-            title: const Text('Favoris'),
+            title: Text(localizations.translate('favorites')),
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -70,7 +72,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.person),
-            title: const Text('Profil'),
+            title: Text(localizations.translate('profile')),
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -79,7 +81,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: Icon(Icons.support_agent, color: Colors.orange[700]),
-            title: const Text('Support Admin'),
+            title: Text(localizations.translate('support_admin')),
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -93,7 +95,7 @@ class AppDrawer extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Chat',
+                localizations.translate('chat'),
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.orange[700],
@@ -105,7 +107,7 @@ class AppDrawer extends StatelessWidget {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.settings),
-            title: const Text('Paramètres'),
+            title: Text(localizations.translate('settings')),
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -114,7 +116,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.logout),
-            title: const Text('Déconnexion'),
+            title: Text(localizations.translate('logout')),
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
