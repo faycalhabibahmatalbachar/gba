@@ -7,6 +7,48 @@
       "path": "lottie/navigation/nav_active_pulse_v1.json",
       "loop": false,
       "autoplay": true
+    },
+    "loadingSpinner": {
+      "format": "lottie",
+      "path": "lottie/ui/loading_spinner_dots_v1.json",
+      "loop": true,
+      "autoplay": true
+    },
+    "emptyBox": {
+      "format": "lottie",
+      "path": "lottie/ui/empty_box_v1.json",
+      "loop": true,
+      "autoplay": true
+    },
+    "emptyCart": {
+      "format": "lottie",
+      "path": "lottie/cart/empty_cart_v1.json",
+      "loop": true,
+      "autoplay": true
+    },
+    "searchNoResult": {
+      "format": "lottie",
+      "path": "lottie/ui/search_no_results_v1.json",
+      "loop": true,
+      "autoplay": true
+    },
+    "errorNoInternet": {
+      "format": "lottie",
+      "path": "lottie/ui/error_no_internet_v1.json",
+      "loop": true,
+      "autoplay": true
+    },
+    "successCheck": {
+      "format": "lottie",
+      "path": "lottie/ui/success_check_v1.json",
+      "loop": false,
+      "autoplay": true
+    },
+    "paymentProcessing": {
+      "format": "lottie",
+      "path": "lottie/checkout/payment_processing_v1.json",
+      "loop": true,
+      "autoplay": true
     }
   }
 }

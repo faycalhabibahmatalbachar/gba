@@ -164,19 +164,19 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _buildSectionTitle('Notifications', FontAwesomeIcons.bell),
+              _buildSectionTitle(localizations.translate('notifications'), FontAwesomeIcons.bell),
               _buildNotificationSettings(),
               const SizedBox(height: 24),
               
-              _buildSectionTitle('Apparence', FontAwesomeIcons.palette),
+              _buildSectionTitle(localizations.translate('appearance'), FontAwesomeIcons.palette),
               _buildAppearanceSettings(),
               const SizedBox(height: 24),
               
-              _buildSectionTitle('Langue', FontAwesomeIcons.globe),
+              _buildSectionTitle(localizations.translate('language'), FontAwesomeIcons.globe),
               _buildLanguageSettings(),
               const SizedBox(height: 24),
               
-              _buildSectionTitle('Confidentialité', FontAwesomeIcons.lock),
+              _buildSectionTitle(localizations.translate('privacy'), FontAwesomeIcons.lock),
               _buildPrivacySettings(),
               const SizedBox(height: 24),
               
@@ -218,6 +218,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   Widget _buildNotificationSettings() {
+    final localizations = AppLocalizations.of(context);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -234,8 +236,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
         children: [
           _buildSwitchTile(
             icon: FontAwesomeIcons.bell,
-            title: 'Notifications Push',
-            subtitle: 'Recevoir des notifications',
+            title: localizations.translate('push_notifications'),
+            subtitle: localizations.translate('receive_notifications'),
             value: _notificationsEnabled,
             onChanged: (value) {
               setState(() => _notificationsEnabled = value);
@@ -248,8 +250,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const Divider(height: 1),
           _buildListTile(
             icon: FontAwesomeIcons.sliders,
-            title: 'Préférences notifications',
-            subtitle: 'Choisir les catégories',
+            title: localizations.translate('notification_preferences'),
+            subtitle: localizations.translate('choose_categories'),
             onTap: () {
               HapticFeedback.selectionClick();
               context.push('/settings/notifications');
@@ -258,8 +260,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const Divider(height: 1),
           _buildSwitchTile(
             icon: FontAwesomeIcons.volumeHigh,
-            title: 'Sons',
-            subtitle: 'Activer les effets sonores',
+            title: localizations.translate('sounds'),
+            subtitle: localizations.translate('enable_sound_effects'),
             value: _soundEnabled,
             onChanged: (value) {
               setState(() => _soundEnabled = value);
@@ -270,8 +272,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const Divider(height: 1),
           _buildSwitchTile(
             icon: FontAwesomeIcons.mobileScreen,
-            title: 'Vibrations',
-            subtitle: 'Retour haptique',
+            title: localizations.translate('vibrations'),
+            subtitle: localizations.translate('haptic_feedback'),
             value: _vibrationEnabled,
             onChanged: (value) {
               setState(() => _vibrationEnabled = value);
@@ -285,6 +287,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   Widget _buildAppearanceSettings() {
+    final localizations = AppLocalizations.of(context);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -299,8 +303,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
       ),
       child: _buildSwitchTile(
         icon: FontAwesomeIcons.moon,
-        title: 'Mode Sombre',
-        subtitle: 'Activer le thème sombre',
+        title: localizations.translate('dark_mode'),
+        subtitle: localizations.translate('enable_dark_theme'),
         value: Provider.of<ThemeProvider>(context).isDarkMode,
         onChanged: (value) {
           Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
@@ -313,6 +317,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   Widget _buildLanguageSettings() {
+    final localizations = AppLocalizations.of(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
 
     return Container(
@@ -335,9 +340,9 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
             children: [
               Icon(FontAwesomeIcons.language, size: 16, color: Colors.grey.shade600),
               const SizedBox(width: 12),
-              const Text(
-                'Langue de l\'application',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              Text(
+                localizations.translate('app_language'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -373,6 +378,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   Widget _buildPrivacySettings() {
+    final localizations = AppLocalizations.of(context);
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -389,8 +396,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
         children: [
           _buildListTile(
             icon: FontAwesomeIcons.key,
-            title: 'Changer mot de passe',
-            subtitle: 'Modifier votre mot de passe',
+            title: localizations.translate('change_password'),
+            subtitle: localizations.translate('change_password_subtitle'),
             onTap: () {
               HapticFeedback.selectionClick();
               context.push('/settings/change-password');
@@ -399,8 +406,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const Divider(height: 1),
           _buildListTile(
             icon: FontAwesomeIcons.shield,
-            title: 'Politique de confidentialité',
-            subtitle: 'Comment nous protégeons vos données',
+            title: localizations.translate('privacy_policy'),
+            subtitle: localizations.translate('privacy_policy_subtitle'),
             onTap: () {
               HapticFeedback.selectionClick();
               context.push('/legal/privacy');
@@ -409,8 +416,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const Divider(height: 1),
           _buildListTile(
             icon: FontAwesomeIcons.fileContract,
-            title: 'Conditions d\'utilisation',
-            subtitle: 'Lire les CGU',
+            title: localizations.translate('terms_of_service'),
+            subtitle: localizations.translate('terms_of_service_subtitle'),
             onTap: () {
               HapticFeedback.selectionClick();
               context.push('/legal/terms');
@@ -422,6 +429,8 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   Widget _buildDangerZone() {
+    final localizations = AppLocalizations.of(context);
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -439,7 +448,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
               Icon(FontAwesomeIcons.triangleExclamation, color: Colors.red.shade600, size: 20),
               const SizedBox(width: 12),
               Text(
-                'Zone de danger',
+                localizations.translate('danger_zone'),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -451,7 +460,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const SizedBox(height: 16),
           _buildDangerButton(
             icon: FontAwesomeIcons.rightFromBracket,
-            title: 'Déconnexion',
+            title: localizations.translate('logout'),
             onTap: () {
               HapticFeedback.heavyImpact();
               _showLogoutDialog();
@@ -460,16 +469,16 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const SizedBox(height: 12),
           _buildDangerButton(
             icon: FontAwesomeIcons.trash,
-            title: 'Vider le cache',
+            title: localizations.translate('clear_cache'),
             onTap: () {
               HapticFeedback.heavyImpact();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Row(
+                  content: Row(
                     children: [
-                      Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
-                      SizedBox(width: 12),
-                      Text('Cache vidé avec succès'),
+                      const Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
+                      const SizedBox(width: 12),
+                      Text(localizations.translate('cache_cleared_success')),
                     ],
                   ),
                   backgroundColor: Colors.green.shade600,
@@ -569,22 +578,24 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   void _showLogoutDialog() {
+    final localizations = AppLocalizations.of(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(FontAwesomeIcons.rightFromBracket, color: Colors.orange, size: 20),
-            SizedBox(width: 12),
-            Text('Déconnexion'),
+            const Icon(FontAwesomeIcons.rightFromBracket, color: Colors.orange, size: 20),
+            const SizedBox(width: 12),
+            Text(localizations.translate('logout')),
           ],
         ),
-        content: const Text('Voulez-vous vraiment vous déconnecter?'),
+        content: Text(localizations.translate('logout_confirm_message')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+            child: Text(localizations.translate('cancel')),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -597,7 +608,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
               backgroundColor: Colors.orange,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Déconnexion'),
+            child: Text(localizations.translate('logout')),
           ),
         ],
       ),

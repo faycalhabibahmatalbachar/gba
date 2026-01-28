@@ -6,10 +6,11 @@ class TermsOfServiceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Conditions d'utilisation"),
+        title: Text(localizations.translate('terms_of_service')),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -27,53 +28,41 @@ class TermsOfServiceScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '1. Objet',
+                            localizations.translate('terms_of_service_section1_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Les présentes conditions définissent les règles d'utilisation de l'application et des services associés.",
-                          ),
+                          Text(localizations.translate('terms_of_service_section1_body')),
                           const SizedBox(height: 16),
                           Text(
-                            '2. Compte utilisateur',
+                            localizations.translate('terms_of_service_section2_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Vous êtes responsable de la confidentialité de vos identifiants et de l'utilisation de votre compte.",
-                          ),
+                          Text(localizations.translate('terms_of_service_section2_body')),
                           const SizedBox(height: 16),
                           Text(
-                            '3. Commandes et paiement',
+                            localizations.translate('terms_of_service_section3_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Les commandes sont soumises à disponibilité. Les prix et frais peuvent changer. Le paiement peut être traité par un prestataire.",
-                          ),
+                          Text(localizations.translate('terms_of_service_section3_body')),
                           const SizedBox(height: 16),
                           Text(
-                            '4. Livraison',
+                            localizations.translate('terms_of_service_section4_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Les délais de livraison sont indicatifs. Assurez-vous de fournir une adresse correcte.",
-                          ),
+                          Text(localizations.translate('terms_of_service_section4_body')),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Si vous choisissez d'utiliser la fonctionnalité de géolocalisation, votre position peut être utilisée uniquement pour faciliter la livraison. La localisation n'est demandée qu'après une action explicite (ex: bouton \"Utiliser ma position\") lors du passage d'une commande ou d'une commande spéciale, et n'est pas collectée en arrière-plan.",
-                          ),
+                          Text(localizations.translate('terms_of_service_section4_body_location')),
                           const SizedBox(height: 16),
                           Text(
-                            '5. Support',
+                            localizations.translate('terms_of_service_section5_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Pour toute question, contactez le support via les canaux disponibles dans l'application.",
-                          ),
+                          Text(localizations.translate('terms_of_service_section5_body')),
                         ],
                       ),
                     ),

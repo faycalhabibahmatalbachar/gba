@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../localization/app_localizations.dart';
 import '../../providers/notification_preferences_provider.dart';
 
 class NotificationPreferencesScreen extends StatelessWidget {
@@ -9,12 +10,13 @@ class NotificationPreferencesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
 
     return Consumer<NotificationPreferencesProvider>(
       builder: (context, prefs, _) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Préférences notifications'),
+            title: Text(localizations.translate('notification_preferences')),
           ),
           body: SafeArea(
             child: LayoutBuilder(
@@ -31,8 +33,8 @@ class NotificationPreferencesScreen extends StatelessWidget {
                         children: [
                           Card(
                             child: SwitchListTile(
-                              title: const Text('Notifications push'),
-                              subtitle: const Text('Activer/Désactiver toutes les notifications'),
+                              title: Text(localizations.translate('push_notifications')),
+                              subtitle: Text(localizations.translate('enable_disable_all_notifications')),
                               value: prefs.pushEnabled,
                               onChanged: prefs.setPushEnabled,
                             ),
@@ -45,28 +47,28 @@ class NotificationPreferencesScreen extends StatelessWidget {
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                                   child: Text(
-                                    'Catégories',
+                                    localizations.translate('categories'),
                                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                 ),
                                 const Divider(height: 1),
                                 SwitchListTile(
-                                  title: const Text('Commandes'),
-                                  subtitle: const Text('Statut de commande, livraison, annulation'),
+                                  title: Text(localizations.translate('orders')),
+                                  subtitle: Text(localizations.translate('notification_category_orders_subtitle')),
                                   value: prefs.ordersEnabled,
                                   onChanged: prefs.pushEnabled ? prefs.setOrdersEnabled : null,
                                 ),
                                 const Divider(height: 1),
                                 SwitchListTile(
-                                  title: const Text('Promotions'),
-                                  subtitle: const Text('Offres, réductions, nouveautés'),
+                                  title: Text(localizations.translate('promotions')),
+                                  subtitle: Text(localizations.translate('notification_category_promotions_subtitle')),
                                   value: prefs.promotionsEnabled,
                                   onChanged: prefs.pushEnabled ? prefs.setPromotionsEnabled : null,
                                 ),
                                 const Divider(height: 1),
                                 SwitchListTile(
-                                  title: const Text('Messages'),
-                                  subtitle: const Text('Nouveaux messages support / chat'),
+                                  title: Text(localizations.translate('messages')),
+                                  subtitle: Text(localizations.translate('notification_category_messages_subtitle')),
                                   value: prefs.chatEnabled,
                                   onChanged: prefs.pushEnabled ? prefs.setChatEnabled : null,
                                 ),

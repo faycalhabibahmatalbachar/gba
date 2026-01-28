@@ -6,10 +6,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Politique de confidentialité'),
+        title: Text(localizations.translate('privacy_policy')),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -27,53 +28,41 @@ class PrivacyPolicyScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '1. Données collectées',
+                            localizations.translate('privacy_policy_section1_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Nous collectons les informations nécessaires pour créer votre compte, traiter vos commandes et améliorer l'expérience (ex: email, nom, téléphone, adresses).",
-                          ),
+                          Text(localizations.translate('privacy_policy_section1_body')),
                           const SizedBox(height: 16),
                           Text(
-                            '2. Utilisation des données',
+                            localizations.translate('privacy_policy_section2_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'Les données sont utilisées pour: authentification, livraison, support client, statistiques, prévention de fraude.',
-                          ),
+                          Text(localizations.translate('privacy_policy_section2_body')),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Si vous utilisez la fonctionnalité de géolocalisation pour la livraison, nous pouvons traiter votre position uniquement pour faciliter la livraison. La localisation n'est demandée qu'après une action explicite (ex: bouton \"Utiliser ma position\") lors du passage d'une commande ou d'une commande spéciale, et n'est pas collectée en arrière-plan.",
-                          ),
+                          Text(localizations.translate('privacy_policy_section2_body_location')),
                           const SizedBox(height: 16),
                           Text(
-                            '3. Notifications',
+                            localizations.translate('privacy_policy_section3_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Si vous activez les notifications, l'application peut utiliser un identifiant de notification (token) afin de vous envoyer des messages (statut commande, promotions).",
-                          ),
+                          Text(localizations.translate('privacy_policy_section3_body')),
                           const SizedBox(height: 16),
                           Text(
-                            '4. Partage',
+                            localizations.translate('privacy_policy_section4_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Nous ne vendons pas vos données. Certains services techniques (ex: authentification, base de données) peuvent traiter des données pour fournir le service.",
-                          ),
+                          Text(localizations.translate('privacy_policy_section4_body')),
                           const SizedBox(height: 16),
                           Text(
-                            '5. Vos droits',
+                            localizations.translate('privacy_policy_section5_title'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            "Vous pouvez demander l'accès, la correction ou la suppression de vos données selon la réglementation applicable.",
-                          ),
+                          Text(localizations.translate('privacy_policy_section5_body')),
                         ],
                       ),
                     ),

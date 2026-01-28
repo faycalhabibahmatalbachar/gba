@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../localization/app_localizations.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -24,6 +25,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   Future<void> _submit() async {
+    final localizations = AppLocalizations.of(context);
+
     final currentPassword = _currentController.text;
     final newPassword = _newController.text;
     final confirm = _confirmController.text;
@@ -32,21 +35,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final email = user?.email;
     if (email == null || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Impossible: email utilisateur introuvable.")),
+        SnackBar(content: Text(localizations.translate('error_user_email_not_found'))),
       );
       return;
     }
 
     if (newPassword.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Le nouveau mot de passe doit contenir au moins 6 caractères.')),
+        SnackBar(content: Text(localizations.translate('password_min_length'))),
       );
       return;
     }
 
     if (newPassword != confirm) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Les mots de passe ne correspondent pas.')),
+        SnackBar(content: Text(localizations.translate('passwords_do_not_match'))),
       );
       return;
     }
@@ -64,13 +67,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mot de passe modifié.')),
+        SnackBar(content: Text(localizations.translate('password_changed_success'))),
       );
       context.pop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
+        SnackBar(
+          content: Text(
+            localizations.translateParams('error_with_details', {'error': e.toString()}),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -80,6 +87,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -87,7 +95,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           children: [
             const Icon(Icons.password),
             const SizedBox(width: 10),
-            const Text('Changer mot de passe'),
+            Text(localizations.translate('change_password')),
           ],
         ),
       ),
@@ -109,37 +117,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Pour ta sécurité, confirme ton mot de passe actuel.',
+                            localizations.translate('change_password_security_hint'),
                             style: theme.textTheme.bodyMedium,
                           ),
                           const SizedBox(height: 16),
                           TextField(
                             controller: _currentController,
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Mot de passe actuel',
-                              prefixIcon: Icon(Icons.lock_outline),
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: localizations.translate('current_password'),
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 12),
                           TextField(
                             controller: _newController,
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Nouveau mot de passe',
-                              prefixIcon: Icon(Icons.lock_reset),
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: localizations.translate('new_password'),
+                              prefixIcon: const Icon(Icons.lock_reset),
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 12),
                           TextField(
                             controller: _confirmController,
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Confirmer le mot de passe',
-                              prefixIcon: Icon(Icons.check_circle_outline),
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: localizations.translate('confirm_password'),
+                              prefixIcon: const Icon(Icons.check_circle_outline),
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -153,7 +161,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                       height: 18,
                                       child: CircularProgressIndicator(strokeWidth: 2),
                                     )
-                                  : const Text('Enregistrer'),
+                                  : Text(localizations.translate('save')),
                             ),
                           ),
                         ],
