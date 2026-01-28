@@ -358,10 +358,19 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
               isExpanded: true,
               underline: const SizedBox(),
               icon: const Icon(FontAwesomeIcons.chevronDown, size: 12),
-              items: const [
-                DropdownMenuItem(value: 'fr', child: Text('🇫🇷 Français')),
-                DropdownMenuItem(value: 'en', child: Text('🇬🇧 English')),
-                DropdownMenuItem(value: 'ar', child: Text('🇸🇦 العربية')),
+              items: [
+                DropdownMenuItem(
+                  value: 'fr',
+                  child: Text("🇫🇷 ${localizations.translate('language_french')}"),
+                ),
+                DropdownMenuItem(
+                  value: 'en',
+                  child: Text("🇬🇧 ${localizations.translate('language_english')}"),
+                ),
+                DropdownMenuItem(
+                  value: 'ar',
+                  child: Text("🇸🇦 ${localizations.translate('language_arabic')}"),
+                ),
               ],
               onChanged: (value) {
                 if (value != null) {

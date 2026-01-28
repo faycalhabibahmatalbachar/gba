@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../localization/app_localizations.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -22,19 +23,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    final localizations = AppLocalizations.of(context);
     final password = _passwordController.text;
     final confirm = _confirmController.text;
 
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Le mot de passe doit contenir au moins 6 caractères.')),
+        SnackBar(content: Text(localizations.translate('password_min_length'))),
       );
       return;
     }
 
     if (password != confirm) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Les mots de passe ne correspondent pas.')),
+        SnackBar(content: Text(localizations.translate('passwords_do_not_match'))),
       );
       return;
     }
@@ -46,13 +48,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mot de passe mis à jour.')),
+        SnackBar(content: Text(localizations.translate('password_changed_success'))),
       );
       context.go('/login');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
+        SnackBar(
+          content: Text(
+            localizations.translateParams('error_with_details', {'error': e.toString()}),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -62,9 +68,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouveau mot de passe')),
+      appBar: AppBar(title: Text(localizations.translate('new_password'))),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -83,25 +90,25 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Définis ton nouveau mot de passe.',
+                            localizations.translate('reset_password_instruction'),
                             style: theme.textTheme.bodyMedium,
                           ),
                           const SizedBox(height: 16),
                           TextField(
                             controller: _passwordController,
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Nouveau mot de passe',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: localizations.translate('new_password'),
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 12),
                           TextField(
                             controller: _confirmController,
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Confirmer le mot de passe',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: localizations.translate('confirm_password'),
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -115,7 +122,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                       height: 18,
                                       child: CircularProgressIndicator(strokeWidth: 2),
                                     )
-                                  : const Text('Valider'),
+                                  : Text(localizations.translate('validate')),
                             ),
                           ),
                         ],

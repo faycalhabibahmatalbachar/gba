@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../localization/app_localizations.dart';
 import '../../services/messaging_service.dart';
 import '../../widgets/app_drawer.dart';
 import '../../models/conversation.dart';
@@ -58,8 +59,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       await Share.share(url);
     } catch (e) {
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Impossible de partager: $e')),
+          SnackBar(
+            content: Text(
+              localizations.translateParams(
+                'share_unavailable_with_details',
+                {'error': e.toString()},
+              ),
+            ),
+          ),
         );
       }
     }
@@ -69,14 +78,23 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     try {
       await Clipboard.setData(ClipboardData(text: text));
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lien copié')),
+          SnackBar(content: Text(localizations.translate('link_copied'))),
         );
       }
     } catch (e) {
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Impossible de copier: $e')),
+          SnackBar(
+            content: Text(
+              localizations.translateParams(
+                'copy_unavailable_with_details',
+                {'error': e.toString()},
+              ),
+            ),
+          ),
         );
       }
     }
@@ -127,14 +145,23 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
       );
       if (!ok && mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
+          SnackBar(content: Text(localizations.translate('open_link_unavailable'))),
         );
       }
     } catch (e) {
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
+          SnackBar(
+            content: Text(
+              localizations.translateParams(
+                'error_with_details',
+                {'error': e.toString()},
+              ),
+            ),
+          ),
         );
       }
     }
@@ -145,6 +172,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       context: context,
       barrierColor: Colors.black,
       builder: (context) {
+        final localizations = AppLocalizations.of(context);
         return Dialog.fullscreen(
           backgroundColor: Colors.black,
           child: Scaffold(
@@ -153,15 +181,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               backgroundColor: Colors.black,
               foregroundColor: Colors.white,
               elevation: 0,
-              title: const Text('Image'),
+              title: Text(localizations.translate('image')),
               actions: [
                 IconButton(
-                  tooltip: 'Télécharger',
+                  tooltip: localizations.translate('download'),
                   icon: const Icon(Icons.download_rounded),
                   onPressed: () => _launchExternal(imageUrl),
                 ),
                 IconButton(
-                  tooltip: 'Partager',
+                  tooltip: localizations.translate('share'),
                   icon: const Icon(Icons.share_rounded),
                   onPressed: () => _shareUrl(imageUrl),
                 ),
@@ -199,13 +227,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       showDragHandle: true,
       backgroundColor: Colors.white,
       builder: (context) {
+        final localizations = AppLocalizations.of(context);
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
                 leading: const Icon(Icons.fullscreen_rounded),
-                title: const Text('Voir en plein écran'),
+                title: Text(localizations.translate('view_fullscreen')),
                 onTap: () {
                   Navigator.of(context).pop();
                   _openImageFullScreen(imageUrl);
@@ -213,7 +242,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
               ListTile(
                 leading: const Icon(Icons.download_rounded),
-                title: const Text('Télécharger'),
+                title: Text(localizations.translate('download')),
                 onTap: () {
                   Navigator.of(context).pop();
                   _launchExternal(imageUrl);
@@ -221,7 +250,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
               ListTile(
                 leading: const Icon(Icons.share_rounded),
-                title: const Text('Partager'),
+                title: Text(localizations.translate('share')),
                 onTap: () {
                   Navigator.of(context).pop();
                   _shareUrl(imageUrl);
@@ -229,7 +258,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
               ListTile(
                 leading: const Icon(Icons.copy_rounded),
-                title: const Text('Copier le lien'),
+                title: Text(localizations.translate('copy_link')),
                 onTap: () {
                   Navigator.of(context).pop();
                   _copyToClipboard(imageUrl);
@@ -333,12 +362,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       _messageController.clear();
       _focusNode.requestFocus();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur envoi: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        final localizations = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              localizations.translateParams(
+                'chat_error_sending_with_details',
+                {'error': e.toString()},
+              ),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -355,6 +392,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (image != null) {
       if (_conversation == null) return;
 
+      final localizations = AppLocalizations.of(context);
+
       if (mounted) {
         setState(() {
           _isSending = true;
@@ -369,7 +408,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         );
 
         if (imageUrl == null || imageUrl.trim().isEmpty) {
-          throw Exception('Upload image échoué');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localizations.translate('image_upload_failed')),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
         }
 
         await messagingService.sendMessage(
@@ -381,12 +428,19 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
         _focusNode.requestFocus();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur envoi image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                localizations.translateParams(
+                  'chat_error_sending_image_with_details',
+                  {'error': e.toString()},
+                ),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } finally {
         if (mounted) {
           setState(() {
@@ -432,6 +486,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final localizations = AppLocalizations.of(context);
     return AppBar(
       elevation: 0,
       flexibleSpace: Container(
@@ -447,8 +502,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Support Client',
+          Text(
+            localizations.translate('support_client'),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -458,8 +513,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           if (_conversation != null)
             Text(
               widget.orderId != null 
-                  ? 'Commande #${widget.orderId}'
-                  : 'Conversation #${_conversation!.id.substring(0, 8)}',
+                  ? localizations.translateParams(
+                      'order_number',
+                      {'id': widget.orderId!},
+                    )
+                  : localizations.translateParams(
+                      'conversation_number',
+                      {'id': _conversation!.id.substring(0, 8)},
+                    ),
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.white.withOpacity(0.9),
@@ -479,6 +540,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMessagesList() {
+    final localizations = AppLocalizations.of(context);
     if (_messages.isEmpty) {
       return Center(
         child: Column(
@@ -491,7 +553,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
             Text(
-              'Commencez la conversation',
+              localizations.translate('start_conversation'),
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey[600],
@@ -499,7 +561,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 8),
             Text(
-              'Nous sommes là pour vous aider',
+              localizations.translate('we_are_here_to_help'),
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -718,6 +780,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMessageInput() {
+    final localizations = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -753,8 +816,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   maxLines: null,
                   keyboardType: TextInputType.multiline,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Tapez votre message...',
+                  decoration: InputDecoration(
+                    hintText: localizations.translate('type_your_message'),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -816,6 +879,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final localizations = AppLocalizations.of(context);
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: const BoxDecoration(
@@ -836,8 +900,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     color: Theme.of(context).primaryColor,
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Informations de la conversation',
+                  Text(
+                    localizations.translate('conversation_info_title'),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -846,13 +910,19 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 ],
               ),
               const SizedBox(height: 20),
-              _buildInfoRow('ID', _conversation?.id ?? 'N/A'),
-              _buildInfoRow('Statut', _conversation?.status ?? 'N/A'),
-              _buildInfoRow('Priorité', _conversation?.priority ?? 'normal'),
-              if (_conversation?.orderId != null)
-                _buildInfoRow('Commande', '#${_conversation!.orderId}'),
+              _buildInfoRow(localizations.translate('label_id'), _conversation?.id ?? 'N/A'),
               _buildInfoRow(
-                'Créée le',
+                localizations.translate('label_status'),
+                _conversation != null ? _localizeConversationStatus(_conversation!.status) : 'N/A',
+              ),
+              _buildInfoRow(
+                localizations.translate('label_priority'),
+                _conversation != null ? _localizeConversationPriority(_conversation!.priority) : 'normal',
+              ),
+              if (_conversation?.orderId != null)
+                _buildInfoRow(localizations.translate('label_order'), '#${_conversation!.orderId}'),
+              _buildInfoRow(
+                localizations.translate('label_created_at'),
                 _conversation != null
                     ? DateFormat('dd/MM/yyyy HH:mm').format(_conversation!.createdAt)
                     : 'N/A',
@@ -862,6 +932,38 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         );
       },
     );
+  }
+
+  String _localizeConversationStatus(String status) {
+    final localizations = AppLocalizations.of(context);
+    switch (status) {
+      case 'active':
+        return localizations.translate('conversation_status_active');
+      case 'resolved':
+        return localizations.translate('conversation_status_resolved');
+      case 'archived':
+        return localizations.translate('conversation_status_archived');
+      case 'pending':
+        return localizations.translate('conversation_status_pending');
+      default:
+        return status;
+    }
+  }
+
+  String _localizeConversationPriority(String priority) {
+    final localizations = AppLocalizations.of(context);
+    switch (priority) {
+      case 'urgent':
+        return localizations.translate('conversation_priority_urgent');
+      case 'high':
+        return localizations.translate('conversation_priority_high');
+      case 'normal':
+        return localizations.translate('conversation_priority_normal');
+      case 'low':
+        return localizations.translate('conversation_priority_low');
+      default:
+        return priority;
+    }
   }
 
   Widget _buildInfoRow(String label, String value) {
@@ -895,12 +997,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
+    final localizations = AppLocalizations.of(context);
     if (_isSameDay(date, now)) {
-      return "Aujourd'hui";
+      return localizations.translate('today');
     } else if (_isSameDay(date, now.subtract(const Duration(days: 1)))) {
-      return "Hier";
+      return localizations.translate('yesterday');
     } else {
-      return DateFormat('dd MMMM yyyy', 'fr').format(date);
+      final locale = Localizations.localeOf(context).languageCode;
+      return DateFormat('dd MMMM yyyy', locale).format(date);
     }
   }
 

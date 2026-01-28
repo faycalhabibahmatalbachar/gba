@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import '../../localization/app_localizations.dart';
 import '../../services/messaging_service.dart';
 import 'chat_screen.dart';
 import '../../models/conversation.dart';
@@ -91,6 +92,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
   }
 
   Widget _buildHeader() {
+    final localizations = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -103,7 +105,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Messages',
+                    localizations.translate('messages'),
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -118,7 +120,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Support & Assistance',
+                    localizations.translate('support_assistance'),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -188,7 +190,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
             ),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Rechercher une conversation...',
+                hintText: localizations.translate('search_conversation_hint'),
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 border: InputBorder.none,
                 icon: Icon(
@@ -236,6 +238,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
   Widget _buildConversationsList() {
     return Builder(
       builder: (context) {
+        final localizations = AppLocalizations.of(context);
         final service = Provider.of<MessagingService>(context);
         final conversations = service.conversations;
 
@@ -259,16 +262,16 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    'Aucune conversation',
-                    style: TextStyle(
+                  Text(
+                    localizations.translate('no_conversation'),
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Commencez une nouvelle conversation',
+                    localizations.translate('start_new_conversation'),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -297,6 +300,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
   }
 
   Widget _buildConversationTile(Conversation conversation) {
+    final localizations = AppLocalizations.of(context);
     final lastMessage = conversation.recentMessages.isNotEmpty 
         ? conversation.recentMessages.last 
         : null;
@@ -390,7 +394,10 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
                         children: [
                           Expanded(
                             child: Text(
-                              'Conversation #${conversation.id.substring(0, 8)}',
+                              localizations.translateParams(
+                                'conversation_number',
+                                {'id': conversation.id.substring(0, 8)},
+                              ),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -410,7 +417,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        lastMessage?.content ?? 'Pas de message',
+                        lastMessage?.content ?? localizations.translate('no_message'),
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[600],
@@ -442,25 +449,36 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
   }
 
   Widget _buildStatusBadge(String status) {
+    final localizations = AppLocalizations.of(context);
     Color color;
     IconData icon;
+    String label;
     
     switch (status) {
       case 'active':
         color = Colors.green;
         icon = Icons.chat_bubble;
+        label = localizations.translate('conversation_status_active');
         break;
       case 'resolved':
         color = Colors.blue;
         icon = Icons.check_circle;
+        label = localizations.translate('conversation_status_resolved');
         break;
       case 'archived':
         color = Colors.grey;
         icon = Icons.archive;
+        label = localizations.translate('conversation_status_archived');
+        break;
+      case 'pending':
+        color = Colors.orange;
+        icon = Icons.pending;
+        label = localizations.translate('conversation_status_pending');
         break;
       default:
         color = Colors.orange;
         icon = Icons.pending;
+        label = status;
     }
     
     return Container(
@@ -475,7 +493,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
           Icon(icon, size: 12, color: color),
           const SizedBox(width: 4),
           Text(
-            status,
+            label,
             style: TextStyle(
               fontSize: 11,
               color: color,
@@ -488,20 +506,30 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
   }
 
   Widget _buildPriorityBadge(String priority) {
+    final localizations = AppLocalizations.of(context);
     Color color;
+    String label;
     
     switch (priority) {
       case 'urgent':
         color = Colors.red;
+        label = localizations.translate('conversation_priority_urgent');
         break;
       case 'high':
         color = Colors.orange;
+        label = localizations.translate('conversation_priority_high');
         break;
       case 'low':
         color = Colors.green;
+        label = localizations.translate('conversation_priority_low');
+        break;
+      case 'normal':
+        color = Colors.blue;
+        label = localizations.translate('conversation_priority_normal');
         break;
       default:
         color = Colors.blue;
+        label = priority;
     }
     
     return Container(
@@ -516,7 +544,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
           Icon(Icons.flag, size: 12, color: color),
           const SizedBox(width: 4),
           Text(
-            priority,
+            label,
             style: TextStyle(
               fontSize: 11,
               color: color,
@@ -561,19 +589,22 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
   }
 
   String _formatTime(DateTime date) {
+    final localizations = AppLocalizations.of(context);
     final now = DateTime.now();
     final difference = now.difference(date);
     
     if (difference.inDays > 0) {
-      if (difference.inDays == 1) return 'Hier';
-      if (difference.inDays < 7) return '${difference.inDays}j';
+      if (difference.inDays == 1) return localizations.translate('yesterday');
+      if (difference.inDays < 7) {
+        return '${difference.inDays}${localizations.translate('day_short')}';
+      }
       return DateFormat('dd/MM').format(date);
     } else if (difference.inHours > 0) {
-      return '${difference.inHours}h';
+      return '${difference.inHours}${localizations.translate('hour_short')}';
     } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m';
+      return '${difference.inMinutes}${localizations.translate('minute_short')}';
     } else {
-      return 'Maintenant';
+      return localizations.translate('now');
     }
   }
 

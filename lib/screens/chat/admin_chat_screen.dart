@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../localization/app_localizations.dart';
 
 class AdminChatScreen extends StatefulWidget {
   const AdminChatScreen({Key? key}) : super(key: key);
@@ -20,18 +21,28 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   String? _conversationId;
   bool _isLoading = true;
   bool _isSending = false;
+  bool _didLoadConversation = false;
 
   @override
   void initState() {
     super.initState();
-    _loadOrCreateConversation();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_didLoadConversation) {
+      _didLoadConversation = true;
+      _loadOrCreateConversation();
+    }
   }
 
   Future<void> _loadOrCreateConversation() async {
+    final localizations = AppLocalizations.of(context);
     try {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) {
-        throw Exception('Utilisateur non connecté');
+        throw Exception(localizations.translate('user_not_logged_in'));
       }
 
       // Chercher une conversation existante avec l'admin
@@ -66,7 +77,14 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     } catch (e) {
       print('Erreur lors du chargement de la conversation: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
+        SnackBar(
+          content: Text(
+            localizations.translateParams(
+              'error_with_details',
+              {'error': e.toString()},
+            ),
+          ),
+        ),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -136,6 +154,8 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty || _conversationId == null) return;
 
+    final localizations = AppLocalizations.of(context);
+
     final messageText = _messageController.text.trim();
     _messageController.clear();
 
@@ -143,7 +163,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
 
     try {
       final userId = supabase.auth.currentUser?.id;
-      if (userId == null) throw Exception('Utilisateur non connecté');
+      if (userId == null) throw Exception(localizations.translate('user_not_logged_in'));
 
       await supabase.from('chat_messages').insert({
         'conversation_id': _conversationId,
@@ -162,7 +182,14 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     } catch (e) {
       print('Erreur envoi message: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de l\'envoi: $e')),
+        SnackBar(
+          content: Text(
+            localizations.translateParams(
+              'chat_error_sending_with_details',
+              {'error': e.toString()},
+            ),
+          ),
+        ),
       );
       _messageController.text = messageText; // Restaurer le message
     } finally {
@@ -183,6 +210,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   }
 
   String _formatTime(String dateStr) {
+    final localizations = AppLocalizations.of(context);
     final date = DateTime.parse(dateStr);
     final now = DateTime.now();
     final diff = now.difference(date);
@@ -190,9 +218,10 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     if (diff.inDays == 0) {
       return DateFormat('HH:mm').format(date);
     } else if (diff.inDays == 1) {
-      return 'Hier ${DateFormat('HH:mm').format(date)}';
+      return '${localizations.translate('yesterday')} ${DateFormat('HH:mm').format(date)}';
     } else if (diff.inDays < 7) {
-      return DateFormat('EEEE HH:mm', 'fr_FR').format(date);
+      final locale = Localizations.localeOf(context).languageCode;
+      return DateFormat('EEEE HH:mm', locale).format(date);
     } else {
       return DateFormat('dd/MM/yyyy HH:mm').format(date);
     }
@@ -200,6 +229,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     final userId = supabase.auth.currentUser?.id;
 
     return Scaffold(
@@ -226,16 +256,16 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Support Admin',
-                  style: TextStyle(
+                Text(
+                  localizations.translate('support_admin'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
                 ),
                 Text(
-                  'Service client disponible',
+                  localizations.translate('admin_support_available'),
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -275,7 +305,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Démarrez une conversation',
+                                localizations.translate('start_conversation'),
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: Colors.grey[600],
@@ -283,7 +313,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Notre équipe est là pour vous aider',
+                                localizations.translate('we_are_here_to_help'),
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[500],
@@ -420,7 +450,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
-                        hintText: 'Tapez votre message...',
+                        hintText: localizations.translate('type_your_message'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(25),
                           borderSide: BorderSide.none,

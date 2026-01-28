@@ -36,9 +36,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final localizations = AppLocalizations.of(context);
+
     if (!_acceptedLegal) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez accepter les CGU et la Politique de confidentialité.')),
+        SnackBar(content: Text(localizations.translate('register_accept_legal_required'))),
       );
       return;
     }
@@ -57,9 +59,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final authState = ref.read(authProvider);
     if (authState.needsEmailConfirmation) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Compte créé. Vérifiez votre email puis connectez-vous.'),
-        ),
+        SnackBar(content: Text(localizations.translate('register_account_created_check_email'))),
       );
       context.go('/login');
       return;
@@ -118,7 +118,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ).animate().fadeIn(duration: 600.ms).scale(delay: 200.ms),
                   const SizedBox(height: 24),
                   Text(
-                    'Créer un compte',
+                    localizations.translate('create_account'),
                     style: GoogleFonts.poppins(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -127,7 +127,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2, end: 0),
                   const SizedBox(height: 8),
                   Text(
-                    'Rejoignez GBA Store en 30 secondes',
+                    localizations.translate('register_subtitle_join_store'),
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       color: Colors.grey[600],
@@ -180,7 +180,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             controller: _nameController,
                             textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
-                              labelText: 'Nom complet',
+                              labelText: localizations.translate('full_name'),
                               prefixIcon: const Icon(
                                 Icons.person_outline,
                                 color: Color(0xFF2196F3),
@@ -194,7 +194,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Veuillez entrer votre nom';
+                                return localizations.translate('enter_your_name');
                               }
                               return null;
                             },
@@ -232,10 +232,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Veuillez entrer votre email';
+                                return localizations.translate('enter_your_email');
                               }
                               if (!value.contains('@')) {
-                                return 'Email invalide';
+                                return localizations.translate('invalid_email');
                               }
                               return null;
                             },
@@ -286,10 +286,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Veuillez entrer votre mot de passe';
+                                return localizations.translate('enter_your_password');
                               }
                               if (value.length < 6) {
-                                return 'Le mot de passe doit contenir au moins 6 caractères';
+                                return localizations.translate('password_min_length_register');
                               }
                               return null;
                             },
@@ -313,7 +313,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             obscureText: _obscureConfirmPassword,
                             textInputAction: TextInputAction.done,
                             decoration: InputDecoration(
-                              labelText: 'Confirmer le mot de passe',
+                              labelText: localizations.translate('confirm_password'),
                               prefixIcon: const Icon(
                                 Icons.lock_outline,
                                 color: Color(0xFF2196F3),
@@ -340,10 +340,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Veuillez confirmer votre mot de passe';
+                                return localizations.translate('confirm_your_password');
                               }
                               if (value != _passwordController.text) {
-                                return 'Les mots de passe ne correspondent pas';
+                                return localizations.translate('passwords_do_not_match');
                               }
                               return null;
                             },
@@ -385,22 +385,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     padding: const EdgeInsets.only(top: 10),
                                     child: Wrap(
                                       children: [
-                                        const Text('J\'accepte les '),
+                                        Text(localizations.translate('accept_legal_prefix')),
                                         GestureDetector(
                                           onTap: () => context.push('/legal/terms'),
                                           child: Text(
-                                            'CGU',
+                                            localizations.translate('terms_of_service'),
                                             style: TextStyle(
                                               color: theme.colorScheme.primary,
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ),
-                                        const Text(' et la '),
+                                        Text(localizations.translate('accept_legal_and')),
                                         GestureDetector(
                                           onTap: () => context.push('/legal/privacy'),
                                           child: Text(
-                                            'Politique de confidentialité',
+                                            localizations.translate('privacy_policy'),
                                             style: TextStyle(
                                               color: theme.colorScheme.primary,
                                               fontWeight: FontWeight.w700,
@@ -450,7 +450,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Déjà un compte ?',
+                              localizations.translate('already_have_account'),
                               style: TextStyle(color: Colors.grey[700]),
                             ),
                             TextButton(
