@@ -81,7 +81,8 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
 
   Future<void> _captureDeliveryLocation() async {
     if (kIsWeb) {
-      _showSnack('Géolocalisation disponible sur mobile.');
+      final localizations = AppLocalizations.of(context);
+      _showSnack(localizations.translate('special_order_geolocation_mobile_only'));
       return;
     }
 
@@ -91,7 +92,8 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showSnack('Active la localisation du téléphone pour continuer.');
+        final localizations = AppLocalizations.of(context);
+        _showSnack(localizations.translate('special_order_enable_location_services'));
         return;
       }
 
@@ -102,7 +104,8 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _showSnack('Permission localisation refusée.');
+        final localizations = AppLocalizations.of(context);
+        _showSnack(localizations.translate('special_order_location_permission_denied'));
         return;
       }
 
@@ -119,11 +122,21 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
       });
 
       _showSnack(
-        'Position enregistrée (±${position.accuracy.toStringAsFixed(0)}m)',
+        AppLocalizations.of(context).translateParams(
+          'special_order_location_saved_with_accuracy',
+          {'meters': position.accuracy.toStringAsFixed(0)},
+        ),
         backgroundColor: Colors.green,
       );
     } catch (e) {
-      _showSnack('Impossible de récupérer la position: $e', backgroundColor: Colors.red);
+      final localizations = AppLocalizations.of(context);
+      _showSnack(
+        localizations.translateParams(
+          'special_order_location_failed_with_details',
+          {'error': e.toString()},
+        ),
+        backgroundColor: Colors.red,
+      );
     } finally {
       if (mounted) {
         setState(() => _isGettingLocation = false);
@@ -163,7 +176,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
       if (!mounted) return;
       _pageController.jumpToPage(_currentStep);
       setState(() {});
-      _showSnack('Brouillon restauré');
+      _showSnack(AppLocalizations.of(context).translate('special_order_draft_restored'));
     });
 
     _draftLoaded = true;
@@ -193,20 +206,40 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
       if (images.isNotEmpty) {
         final remaining = _maxImages - _selectedImages.length;
         if (remaining <= 0) {
-          _showSnack('Maximum $_maxImages images');
+          final localizations = AppLocalizations.of(context);
+          _showSnack(
+            localizations.translateParams(
+              'special_order_max_images',
+              {'count': _maxImages.toString()},
+            ),
+          );
           return;
         }
 
         final picked = images.take(remaining).toList();
         if (images.length > picked.length) {
-          _showSnack('Maximum $_maxImages images (les autres ont été ignorées)');
+          final localizations = AppLocalizations.of(context);
+          _showSnack(
+            localizations.translateParams(
+              'special_order_max_images_ignored',
+              {'count': _maxImages.toString()},
+            ),
+          );
         }
 
         final toAdd = <_SelectedImage>[];
         for (final img in picked) {
           final bytes = await img.readAsBytes();
           if (bytes.lengthInBytes > _maxImageBytes) {
-            _showSnack('Image trop lourde (${(bytes.lengthInBytes / (1024 * 1024)).toStringAsFixed(1)}MB)');
+            final localizations = AppLocalizations.of(context);
+            _showSnack(
+              localizations.translateParams(
+                'special_order_image_too_large_with_size',
+                {
+                  'size': (bytes.lengthInBytes / (1024 * 1024)).toStringAsFixed(1),
+                },
+              ),
+            );
             continue;
           }
           toAdd.add(
@@ -225,7 +258,13 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      _showSnack('Erreur lors de la sélection des images: $e');
+      final localizations = AppLocalizations.of(context);
+      _showSnack(
+        localizations.translateParams(
+          'special_order_pick_images_error_with_details',
+          {'error': e.toString()},
+        ),
+      );
     }
   }
 
@@ -235,7 +274,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     if (_currentStep == 0) {
       final ok = _detailsFormKey.currentState?.validate() ?? false;
       if (!ok) {
-        _showSnack('Vérifie les champs obligatoires');
+        _showSnack(AppLocalizations.of(context).translate('special_order_check_required_fields'));
         return;
       }
     }
@@ -243,7 +282,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     if (_currentStep == 2) {
       final ok = _deliveryFormKey.currentState?.validate() ?? false;
       if (!ok) {
-        _showSnack('Vérifie les champs obligatoires');
+        _showSnack(AppLocalizations.of(context).translate('special_order_check_required_fields'));
         return;
       }
     }
@@ -324,7 +363,13 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
 
   Widget _buildHeader(ThemeData theme, AppLocalizations localizations) {
     final progress = (_currentStep + 1) / _totalSteps;
-    final stepLabel = 'Étape ${_currentStep + 1}/$_totalSteps';
+    final stepLabel = localizations.translateParams(
+      'special_order_step_indicator',
+      {
+        'current': (_currentStep + 1).toString(),
+        'total': _totalSteps.toString(),
+      },
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
@@ -409,7 +454,11 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(isLast ? localizations.translate('confirmOrder') : 'Sauvegarder et continuer'),
+                  : Text(
+                      isLast
+                          ? localizations.translate('confirmOrder')
+                          : localizations.translate('save_and_continue'),
+                    ),
             ),
           ),
           const SizedBox(width: 10),
@@ -421,7 +470,9 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
-            child: Text(_currentStep == 0 ? 'Annuler' : 'Retour'),
+            child: Text(
+              _currentStep == 0 ? localizations.translate('cancel') : localizations.translate('back'),
+            ),
           ),
         ],
       ),
@@ -437,7 +488,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Détails du produit',
+              localizations.translate('special_order_product_details_title'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -448,7 +499,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               decoration: _fieldDecoration(localizations.translate('productName')),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Nom du produit requis';
+                  return localizations.translate('special_order_product_name_required');
                 }
                 return null;
               },
@@ -461,7 +512,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               validator: (value) {
                 final q = int.tryParse(value?.trim() ?? '');
                 if (q == null || q <= 0) {
-                  return 'Quantité invalide';
+                  return localizations.translate('special_order_invalid_quantity');
                 }
                 return null;
               },
@@ -473,7 +524,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               maxLines: 4,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Description requise';
+                  return localizations.translate('special_order_description_required');
                 }
                 return null;
               },
@@ -493,7 +544,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Photos (optionnel)',
+                  localizations.translate('special_order_images_optional_title'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
@@ -502,13 +553,13 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               FilledButton.tonalIcon(
                 onPressed: _isSubmitting ? null : _pickImages,
                 icon: const Icon(Icons.add_a_photo),
-                label: const Text('Ajouter'),
+                label: Text(localizations.translate('special_order_add')),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Text(
-            'Ajoute des images pour aider à identifier le produit.',
+            localizations.translate('special_order_images_hint'),
             style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 14),
@@ -564,6 +615,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
   }
 
   Widget _buildDeliveryStep() {
+    final localizations = AppLocalizations.of(context);
     return _card(
       child: Form(
         key: _deliveryFormKey,
@@ -572,7 +624,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Livraison',
+              localizations.translate('special_order_delivery_title'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -591,8 +643,11 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
                   : const Icon(Icons.my_location),
               label: Text(
                 (_deliveryLat != null && _deliveryLng != null)
-                    ? 'Position prête (±${(_deliveryAccuracy ?? 0).toStringAsFixed(0)}m)'
-                    : 'Utiliser ma position',
+                    ? localizations.translateParams(
+                        'special_order_location_ready_with_accuracy',
+                        {'meters': (_deliveryAccuracy ?? 0).toStringAsFixed(0)},
+                      )
+                    : localizations.translate('special_order_use_my_location'),
               ),
             ),
             Container(
@@ -606,7 +661,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
                   RadioListTile<String>(
                     value: 'air',
                     groupValue: _shippingMethod,
-                    title: const Text('Par avion (plus rapide)'),
+                    title: Text(localizations.translate('special_order_shipping_air_fast')),
                     onChanged: _isSubmitting
                         ? null
                         : (v) {
@@ -621,7 +676,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
                   RadioListTile<String>(
                     value: 'other',
                     groupValue: _shippingMethod,
-                    title: const Text('Autre voie (standard)'),
+                    title: Text(localizations.translate('special_order_shipping_other_standard')),
                     onChanged: _isSubmitting
                         ? null
                         : (v) {
@@ -638,7 +693,10 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _notesController,
-              decoration: _fieldDecoration('Notes (optionnel)', hint: 'Précisions, liens, etc.'),
+              decoration: _fieldDecoration(
+                localizations.translate('special_order_notes_optional'),
+                hint: localizations.translate('special_order_notes_hint'),
+              ),
               maxLines: 3,
             ),
           ],
@@ -648,30 +706,45 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
   }
 
   Widget _buildSummaryStep() {
+    final localizations = AppLocalizations.of(context);
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Récapitulatif',
+            localizations.translate('special_order_summary_title'),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
           ),
           const SizedBox(height: 14),
-          _SummaryRow(label: 'Produit', value: _productNameController.text.trim()),
-          const SizedBox(height: 10),
-          _SummaryRow(label: 'Quantité', value: _quantityController.text.trim()),
-          const SizedBox(height: 10),
           _SummaryRow(
-            label: 'Livraison',
-            value: _shippingMethod == 'air' ? 'Avion' : 'Autre',
+            label: localizations.translate('special_order_summary_product'),
+            value: _productNameController.text.trim(),
           ),
           const SizedBox(height: 10),
-          _SummaryRow(label: 'Images', value: _selectedImages.length.toString()),
+          _SummaryRow(
+            label: localizations.translate('special_order_summary_quantity'),
+            value: _quantityController.text.trim(),
+          ),
+          const SizedBox(height: 10),
+          _SummaryRow(
+            label: localizations.translate('special_order_summary_delivery'),
+            value: _shippingMethod == 'air'
+                ? localizations.translate('special_order_shipping_air')
+                : localizations.translate('special_order_shipping_standard'),
+          ),
+          const SizedBox(height: 10),
+          _SummaryRow(
+            label: localizations.translate('special_order_summary_images'),
+            value: _selectedImages.length.toString(),
+          ),
           if (_notesController.text.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
-            _SummaryRow(label: 'Notes', value: _notesController.text.trim()),
+            _SummaryRow(
+              label: localizations.translate('special_order_summary_notes'),
+              value: _notesController.text.trim(),
+            ),
           ],
           const SizedBox(height: 14),
           Container(
@@ -682,9 +755,9 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.grey.withOpacity(0.12)),
             ),
-            child: const Text(
-              'En confirmant, ta demande sera envoyée à l\'équipe pour traitement.',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            child: Text(
+              localizations.translate('special_order_confirm_hint'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -708,13 +781,13 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     final detailsOk = _detailsFormKey.currentState?.validate() ?? false;
     final deliveryOk = _deliveryFormKey.currentState?.validate() ?? false;
     if (!detailsOk || !deliveryOk) {
-      _showSnack('Vérifie les champs obligatoires');
+      _showSnack(AppLocalizations.of(context).translate('special_order_check_required_fields'));
       return;
     }
 
     final quantity = int.tryParse(_quantityController.text.trim());
     if (quantity == null || quantity <= 0) {
-      _showSnack('Quantité invalide');
+      _showSnack(AppLocalizations.of(context).translate('special_order_invalid_quantity'));
       return;
     }
 
@@ -758,14 +831,18 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
       final orderId = (result['order'] is Map<String, dynamic>)
           ? (result['order']['id']?.toString() ?? '')
           : '';
-      _showSnack('Commande spéciale envoyée', backgroundColor: Colors.green);
+      _showSnack(AppLocalizations.of(context).translate('special_order_sent'), backgroundColor: Colors.green);
       if (orderId.isNotEmpty) {
         context.go('/special-order/$orderId');
       } else {
         context.go('/special-orders');
       }
     } else {
-      _showSnack(result['error']?.toString() ?? 'Erreur lors de l\'envoi', backgroundColor: Colors.red);
+      final localizations = AppLocalizations.of(context);
+      _showSnack(
+        result['error']?.toString() ?? localizations.translate('special_order_send_error'),
+        backgroundColor: Colors.red,
+      );
     }
   }
 

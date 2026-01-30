@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:ui';
+import 'package:intl/intl.dart';
+
+import '../../animations/app_animations.dart';
+import '../../localization/app_localizations.dart';
 import '../../services/order_service.dart';
 import '../../widgets/adaptive_scaffold.dart';
+import '../../widgets/app_state_view.dart';
 
 class MyOrdersScreen extends ConsumerStatefulWidget {
   const MyOrdersScreen({super.key});
@@ -20,6 +25,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   final OrderService _orderService = OrderService();
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
+  String? _errorMessage;
   String _filter = 'all';
   StreamSubscription<List<Map<String, dynamic>>>? _ordersSubscription;
   
@@ -111,7 +117,10 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   Future<void> _loadOrders() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final cached = await _orderService.getCachedUserOrders();
       if (mounted && cached.isNotEmpty) {
@@ -122,12 +131,18 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
       }
 
       final orders = await _orderService.getUserOrders();
+      if (!mounted) return;
       setState(() {
         _orders = orders;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
     }
   }
 
@@ -163,9 +178,13 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                 Expanded(
                   child: _isLoading
                       ? _buildLoadingState()
-                      : filteredOrders.isEmpty
-                          ? _buildEmptyState(theme)
-                          : _buildOrdersList(theme),
+                      : (_orders.isEmpty && _errorMessage != null)
+                          ? _buildErrorState()
+                          : filteredOrders.isEmpty
+                              ? _orders.isEmpty
+                                  ? _buildEmptyState(theme)
+                                  : _buildNoResultsState()
+                              : _buildOrdersList(theme),
                 ),
               ],
             ),
@@ -176,6 +195,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   Widget _buildHeader(ThemeData theme) {
+    final localizations = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -202,13 +222,16 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Mes Commandes',
+                  localizations.translate('my_orders_title'),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  '${_orders.length} commande(s) au total',
+                  localizations.translateParams(
+                    'orders_total_count',
+                    {'count': _orders.length.toString()},
+                  ),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.grey,
                   ),
@@ -229,13 +252,14 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   Widget _buildFilterChips(ThemeData theme) {
+    final localizations = AppLocalizations.of(context);
     final filters = [
-      {'value': 'all', 'label': 'Toutes'},
-      {'value': 'pending', 'label': 'En attente'},
-      {'value': 'confirmed', 'label': 'Confirmées'},
-      {'value': 'shipped', 'label': 'Expédiées'},
-      {'value': 'delivered', 'label': 'Livrées'},
-      {'value': 'cancelled', 'label': 'Annulées'},
+      {'value': 'all', 'label': localizations.translate('all')},
+      {'value': 'pending', 'label': localizations.translate('order_status_pending')},
+      {'value': 'confirmed', 'label': localizations.translate('order_status_confirmed')},
+      {'value': 'shipped', 'label': localizations.translate('order_status_shipped')},
+      {'value': 'delivered', 'label': localizations.translate('order_status_delivered')},
+      {'value': 'cancelled', 'label': localizations.translate('order_status_cancelled')},
     ];
     
     return Container(
@@ -294,6 +318,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   Widget _buildOrderCard(Map<String, dynamic> order, ThemeData theme) {
+    final localizations = AppLocalizations.of(context);
     final status = order['status'] ?? 'pending';
     final statusColor = statusColors[status] ?? Colors.grey;
     final statusIcon = statusIcons[status] ?? FontAwesomeIcons.question;
@@ -384,7 +409,10 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                   // Items preview
                   if (items.isNotEmpty) ...[
                     Text(
-                      '${items.length} article(s)',
+                      localizations.translateParams(
+                        'items_count',
+                        {'count': items.length.toString()},
+                      ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.grey,
                       ),
@@ -455,7 +483,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Total',
+                        localizations.translate('total'),
                         style: theme.textTheme.bodyMedium,
                       ),
                       Text(
@@ -477,56 +505,54 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   Widget _buildLoadingState() {
-    return const Center(
-      child: CircularProgressIndicator(),
+    return const AppStateView(
+      state: AppViewState.loading,
+      animationId: AppAnimations.loadingSpinner,
     );
   }
 
   Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            FontAwesomeIcons.boxOpen,
-            size: 80,
-            color: Colors.grey.shade300,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Aucune commande',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Vos commandes apparaîtront ici',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.grey.shade500,
-            ),
-          ),
-          const SizedBox(height: 30),
-          ElevatedButton.icon(
-            onPressed: () => context.go('/home'),
-            icon: const Icon(FontAwesomeIcons.arrowLeft),
-            label: const Text('Continuer vos achats'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 30,
-                vertical: 15,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-          ),
-        ],
-      ),
+    final localizations = AppLocalizations.of(context);
+    return AppStateView(
+      state: AppViewState.empty,
+      animationId: AppAnimations.emptyBox,
+      title: localizations.translate('no_orders'),
+      subtitle: localizations.translate('no_orders_hint'),
+      primaryActionLabel: localizations.translate('continue_shopping'),
+      onPrimaryAction: () => context.go('/home'),
+    );
+  }
+
+  Widget _buildNoResultsState() {
+    final localizations = AppLocalizations.of(context);
+    return AppStateView(
+      state: AppViewState.empty,
+      animationId: AppAnimations.searchNoResult,
+      title: localizations.translate('no_results'),
+      subtitle: localizations.translate('try_another_keyword'),
+      primaryActionLabel: localizations.translate('clear_filter'),
+      onPrimaryAction: () {
+        setState(() {
+          _filter = 'all';
+        });
+      },
+    );
+  }
+
+  Widget _buildErrorState() {
+    final localizations = AppLocalizations.of(context);
+    return AppStateView(
+      state: AppViewState.error,
+      animationId: AppAnimations.errorNoInternet,
+      title: localizations.translate('error_loading'),
+      subtitle: _errorMessage,
+      primaryActionLabel: localizations.translate('retry'),
+      onPrimaryAction: _loadOrders,
     );
   }
 
   void _showOrderDetails(Map<String, dynamic> order, ThemeData theme) {
+    final localizations = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -550,7 +576,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
             ),
             const SizedBox(height: 20),
             Text(
-              'Détails de la commande',
+              localizations.translate('order_details_title'),
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -564,16 +590,16 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                     Builder(
                       builder: (context) {
                         final clientRows = <Widget>[
-                          _buildDetailRow('Nom', order['customer_name']?.toString()),
-                          _buildDetailRow('Téléphone', order['customer_phone']?.toString()),
-                          _buildDetailRow('Email', order['customer_email']?.toString()),
+                          _buildDetailRow(localizations.translate('name'), order['customer_name']?.toString()),
+                          _buildDetailRow(localizations.translate('phone'), order['customer_phone']?.toString()),
+                          _buildDetailRow(localizations.translate('email'), order['customer_email']?.toString()),
                         ].where((w) => w is! SizedBox).toList();
 
                         final shippingRows = <Widget>[
-                          _buildDetailRow('Pays', order['shipping_country']?.toString()),
-                          _buildDetailRow('Ville', order['shipping_city']?.toString()),
-                          _buildDetailRow('Quartier', order['shipping_district']?.toString()),
-                          _buildDetailRow('Adresse', order['shipping_address']?.toString()),
+                          _buildDetailRow(localizations.translate('country'), order['shipping_country']?.toString()),
+                          _buildDetailRow(localizations.translate('city'), order['shipping_city']?.toString()),
+                          _buildDetailRow(localizations.translate('district'), order['shipping_district']?.toString()),
+                          _buildDetailRow(localizations.translate('address'), order['shipping_address']?.toString()),
                         ].where((w) => w is! SizedBox).toList();
 
                         return Column(
@@ -581,12 +607,15 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                           children: [
                     // Order info
                     _buildDetailSection(
-                      'Informations',
+                      localizations.translate('order_information'),
                       [
-                        _buildDetailRow('Numéro', order['order_number']),
-                        _buildDetailRow('Date', _formatDate(order['created_at'])),
-                        _buildDetailRow('Statut', _getStatusLabel(order['status'])),
-                        _buildDetailRow('Paiement', order['payment_method'] ?? 'N/A'),
+                        _buildDetailRow(localizations.translate('number'), order['order_number']),
+                        _buildDetailRow(localizations.translate('date'), _formatDate(order['created_at'])),
+                        _buildDetailRow(localizations.translate('label_status'), _getStatusLabel(order['status'])),
+                        _buildDetailRow(
+                          localizations.translate('payment'),
+                          (order['payment_method'] ?? localizations.translate('not_available'))?.toString(),
+                        ),
                       ],
                     ),
                     
@@ -594,18 +623,18 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                     
                     // Shipping address
                     if (clientRows.isNotEmpty) ...[
-                      _buildDetailSection('Client', clientRows),
+                      _buildDetailSection(localizations.translate('customer'), clientRows),
                       const SizedBox(height: 20),
                     ],
 
                     if (shippingRows.isNotEmpty) ...[
-                      _buildDetailSection('Adresse de livraison', shippingRows),
+                      _buildDetailSection(localizations.translate('shipping_address_title'), shippingRows),
                       const SizedBox(height: 20),
                     ],
                     
                     // Items
                     Text(
-                      'Articles',
+                      localizations.translate('items'),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -614,7 +643,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: Text(
-                          'Aucun article',
+                          localizations.translate('no_items'),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: Colors.grey.shade600,
                           ),
@@ -700,16 +729,16 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                         return Column(
                           children: [
                             _buildDetailRow(
-                              'Sous-total',
+                              localizations.translate('subtotal'),
                               '${computedSubtotal.toStringAsFixed(0)} FCFA',
                             ),
                             _buildDetailRow(
-                              'Livraison',
+                              localizations.translate('delivery'),
                               '${shippingFee.toStringAsFixed(0)} FCFA',
                             ),
                             const SizedBox(height: 10),
                             _buildDetailRow(
-                              'Total',
+                              localizations.translate('total'),
                               '${totalAmount.toStringAsFixed(0)} FCFA',
                               isTotal: true,
                             ),
@@ -749,8 +778,14 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   Widget _buildDetailRow(String label, String? value, {bool isTotal = false}) {
+    final localizations = AppLocalizations.of(context);
+    final notAvailable = localizations.translate('not_available');
     final normalized = value?.toString().trim();
-    if (!isTotal && (normalized == null || normalized.isEmpty || normalized.toLowerCase() == 'n/a')) {
+    if (!isTotal &&
+        (normalized == null ||
+            normalized.isEmpty ||
+            normalized.toLowerCase() == 'n/a' ||
+            normalized == notAvailable)) {
       return const SizedBox.shrink();
     }
 
@@ -768,7 +803,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
             ),
           ),
           Text(
-            normalized ?? 'N/A',
+            normalized ?? notAvailable,
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
               fontSize: isTotal ? 16 : 14,
@@ -781,31 +816,36 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   }
 
   String _formatDate(String? dateStr) {
-    if (dateStr == null) return 'N/A';
+    final localizations = AppLocalizations.of(context);
+    if (dateStr == null) return localizations.translate('not_available');
     try {
       final date = DateTime.parse(dateStr);
-      return '${date.day}/${date.month}/${date.year} à ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+      final localeTag = Localizations.localeOf(context).toLanguageTag();
+      return DateFormat.yMd(localeTag).add_Hm().format(date);
     } catch (e) {
       return dateStr;
     }
   }
 
   String _getStatusLabel(String? status) {
+    final localizations = AppLocalizations.of(context);
     switch (status) {
       case 'pending':
-        return 'En attente';
+        return localizations.translate('order_status_pending');
       case 'confirmed':
-        return 'Confirmée';
+        return localizations.translate('order_status_confirmed');
       case 'processing':
-        return 'En traitement';
+        return localizations.translate('order_status_processing');
       case 'shipped':
-        return 'Expédiée';
+        return localizations.translate('order_status_shipped');
       case 'delivered':
-        return 'Livrée';
+        return localizations.translate('order_status_delivered');
       case 'cancelled':
-        return 'Annulée';
+        return localizations.translate('order_status_cancelled');
+      case 'refunded':
+        return localizations.translate('order_status_refunded');
       default:
-        return status ?? 'Inconnu';
+        return localizations.translate('unknown');
     }
   }
 }

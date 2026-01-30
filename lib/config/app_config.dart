@@ -8,6 +8,9 @@ class AppConfig {
 
   static const String _envBackendUrl = String.fromEnvironment('BACKEND_URL');
 
+  static const String _envStripePublishableKey =
+      String.fromEnvironment('STRIPE_PUBLISHABLE_KEY');
+
   static const String _envFirebaseVapidKey =
       String.fromEnvironment('FIREBASE_VAPID_KEY');
 
@@ -23,6 +26,8 @@ class AppConfig {
 
   static const String _fallbackBackendUrl = 'http://localhost:8000';
 
+  static const String _fallbackStripePublishableKey = '';
+
   static String get supabaseUrl =>
       _envSupabaseUrl.isNotEmpty ? _envSupabaseUrl : _fallbackSupabaseUrl;
 
@@ -35,6 +40,10 @@ class AppConfig {
       : _fallbackFirebaseVapidKey;
 
   static String get siteUrl => _envSiteUrl.isNotEmpty ? _envSiteUrl : _fallbackSiteUrl;
+
+  static String get stripePublishableKey => _envStripePublishableKey.isNotEmpty
+      ? _envStripePublishableKey
+      : _fallbackStripePublishableKey;
 
   static String get backendUrl {
     final raw = _envBackendUrl.isNotEmpty ? _envBackendUrl : _fallbackBackendUrl;

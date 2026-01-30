@@ -60,6 +60,12 @@ class AppAnimationRegistry {
 
       final assetPath = _join(basePath, path.trim());
 
+      try {
+        await rootBundle.load(assetPath);
+      } catch (_) {
+        continue;
+      }
+
       specs[id] = AppAnimationSpec(
         id: id,
         format: format,

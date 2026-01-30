@@ -9,7 +9,9 @@ class I18nAudit extends ChangeNotifier {
   static final I18nAudit instance = I18nAudit._();
   I18nAudit._();
 
-  bool get enabled => kDebugMode;
+  static const bool _auditEnabled = bool.fromEnvironment('I18N_AUDIT', defaultValue: false);
+
+  bool get enabled => kDebugMode && _auditEnabled;
 
   Locale? _locale;
   String _location = '';

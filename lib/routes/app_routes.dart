@@ -6,6 +6,11 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/reset_password_screen.dart';
 import '../screens/auth/change_password_screen.dart';
+import '../screens/auth/welcome_screen.dart';
+import '../screens/auth/auth_method_selection_screen.dart';
+import '../screens/auth/phone_auth_screen.dart';
+import '../screens/auth/otp_verification_screen.dart';
+import '../screens/splash_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/home_screen_premium.dart';
 import '../screens/product/product_detail_screen.dart';
@@ -42,7 +47,7 @@ class AppRoutes {
 
   static final router = GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: '/',
+    initialLocation: '/splash',
     errorBuilder: (context, state) {
       final localizations = AppLocalizations.of(context);
       return Scaffold(
@@ -116,7 +121,13 @@ class AppRoutes {
       final supabase = Supabase.instance.client;
       final session = supabase.auth.currentSession;
       final isLoggedIn = session != null;
+      final isSplashRoute = state.matchedLocation == '/splash';
       final isAuthRoute = state.matchedLocation == '/login' ||
+          state.matchedLocation == '/splash' ||
+          state.matchedLocation == '/welcome' ||
+          state.matchedLocation == '/auth-method' ||
+          state.matchedLocation == '/phone-auth' ||
+          state.matchedLocation == '/otp' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/forgot-password' ||
           state.matchedLocation == '/reset-password' ||
@@ -124,6 +135,10 @@ class AppRoutes {
           state.matchedLocation == '/legal/privacy';
       final isOnboardingRoute = state.matchedLocation == '/onboarding';
       final isBlockedRoute = state.matchedLocation == '/blocked';
+
+      if (isSplashRoute) {
+        return null;
+      }
       
       // Si connecté, vérifier si l'utilisateur est bloqué
       if (isLoggedIn && !isBlockedRoute) {
@@ -147,7 +162,7 @@ class AppRoutes {
       
       // If not logged in and trying to access protected routes
       if (!isLoggedIn && !isAuthRoute && !isBlockedRoute) {
-        return '/login';
+        return '/welcome';
       }
 
       // If logged in but onboarding not completed, force onboarding
@@ -179,8 +194,68 @@ class AppRoutes {
     },
     routes: [
       GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
         path: '/',
-        redirect: (context, state) => '/home',
+        redirect: (context, state) {
+          final session = Supabase.instance.client.auth.currentSession;
+          return session == null ? '/welcome' : '/home';
+        },
+      ),
+      GoRoute(
+        path: '/welcome',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const WelcomeScreen(),
+          transitionDuration: const Duration(milliseconds: 500),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, 1.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
+                ),
+                child: child,
+              ),
+            );
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/auth-method',
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode']?.trim().toLowerCase();
+          final effectiveMode = (mode == 'register' || mode == 'login') ? mode! : 'login';
+          return AuthMethodSelectionScreen(mode: effectiveMode);
+        },
+      ),
+      GoRoute(
+        path: '/phone-auth',
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode']?.trim().toLowerCase();
+          final effectiveMode = (mode == 'register' || mode == 'login') ? mode! : 'login';
+          return PhoneAuthScreen(mode: effectiveMode);
+        },
+      ),
+      GoRoute(
+        path: '/otp',
+        builder: (context, state) {
+          final phone = state.uri.queryParameters['phone'] ?? '';
+          final mode = state.uri.queryParameters['mode']?.trim().toLowerCase();
+          final effectiveMode = (mode == 'register' || mode == 'login') ? mode! : 'login';
+          if (phone.trim().isEmpty) {
+            return const PhoneAuthScreen(mode: 'login');
+          }
+          return OtpVerificationScreen(phone: phone, mode: effectiveMode);
+        },
       ),
       GoRoute(
         path: '/login',

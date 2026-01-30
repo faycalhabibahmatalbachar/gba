@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:country_picker/country_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
@@ -53,6 +55,16 @@ const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (AppConfig.stripePublishableKey.isNotEmpty) {
+    Stripe.publishableKey = AppConfig.stripePublishableKey;
+    Stripe.urlScheme = 'flutterstripe';
+    await Stripe.instance.applySettings();
+  } else {
+    debugPrint(
+      '[Stripe] STRIPE_PUBLISHABLE_KEY manquant (dart-define). Paiements Stripe désactivés.',
+    );
+  }
 
   var firebaseReady = false;
   try {
@@ -140,6 +152,7 @@ class MyApp extends StatelessWidget {
           },
           locale: languageProvider.locale,
           localizationsDelegates: const [
+            CountryLocalizations.delegate,
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,

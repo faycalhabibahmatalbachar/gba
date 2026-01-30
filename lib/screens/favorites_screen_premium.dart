@@ -9,8 +9,10 @@ import 'dart:math' as math;
 import '../providers/favorites_provider.dart';
 import '../providers/product_provider.dart';
 import '../models/product.dart';
+import '../animations/app_animations.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/adaptive_scaffold.dart';
+import '../widgets/app_state_view.dart';
 import 'product/product_detail_screen.dart';
 
 class FavoritesScreenPremium extends StatefulWidget {
@@ -170,38 +172,19 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
             child: Builder(
               builder: (context) {
                 if (productsProvider.isLoading && productsProvider.products.isEmpty) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const AppStateView(state: AppViewState.loading);
                 }
 
                 if (productsProvider.error != null && productsProvider.products.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.wifi_off, size: 56, color: Colors.grey),
-                          const SizedBox(height: 16),
-                          Text(localizations.translate('error_loading')),
-                          const SizedBox(height: 8),
-                          Text(
-                            productsProvider.error!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              productsProvider.loadProducts(force: true);
-                            },
-                            child: Text(localizations.translate('retry')),
-                          ),
-                        ],
-                      ),
-                    ),
+                  return AppStateView(
+                    state: AppViewState.error,
+                    title: localizations.translate('error_loading'),
+                    subtitle: productsProvider.error,
+                    primaryActionLabel: localizations.translate('retry'),
+                    onPrimaryAction: () {
+                      HapticFeedback.lightImpact();
+                      productsProvider.loadProducts(force: true);
+                    },
                   );
                 }
 
@@ -210,32 +193,16 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                 }
 
                 if (favorites.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.search_off, size: 56, color: Colors.grey),
-                          const SizedBox(height: 16),
-                          Text(localizations.translate('favorites_not_found_title')),
-                          const SizedBox(height: 8),
-                          Text(
-                            localizations.translate('favorites_not_found_hint'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              productsProvider.loadProducts(force: true);
-                            },
-                            child: Text(localizations.translate('refresh')),
-                          ),
-                        ],
-                      ),
-                    ),
+                  return AppStateView(
+                    state: AppViewState.empty,
+                    animationId: AppAnimations.searchNoResult,
+                    title: localizations.translate('favorites_not_found_title'),
+                    subtitle: localizations.translate('favorites_not_found_hint'),
+                    primaryActionLabel: localizations.translate('refresh'),
+                    onPrimaryAction: () {
+                      HapticFeedback.lightImpact();
+                      productsProvider.loadProducts(force: true);
+                    },
                   );
                 }
 

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../localization/app_localizations.dart';
 import '../providers/products_provider.dart';
 import '../widgets/product_card_premium.dart';
-import '../models/product.dart';
 
 class ProductsByCategoryScreen extends ConsumerStatefulWidget {
   final String categoryId;
@@ -51,6 +51,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
     final productsAsync = ref.watch(productsByCategoryProvider(widget.categoryId));
 
     return Scaffold(
@@ -96,7 +97,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                             ),
                           ),
                           Text(
-                            'Produits',
+                            localizations.translate('products'),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: Colors.grey.shade700,
                               fontWeight: FontWeight.w700,
@@ -141,8 +142,8 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          decoration: const InputDecoration(
-                            hintText: 'Rechercher un produit…',
+                          decoration: InputDecoration(
+                            hintText: localizations.translate('search_product_hint'),
                             border: InputBorder.none,
                             isDense: true,
                           ),
@@ -187,8 +188,8 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                                       const SizedBox(height: 14),
                                       Text(
                                         _query.isEmpty
-                                            ? 'Aucun produit dans cette catégorie'
-                                            : 'Aucun résultat',
+                                            ? localizations.translate('no_products_in_category')
+                                            : localizations.translate('no_results'),
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w800,
@@ -198,8 +199,8 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                                       const SizedBox(height: 8),
                                       Text(
                                         _query.isEmpty
-                                            ? 'Tire pour rafraîchir.'
-                                            : 'Essaie un autre mot-clé.',
+                                            ? localizations.translate('pull_to_refresh')
+                                            : localizations.translate('try_another_keyword'),
                                         style: TextStyle(
                                           color: Colors.grey.shade700,
                                           fontWeight: FontWeight.w600,
@@ -241,8 +242,8 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                               color: Colors.red.shade400,
                             ),
                             const SizedBox(height: 14),
-                            const Text(
-                              'Erreur de chargement',
+                            Text(
+                              localizations.translate('error_loading'),
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 8),
@@ -255,7 +256,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                             ElevatedButton.icon(
                               onPressed: _refresh,
                               icon: const Icon(FontAwesomeIcons.arrowsRotate, size: 16),
-                              label: const Text('Réessayer'),
+                              label: Text(localizations.translate('retry')),
                             ),
                           ],
                         ),

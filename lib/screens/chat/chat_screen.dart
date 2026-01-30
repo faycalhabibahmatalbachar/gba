@@ -880,54 +880,64 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       builder: (context) {
         final localizations = AppLocalizations.of(context);
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
+        final maxHeight = MediaQuery.of(context).size.height * 0.6;
+        return SafeArea(
+          child: Container(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info,
-                    color: Theme.of(context).primaryColor,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          localizations.translate('conversation_info_title'),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    localizations.translate('conversation_info_title'),
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const SizedBox(height: 20),
+                  _buildInfoRow(localizations.translate('label_id'), _conversation?.id ?? 'N/A'),
+                  _buildInfoRow(
+                    localizations.translate('label_status'),
+                    _conversation != null ? _localizeConversationStatus(_conversation!.status) : 'N/A',
+                  ),
+                  _buildInfoRow(
+                    localizations.translate('label_priority'),
+                    _conversation != null ? _localizeConversationPriority(_conversation!.priority) : 'normal',
+                  ),
+                  if (_conversation?.orderId != null)
+                    _buildInfoRow(localizations.translate('label_order'), '#${_conversation!.orderId}'),
+                  _buildInfoRow(
+                    localizations.translate('label_created_at'),
+                    _conversation != null
+                        ? DateFormat('dd/MM/yyyy HH:mm').format(_conversation!.createdAt)
+                        : 'N/A',
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              _buildInfoRow(localizations.translate('label_id'), _conversation?.id ?? 'N/A'),
-              _buildInfoRow(
-                localizations.translate('label_status'),
-                _conversation != null ? _localizeConversationStatus(_conversation!.status) : 'N/A',
-              ),
-              _buildInfoRow(
-                localizations.translate('label_priority'),
-                _conversation != null ? _localizeConversationPriority(_conversation!.priority) : 'normal',
-              ),
-              if (_conversation?.orderId != null)
-                _buildInfoRow(localizations.translate('label_order'), '#${_conversation!.orderId}'),
-              _buildInfoRow(
-                localizations.translate('label_created_at'),
-                _conversation != null
-                    ? DateFormat('dd/MM/yyyy HH:mm').format(_conversation!.createdAt)
-                    : 'N/A',
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -972,18 +982,28 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
             ),
           ),
         ],

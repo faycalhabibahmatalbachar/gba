@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -178,6 +179,19 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
 
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_paymentMethod == 'stripe_card' && (kIsWeb || Stripe.publishableKey.isEmpty)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Paiement Stripe indisponible sur cette plateforme. '
+            'Choisis Flutterwave ou paiement à la livraison.',
+          ),
+        ),
+      );
+      return;
+    }
     
     setState(() => _isProcessing = true);
     HapticFeedback.heavyImpact();
@@ -244,6 +258,19 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
       final orderId = result['order_id']?.toString();
 
       if (_paymentMethod == 'stripe_card') {
+        if (kIsWeb) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Paiement Stripe indisponible sur web pour le moment. '
+                'Choisis Flutterwave ou paiement à la livraison.',
+              ),
+            ),
+          );
+          return;
+        }
+
         if (orderId == null || orderId.isEmpty) {
           throw Exception('order_id manquant');
         }
@@ -261,19 +288,43 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
           parsed = jsonDecode(data) as Map<String, dynamic>;
         }
 
-        final url = parsed?['url']?.toString();
-        if (url == null || url.isEmpty) {
-          throw Exception('URL de paiement manquante');
+        final clientSecret = parsed?['clientSecret']?.toString();
+        if (clientSecret == null || clientSecret.isEmpty) {
+          throw Exception('clientSecret manquant');
         }
 
-        final ok = await launchUrl(
-          Uri.parse(url),
-          mode: LaunchMode.platformDefault,
-          webOnlyWindowName: '_self',
+        await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+            paymentIntentClientSecret: clientSecret,
+            merchantDisplayName: 'GBA Store',
+            returnURL: 'flutterstripe://redirect',
+          ),
         );
 
-        if (!ok) {
-          throw Exception('Impossible d\'ouvrir la page de paiement');
+        try {
+          await Stripe.instance.presentPaymentSheet();
+        } on StripeException catch (e) {
+          final message = e.error.localizedMessage ?? 'Paiement annulé';
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Stripe: $message'),
+              backgroundColor: Colors.red,
+              behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
+              margin: kIsWeb ? null : const EdgeInsets.fromLTRB(16, 0, 16, 90),
+            ),
+          );
+          return;
+        }
+
+        await cart.clearCart();
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => _buildSuccessDialog(result['order_number']),
+          );
         }
 
         return;
@@ -457,9 +508,15 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                                 RadioListTile<String>(
                                   value: 'stripe_card',
                                   groupValue: _paymentMethod,
-                                  onChanged: (value) => setState(() => _paymentMethod = value!),
+                                  onChanged: (kIsWeb || Stripe.publishableKey.isEmpty)
+                                      ? null
+                                      : (value) => setState(() => _paymentMethod = value!),
                                   title: const Text('Carte bancaire (Stripe)'),
-                                  subtitle: const Text('Paiement sécurisé (Visa/Mastercard)'),
+                                  subtitle: Text(
+                                    (kIsWeb || Stripe.publishableKey.isEmpty)
+                                        ? 'Indisponible sur cette plateforme'
+                                        : 'Paiement sécurisé (Visa/Mastercard)',
+                                  ),
                                   secondary: const Icon(FontAwesomeIcons.creditCard),
                                 ),
                                 const Divider(height: 1),

@@ -5,7 +5,7 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ========================================
+-- ====================================
 -- PROFILES TABLE (lié à auth.users)
 -- ========================================
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -451,10 +451,67 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 -- REALTIME
 -- ========================================
 -- Activer le temps réel pour certaines tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.cart_items;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_publication
+    WHERE pubname = 'supabase_realtime'
+      AND puballtables = false
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication p
+      JOIN pg_publication_rel pr ON p.oid = pr.prpubid
+      JOIN pg_class c ON c.oid = pr.prrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE p.pubname = 'supabase_realtime'
+        AND n.nspname = 'public'
+        AND c.relname = 'products'
+    ) THEN
+      EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.products';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication p
+      JOIN pg_publication_rel pr ON p.oid = pr.prpubid
+      JOIN pg_class c ON c.oid = pr.prrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE p.pubname = 'supabase_realtime'
+        AND n.nspname = 'public'
+        AND c.relname = 'cart_items'
+    ) THEN
+      EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.cart_items';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication p
+      JOIN pg_publication_rel pr ON p.oid = pr.prpubid
+      JOIN pg_class c ON c.oid = pr.prrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE p.pubname = 'supabase_realtime'
+        AND n.nspname = 'public'
+        AND c.relname = 'orders'
+    ) THEN
+      EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.orders';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication p
+      JOIN pg_publication_rel pr ON p.oid = pr.prpubid
+      JOIN pg_class c ON c.oid = pr.prrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE p.pubname = 'supabase_realtime'
+        AND n.nspname = 'public'
+        AND c.relname = 'chat_messages'
+    ) THEN
+      EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages';
+    END IF;
+  END IF;
+END $$;
 
 -- ========================================
 -- SAMPLE DATA (Optionnel)
