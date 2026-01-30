@@ -9,9 +9,11 @@ import 'dart:ui';
 import 'dart:math' as math;
 import '../models/category.dart';
 import '../models/product.dart';
+import '../animations/app_animations.dart';
 import '../providers/categories_provider.dart';
 import '../providers/products_provider.dart' as prod_provider;
 import '../widgets/adaptive_scaffold.dart';
+import '../widgets/app_state_view.dart';
 import '../services/supabase_service.dart';
 import '../localization/app_localizations.dart';
 import 'products_by_category_screen.dart';
@@ -301,30 +303,11 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
   }
 
   Widget _buildNoResultsState(AppLocalizations localizations) {
-    return Center(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.grey.shade50,
-            ),
-            child: Icon(FontAwesomeIcons.magnifyingGlass, size: 34, color: Colors.grey.shade500),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            localizations.translate('no_results'),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            localizations.translate('try_another_keyword'),
-            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return AppStateView(
+      state: AppViewState.empty,
+      animationId: AppAnimations.searchNoResult,
+      title: localizations.translate('no_results'),
+      subtitle: localizations.translate('try_another_keyword'),
     );
   }
 
@@ -846,137 +829,27 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
   }
 
   Widget _buildLoadingState(AppLocalizations localizations) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.blue.shade300,
-                  Colors.purple.shade300,
-                ],
-              ),
-            ),
-            child: const CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 3,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            localizations.translate('loading_categories'),
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+    return AppStateView(
+      state: AppViewState.loading,
+      title: localizations.translate('loading_categories'),
     );
   }
 
   Widget _buildEmptyState(AppLocalizations localizations) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey.shade50,
-              ),
-              child: Icon(
-                FontAwesomeIcons.folderOpen,
-                size: 48,
-                color: Colors.grey.shade400,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              localizations.translate('no_categories'),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              localizations.translate('no_categories_hint'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppStateView(
+      state: AppViewState.empty,
+      title: localizations.translate('no_categories'),
+      subtitle: localizations.translate('no_categories_hint'),
     );
   }
 
   Widget _buildErrorState(String error, AppLocalizations localizations, CategoriesProvider provider) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.red.shade50,
-              ),
-              child: Icon(
-                FontAwesomeIcons.triangleExclamation,
-                size: 48,
-                color: Colors.red.shade400,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              localizations.translate('error_loading'),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                provider.loadCategories();
-              },
-              icon: const Icon(FontAwesomeIcons.arrowRotateRight, size: 16),
-              label: Text(localizations.translate('retry')),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppStateView(
+      state: AppViewState.error,
+      title: localizations.translate('error_loading'),
+      subtitle: error,
+      primaryActionLabel: localizations.translate('retry'),
+      onPrimaryAction: () => provider.loadCategories(),
     );
   }
 }

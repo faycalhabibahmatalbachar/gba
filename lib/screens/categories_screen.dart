@@ -47,7 +47,7 @@ class CategoriesScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Aucune catégorie disponible',
+                    localizations.translate('no_categories'),
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.grey[600],
@@ -89,7 +89,7 @@ class CategoriesScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               Text(
-                'Erreur de chargement',
+                localizations.translate('error_loading'),
                 style: TextStyle(
                   fontSize: 18,
                   color: Colors.grey[600],
@@ -99,7 +99,7 @@ class CategoriesScreen extends ConsumerWidget {
               ElevatedButton.icon(
                 onPressed: () => ref.refresh(categoriesProvider),
                 icon: const Icon(Icons.refresh),
-                label: const Text('Réessayer'),
+                label: Text(localizations.translate('retry')),
               ),
             ],
           ),
@@ -116,6 +116,7 @@ class _CategoryCard extends ConsumerWidget {
   
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final localizations = AppLocalizations.of(context);
     return GestureDetector(
       onTap: () {
         context.push('/category/${category.id}');
@@ -233,7 +234,10 @@ class _CategoryCard extends ConsumerWidget {
                         final productsAsync = ref.watch(productsByCategoryProvider(category.id));
                         return productsAsync.when(
                           data: (products) => Text(
-                            '${products.length} produits',
+                            localizations.translateParams(
+                              'products_count',
+                              {'count': products.length.toString()},
+                            ),
                             style: TextStyle(
                               fontSize: 12,
                               color: Theme.of(context).primaryColor,
@@ -247,9 +251,9 @@ class _CategoryCard extends ConsumerWidget {
                               minHeight: 2,
                             ),
                           ),
-                          error: (_, __) => const Text(
-                            '- produits',
-                            style: TextStyle(
+                          error: (_, __) => Text(
+                            localizations.translateParams('products_count', {'count': '-'}),
+                            style: const TextStyle(
                               fontSize: 12,
                               color: Colors.grey,
                             ),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart' as classic_provider;
+import '../../localization/app_localizations.dart';
 import '../../providers/cart_provider.dart';
 import '../../models/product.dart';
 import '../../services/favorites_service.dart';
@@ -89,8 +90,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       
     } catch (e) {
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
+          SnackBar(
+            content: Text(
+              localizations.translateParams(
+                'error_with_details',
+                {'error': e.toString()},
+              ),
+            ),
+          ),
         );
       }
     } finally {
@@ -114,7 +123,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         similarProducts = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
-      print('Erreur chargement produits similaires: $e');
+      debugPrint('Error loading similar products: $e');
     }
   }
 
@@ -127,12 +136,23 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
   Future<void> _toggleFavorite() async {
     try {
+      final localizations = AppLocalizations.of(context);
+      final rawName = product?['name']?.toString() ?? '';
+      final productName = rawName.trim().isNotEmpty
+          ? rawName
+          : localizations.translate('unnamed_product');
+
       if (isFavorite) {
         await _favoritesService.removeFromFavorites(widget.productId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Retiré des favoris'),
+            SnackBar(
+              content: Text(
+                localizations.translateParams(
+                  'removed_from_favorites',
+                  {'name': productName},
+                ),
+              ),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 1),
             ),
@@ -142,8 +162,13 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         await _favoritesService.addToFavorites(widget.productId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ajouté aux favoris'),
+            SnackBar(
+              content: Text(
+                localizations.translateParams(
+                  'added_to_favorites',
+                  {'name': productName},
+                ),
+              ),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 1),
             ),
@@ -153,9 +178,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       setState(() => isFavorite = !isFavorite);
     } catch (e) {
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text(
+              localizations.translateParams(
+                'error_with_details',
+                {'error': e.toString()},
+              ),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -199,6 +230,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   }
 
   Future<void> _openReviewComposer() async {
+    final localizations = AppLocalizations.of(context);
     final initialRating = (_myReview?['rating'] is num)
         ? (_myReview!['rating'] as num).toDouble()
         : 5.0;
@@ -225,7 +257,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _myReview == null ? 'Laisser un avis' : 'Modifier mon avis',
+                _myReview == null
+                    ? localizations.translate('leave_review')
+                    : localizations.translate('edit_my_review'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
@@ -242,8 +276,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               TextField(
                 controller: controller,
                 maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Commentaire (optionnel)',
+                decoration: InputDecoration(
+                  labelText: localizations.translate('review_comment_optional'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -253,7 +287,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Envoyer'),
+                  child: Text(localizations.translate('send')),
                 ),
               ),
             ],
@@ -283,13 +317,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Avis envoyé. +5 points ajoutés')),
+          SnackBar(content: Text(localizations.translate('review_submitted_bonus'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur avis: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(
+              localizations.translateParams(
+                'review_error_with_details',
+                {'error': e.toString()},
+              ),
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -297,8 +339,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
   Future<void> _addToCart() async {
     try {
+      final localizations = AppLocalizations.of(context);
       if (product == null) {
-        throw Exception('Produit non trouvé');
+        throw Exception(localizations.translate('product_not_found'));
       }
 
       final mapped = <String, dynamic>{
@@ -336,13 +379,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       await classic_provider.Provider.of<CartProvider>(context, listen: false).addItem(p, quantity);
       
       if (mounted) {
+        final productName = (product?['name']?.toString() ?? '').trim().isNotEmpty
+            ? (product?['name']?.toString() ?? '').trim()
+            : localizations.translate('unnamed_product');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${product!['name']} ajouté au panier'),
+            content: Text(
+              localizations.translateParams(
+                'added_to_cart',
+                {'name': productName},
+              ),
+            ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
             action: SnackBarAction(
-              label: 'Voir le panier',
+              label: localizations.translate('view_cart'),
               textColor: Colors.white,
               onPressed: () => context.go('/cart'),
             ),
@@ -351,9 +402,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final localizations = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text(
+              localizations.translateParams(
+                'error_with_details',
+                {'error': e.toString()},
+              ),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -363,6 +420,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     if (isLoading) {
       return Scaffold(
         body: const Center(
@@ -374,8 +432,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     if (product == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(
-          child: Text('Produit non trouvé'),
+        body: Center(
+          child: Text(localizations.translate('product_not_found')),
         ),
       );
     }
@@ -531,7 +589,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         TextButton.icon(
                           onPressed: _openReviewComposer,
                           icon: const Icon(Icons.rate_review_outlined, size: 18),
-                          label: Text(_myReview == null ? 'Laisser un avis' : 'Modifier'),
+                          label: Text(
+                            _myReview == null
+                                ? localizations.translate('leave_review')
+                                : localizations.translate('edit'),
+                          ),
                         ),
                       ],
                     ),
@@ -563,8 +625,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           ),
                           child: Text(
                             (product!['stock_quantity'] ?? 0) > 0
-                                ? 'En stock (${product!['stock_quantity']})'
-                                : 'Rupture de stock',
+                                ? localizations.translateParams(
+                                    'in_stock_with_count',
+                                    {
+                                      'count':
+                                          ((product!['stock_quantity'] as num?)?.toInt() ?? 0)
+                                              .toString(),
+                                    },
+                                  )
+                                : localizations.translate('out_of_stock'),
                             style: TextStyle(
                               color: (product!['stock_quantity'] ?? 0) > 0
                                   ? Colors.green.shade700
@@ -580,8 +649,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     const SizedBox(height: 24),
                     
                     // Description
-                    const Text(
-                      'Description',
+                    Text(
+                      localizations.translate('description'),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -589,7 +658,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      product!['description'] ?? 'Aucune description disponible',
+                      product!['description'] ?? localizations.translate('no_description_available'),
                       style: const TextStyle(
                         fontSize: 14,
                         height: 1.5,
@@ -599,8 +668,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
                     const SizedBox(height: 24),
 
-                    const Text(
-                      'Avis',
+                    Text(
+                      localizations.translate('reviews'),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -611,7 +680,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
                     else if (_reviews.isEmpty)
                       Text(
-                        'Aucun avis pour le moment',
+                        localizations.translate('no_reviews_yet'),
                         style: TextStyle(color: Colors.grey.shade600),
                       )
                     else
@@ -626,7 +695,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           final lastName = profiles?['last_name']?.toString();
                           final who = ((firstName ?? '').trim().isNotEmpty || (lastName ?? '').trim().isNotEmpty)
                               ? '${(firstName ?? '').trim()} ${(lastName ?? '').trim()}'.trim()
-                              : 'Client';
+                              : localizations.translate('customer');
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
@@ -674,8 +743,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     // Sélecteur de quantité
                     Row(
                       children: [
-                        const Text(
-                          'Quantité:',
+                        Text(
+                          '${localizations.translate('quantity')}:',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
@@ -723,8 +792,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     
                     // Produits similaires
                     if (similarProducts.isNotEmpty) ...[
-                      const Text(
-                        'Produits similaires',
+                      Text(
+                        localizations.translate('similar_products'),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -829,8 +898,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 const SizedBox(width: 8),
                 Text(
                   (product!['stock_quantity'] ?? 0) > 0
-                      ? 'Ajouter au panier'
-                      : 'Rupture de stock',
+                      ? localizations.translate('addToCart')
+                      : localizations.translate('out_of_stock'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -861,6 +930,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       imageUrl,
       fit: fit,
       errorBuilder: (context, error, stackTrace) {
+        final localizations = AppLocalizations.of(context);
         return Container(
           color: Colors.grey.shade200,
           child: Column(
@@ -873,7 +943,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                product?['name'] ?? 'Produit',
+                product?['name'] ?? localizations.translate('product'),
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: 12,

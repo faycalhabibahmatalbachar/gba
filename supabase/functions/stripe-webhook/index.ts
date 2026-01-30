@@ -41,29 +41,96 @@ Deno.serve(async (req) => {
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = (session.metadata?.order_id ?? session.client_reference_id)?.toString();
 
+      const piId = session.payment_intent?.toString() ?? null;
+
       await supabase
         .from('payments')
         .update({
           status: 'succeeded',
-          stripe_payment_intent_id: session.payment_intent ?? null,
+          stripe_payment_intent_id: piId,
         })
         .eq('stripe_checkout_session_id', session.id);
 
       if (orderId) {
-        await supabase
+        const { error: updErr1 } = await supabase
           .from('orders')
           .update({
             payment_status: 'paid',
             status: 'processing',
             paid_at: new Date().toISOString(),
-            stripe_payment_intent_id: session.payment_intent ?? null,
+            stripe_payment_intent_id: piId,
           })
           .eq('id', orderId);
+
+        if (updErr1) {
+          await supabase
+            .from('orders')
+            .update({
+              payment_status: 'paid',
+              status: 'processing',
+            })
+            .eq('id', orderId);
+        }
+      }
+    }
+
+    if (event.type === 'payment_intent.succeeded') {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      const orderId = pi.metadata?.order_id?.toString();
+
+      await supabase
+        .from('payments')
+        .update({
+          status: 'succeeded',
+          stripe_payment_intent_id: pi.id,
+        })
+        .eq('stripe_payment_intent_id', pi.id);
+
+      if (orderId) {
+        const { error: updErr1 } = await supabase
+          .from('orders')
+          .update({
+            payment_status: 'paid',
+            status: 'processing',
+            paid_at: new Date().toISOString(),
+            stripe_payment_intent_id: pi.id,
+          })
+          .eq('id', orderId);
+
+        if (updErr1) {
+          await supabase
+            .from('orders')
+            .update({
+              payment_status: 'paid',
+              status: 'processing',
+            })
+            .eq('id', orderId);
+        }
+      } else {
+        const { error: updErr1 } = await supabase
+          .from('orders')
+          .update({
+            payment_status: 'paid',
+            status: 'processing',
+            paid_at: new Date().toISOString(),
+          })
+          .eq('stripe_payment_intent_id', pi.id);
+
+        if (updErr1) {
+          await supabase
+            .from('orders')
+            .update({
+              payment_status: 'paid',
+              status: 'processing',
+            })
+            .eq('stripe_payment_intent_id', pi.id);
+        }
       }
     }
 
     if (event.type === 'payment_intent.payment_failed') {
       const pi = event.data.object as Stripe.PaymentIntent;
+      const orderId = pi.metadata?.order_id?.toString();
 
       await supabase
         .from('payments')
@@ -73,12 +140,30 @@ Deno.serve(async (req) => {
         })
         .eq('stripe_payment_intent_id', pi.id);
 
-      await supabase
-        .from('orders')
-        .update({
-          payment_status: 'failed',
-        })
-        .eq('stripe_payment_intent_id', pi.id);
+      if (orderId) {
+        const { error: updErr1 } = await supabase
+          .from('orders')
+          .update({
+            payment_status: 'failed',
+          })
+          .eq('id', orderId);
+
+        if (updErr1) {
+          await supabase
+            .from('orders')
+            .update({
+              payment_status: 'failed',
+            })
+            .eq('stripe_payment_intent_id', pi.id);
+        }
+      } else {
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: 'failed',
+          })
+          .eq('stripe_payment_intent_id', pi.id);
+      }
     }
 
     return new Response(JSON.stringify({ ok: true }), {

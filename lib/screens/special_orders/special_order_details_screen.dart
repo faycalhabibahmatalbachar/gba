@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../localization/app_localizations.dart';
 import '../../services/special_order_service.dart';
+import '../../widgets/app_state_view.dart';
 
 class SpecialOrderDetailsScreen extends StatefulWidget {
   final String specialOrderId;
@@ -18,6 +20,8 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
 
   bool _loading = true;
   bool _actionLoading = false;
+
+  String? _errorMessage;
 
   Map<String, dynamic>? _order;
   List<Map<String, dynamic>> _offers = [];
@@ -44,6 +48,7 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
+      _errorMessage = null;
     });
 
     try {
@@ -57,11 +62,18 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
         _offers = offers;
         _events = events;
         _loading = false;
+        _errorMessage = null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      final localizations = AppLocalizations.of(context);
+      final message = localizations.translateParams(
+        'special_order_loading_error_with_details',
+        {'error': e.toString()},
+      );
       setState(() {
         _loading = false;
+        _errorMessage = message;
       });
     }
   }
@@ -95,7 +107,8 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
     try {
       await _service.acceptQuote(widget.specialOrderId);
       if (!mounted) return;
-      _showSnack('Devis accepté', backgroundColor: Colors.green);
+      final localizations = AppLocalizations.of(context);
+      _showSnack(localizations.translate('special_order_quote_accepted'), backgroundColor: Colors.green);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -107,28 +120,29 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
   }
 
   Future<void> _reject() async {
+    final localizations = AppLocalizations.of(context);
     final controller = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Refuser le devis'),
+          title: Text(localizations.translate('special_order_reject_dialog_title')),
           content: TextField(
             controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Message (optionnel)',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: localizations.translate('special_order_optional_message_label'),
+              border: const OutlineInputBorder(),
             ),
             maxLines: 3,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
+              child: Text(localizations.translate('cancel')),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Refuser'),
+              child: Text(localizations.translate('special_order_reject_quote')),
             ),
           ],
         );
@@ -141,7 +155,7 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
     try {
       await _service.rejectQuote(widget.specialOrderId, message: controller.text.trim());
       if (!mounted) return;
-      _showSnack('Devis refusé', backgroundColor: Colors.orange);
+      _showSnack(localizations.translate('special_order_quote_rejected'), backgroundColor: Colors.orange);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -153,6 +167,7 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
   }
 
   Future<void> _counter() async {
+    final localizations = AppLocalizations.of(context);
     final unitCtrl = TextEditingController();
     final shipCtrl = TextEditingController(text: '0');
     final msgCtrl = TextEditingController();
@@ -161,15 +176,15 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Proposer une contre-offre'),
+          title: Text(localizations.translate('special_order_counter_dialog_title')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: unitCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Prix unitaire proposé',
+                decoration: InputDecoration(
+                  labelText: localizations.translate('special_order_unit_price_label'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -177,16 +192,16 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
               TextField(
                 controller: shipCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Frais de livraison proposés',
+                decoration: InputDecoration(
+                  labelText: localizations.translate('special_order_shipping_fee_label'),
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: msgCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Message (optionnel)',
+                decoration: InputDecoration(
+                  labelText: localizations.translate('special_order_optional_message_label'),
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
@@ -196,11 +211,11 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
+              child: Text(localizations.translate('cancel')),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Envoyer'),
+              child: Text(localizations.translate('send')),
             ),
           ],
         );
@@ -213,7 +228,7 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
     final ship = double.tryParse(shipCtrl.text.trim()) ?? 0;
     if (unit == null || unit <= 0) {
       if (!mounted) return;
-      _showSnack('Prix unitaire invalide');
+      _showSnack(localizations.translate('special_order_invalid_unit_price'));
       return;
     }
 
@@ -226,7 +241,7 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
         message: msgCtrl.text.trim(),
       );
       if (!mounted) return;
-      _showSnack('Contre-offre envoyée', backgroundColor: Colors.green);
+      _showSnack(localizations.translate('special_order_counter_offer_sent'), backgroundColor: Colors.green);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -242,22 +257,52 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
     if (_loading) {
       return const Scaffold(
         body: SafeArea(
-          child: Center(child: CircularProgressIndicator()),
+          child: AppStateView(state: AppViewState.loading),
         ),
       );
     }
 
+    final localizations = AppLocalizations.of(context);
+
     final order = _order;
+    if (order == null && _errorMessage != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(localizations.translate('special_order_details_title')),
+        ),
+        body: SafeArea(
+          child: AppStateView(
+            state: AppViewState.error,
+            title: localizations.translate('error_loading'),
+            subtitle: _errorMessage,
+            primaryActionLabel: localizations.translate('retry'),
+            onPrimaryAction: _load,
+            secondaryActionLabel: localizations.translate('back'),
+            onSecondaryAction: () => context.go('/special-orders'),
+          ),
+        ),
+      );
+    }
+
     if (order == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Commande spéciale'),
+          title: Text(localizations.translate('special_order_details_title')),
         ),
-        body: const Center(child: Text('Commande introuvable')),
+        body: SafeArea(
+          child: AppStateView(
+            state: AppViewState.empty,
+            title: localizations.translate('special_order_not_found'),
+            primaryActionLabel: localizations.translate('retry'),
+            onPrimaryAction: _load,
+            secondaryActionLabel: localizations.translate('back'),
+            onSecondaryAction: () => context.go('/special-orders'),
+          ),
+        ),
       );
     }
 
-    final title = order['product_name']?.toString() ?? 'Commande spéciale';
+    final title = order['product_name']?.toString() ?? localizations.translate('special_order_generic_title');
     final status = order['status']?.toString() ?? 'pending';
 
     final currency = order['currency']?.toString() ?? 'XOF';
@@ -276,7 +321,7 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Détails commande spéciale'),
+        title: Text(localizations.translate('special_order_details_title')),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -299,7 +344,13 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
         children: [
           Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          Text('Statut: ${quoteStatus ?? status}', style: TextStyle(color: Colors.grey.shade700)),
+          Text(
+            localizations.translateParams(
+              'special_order_status_with_status',
+              {'status': (quoteStatus ?? status).toString()},
+            ),
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
           const SizedBox(height: 14),
           if (quoteTotal != null)
             _PriceCard(
@@ -314,12 +365,17 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
               formatDateTime: _formatDateTime,
             )
           else
-            const _InfoCard(text: 'En attente de devis'),
+            _InfoCard(text: localizations.translate('special_order_quote_pending')),
           if (etaMin != null || etaMax != null) ...[
             const SizedBox(height: 12),
             _InfoCard(
-              text:
-                  'Arrivée estimée: ${_formatDate(etaMin)}${etaMax != null ? ' - ${_formatDate(etaMax)}' : ''}',
+              text: localizations.translateParams(
+                'special_order_eta_with_range',
+                {
+                  'range':
+                      '${_formatDate(etaMin)}${etaMax != null ? ' - ${_formatDate(etaMax)}' : ''}',
+                },
+              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -329,14 +385,14 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _actionLoading ? null : _accept,
-                    child: const Text('Accepter'),
+                    child: Text(localizations.translate('special_order_accept_quote')),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _actionLoading ? null : _reject,
-                    child: const Text('Refuser'),
+                    child: Text(localizations.translate('special_order_reject_quote')),
                   ),
                 ),
               ],
@@ -347,18 +403,18 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: _actionLoading ? null : _counter,
-                child: const Text('Négocier (contre-offre)'),
+                child: Text(localizations.translate('special_order_negotiate_quote')),
               ),
             ),
           ],
           const SizedBox(height: 18),
-          const Text('Historique', style: TextStyle(fontWeight: FontWeight.w800)),
+          Text(localizations.translate('special_order_history'), style: const TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
           if (_offers.isEmpty && _events.isEmpty)
-            const _InfoCard(text: 'Aucun événement pour le moment')
+            _InfoCard(text: localizations.translate('no_events_yet'))
           else ...[
             if (_events.isNotEmpty) ...[
-              const Text('Timeline', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(localizations.translate('special_order_timeline'), style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               ..._events.map((e) {
                 final label = e['label']?.toString() ?? e['event_type']?.toString() ?? '';
@@ -371,7 +427,10 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
               const SizedBox(height: 12),
             ],
             if (_offers.isNotEmpty) ...[
-              const Text('Offres / messages', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                localizations.translate('special_order_offers_messages'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 8),
               ..._offers.map((o) {
                 final role = o['from_role']?.toString() ?? '';
@@ -382,7 +441,12 @@ class _SpecialOrderDetailsScreenState extends State<SpecialOrderDetailsScreen> {
                 final currencyOffer = o['currency']?.toString() ?? currency;
 
                 final header = '${role.toUpperCase()} • ${type.toUpperCase()}';
-                final priceLine = total != null ? 'Total: ${_formatMoney(total, currencyOffer)}' : null;
+                final priceLine = total != null
+                    ? localizations.translateParams(
+                        'special_order_quote_with_amount',
+                        {'amount': _formatMoney(total, currencyOffer)},
+                      )
+                    : null;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -457,6 +521,7 @@ class _PriceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -474,17 +539,17 @@ class _PriceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Devis', style: TextStyle(fontWeight: FontWeight.w800)),
+          Text(localizations.translate('special_order_quote'), style: const TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          _line('Sous-total', subtotal, currency),
-          _line('Livraison', shipping, currency),
-          _line('Tax', tax, currency),
-          _line('Service', serviceFee, currency),
+          _line(localizations.translate('special_order_subtotal'), subtotal, currency),
+          _line(localizations.translate('special_order_shipping'), shipping, currency),
+          _line(localizations.translate('special_order_tax'), tax, currency),
+          _line(localizations.translate('special_order_service_fee'), serviceFee, currency),
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total', style: TextStyle(fontWeight: FontWeight.w900)),
+              Text(localizations.translate('special_order_total'), style: const TextStyle(fontWeight: FontWeight.w900)),
               Text(
                 formatMoney(total, currency),
                 style: const TextStyle(fontWeight: FontWeight.w900),
@@ -494,7 +559,10 @@ class _PriceCard extends StatelessWidget {
           if (validUntil != null) ...[
             const SizedBox(height: 10),
             Text(
-              'Valable jusqu\'au: ${formatDateTime(validUntil)}',
+              localizations.translateParams(
+                'special_order_valid_until_with_date',
+                {'date': formatDateTime(validUntil)},
+              ),
               style: TextStyle(color: Colors.grey.shade700),
             ),
           ],

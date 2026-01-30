@@ -56,6 +56,18 @@ flutter run -d chrome  # Pour le web
 flutter run           # Pour mobile
 ```
 
+#### Paiement Stripe (mobile)
+
+Le paiement par carte via Stripe utilise `flutter_stripe` (PaymentSheet) et nécessite une clé publishable :
+
+```bash
+flutter run --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_... --dart-define=SUPABASE_URL=https://xxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJ...
+```
+
+- **Return URL** utilisée: `flutterstripe://redirect`
+- **Android**: l'application doit gérer le deep link `flutterstripe://redirect` (intent-filter déjà ajouté dans `AndroidManifest.xml`).
+- **Web**: PaymentSheet n'est pas supportée (Stripe web est expérimental) — utilisez Flutterwave ou paiement à la livraison.
+
 ### Admin React
 ```bash
 cd admin-react

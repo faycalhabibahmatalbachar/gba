@@ -64,6 +64,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         .toLowerCase();
   }
 
+  String _normalizePhone(String phone) {
+    final trimmed = phone.trim();
+    final digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.isEmpty ? '' : '+$digits';
+  }
+
   Map<String, String?> _splitFullName(String fullName) {
     final normalized = fullName.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (normalized.isEmpty) {
@@ -240,6 +246,78 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       state = state.copyWith(isLoading: false, error: message, errorCode: code);
+    }
+  }
+
+  Future<void> requestPhoneOtp({
+    required String phone,
+    String? fullName,
+    String? locale,
+    bool shouldCreateUser = true,
+  }) async {
+    final normalizedPhone = _normalizePhone(phone);
+    _log('requestPhoneOtp start: phone=$normalizedPhone, shouldCreateUser=$shouldCreateUser');
+
+    if (normalizedPhone.isEmpty) {
+      state = state.copyWith(isLoading: false, error: 'Numéro de téléphone invalide.');
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, error: null, errorCode: null);
+    try {
+      await Supabase.instance.client.auth.signInWithOtp(
+        phone: normalizedPhone,
+        shouldCreateUser: shouldCreateUser,
+        data: {
+          if (fullName != null && fullName.trim().isNotEmpty) 'full_name': fullName.trim(),
+          if (locale != null && locale.trim().isNotEmpty) 'locale': locale.trim(),
+        },
+      );
+      state = state.copyWith(isLoading: false);
+      _log('requestPhoneOtp success');
+    } catch (e) {
+      _log('requestPhoneOtp error: $e');
+      String message = e.toString();
+      if (e is AuthApiException) {
+        message = e.message;
+      }
+      state = state.copyWith(isLoading: false, error: message);
+    }
+  }
+
+  Future<void> verifyPhoneOtp({required String phone, required String token}) async {
+    final normalizedPhone = _normalizePhone(phone);
+    final normalizedToken = token.trim();
+    _log('verifyPhoneOtp start: phone=$normalizedPhone');
+
+    if (normalizedPhone.isEmpty || normalizedToken.isEmpty) {
+      state = state.copyWith(isLoading: false, error: 'Code OTP invalide.');
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, error: null, errorCode: null);
+    try {
+      final response = await Supabase.instance.client.auth.verifyOTP(
+        type: OtpType.sms,
+        phone: normalizedPhone,
+        token: normalizedToken,
+      );
+
+      if (response.user == null) {
+        state = state.copyWith(isLoading: false, error: 'OTP invalide.');
+        return;
+      }
+
+      state = state.copyWith(user: response.user, isLoading: false);
+      await _loadProfile();
+      _log('verifyPhoneOtp success: userId=${response.user!.id}');
+    } catch (e) {
+      _log('verifyPhoneOtp error: $e');
+      String message = e.toString();
+      if (e is AuthApiException) {
+        message = e.message;
+      }
+      state = state.copyWith(isLoading: false, error: message);
     }
   }
 

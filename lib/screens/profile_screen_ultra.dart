@@ -15,6 +15,7 @@ import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../routes/app_routes.dart';
 import '../widgets/adaptive_scaffold.dart';
+import '../localization/app_localizations.dart';
 import 'settings_screen_premium.dart';
 
 class ProfileScreenUltra extends StatefulWidget {
@@ -129,6 +130,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
 
   Widget _buildProfileCompletionCard(Profile? profile) {
+    final localizations = AppLocalizations.of(context);
     final ratio = _profileCompletionRatio(profile);
     final percent = (ratio * 100).round();
     final isComplete = ratio >= 0.999;
@@ -158,7 +160,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               children: [
                 Expanded(
                   child: Text(
-                    'Complétion du profil',
+                    localizations.translate('profile_completion_title'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -184,14 +186,14 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
             if (!isComplete) ...[
               const SizedBox(height: 12),
               Text(
-                'Complète ton profil pour accélérer le checkout.',
+                localizations.translate('profile_completion_hint'),
                 style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
                 onPressed: () => context.push('/onboarding'),
                 icon: const Icon(Icons.auto_fix_high_rounded),
-                label: const Text('Compléter maintenant'),
+                label: Text(localizations.translate('complete_now')),
                 style: ElevatedButton.styleFrom(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -342,6 +344,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
 
   Future<void> _showAvatarActions() async {
+    final localizations = AppLocalizations.of(context);
     final avatarUrl = _profile?.avatarUrl;
 
     final action = await showModalBottomSheet<String>(
@@ -370,7 +373,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 const SizedBox(height: 12),
                 ListTile(
                   leading: const Icon(Icons.visibility),
-                  title: const Text('Voir'),
+                  title: Text(localizations.translate('view')),
                   enabled: avatarUrl != null && avatarUrl.trim().isNotEmpty,
                   onTap: avatarUrl == null || avatarUrl.trim().isEmpty
                       ? null
@@ -378,12 +381,15 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 ),
                 ListTile(
                   leading: const Icon(Icons.photo_camera),
-                  title: const Text('Modifier'),
+                  title: Text(localizations.translate('edit')),
                   onTap: () => Navigator.pop(context, 'change'),
                 ),
                 ListTile(
                   leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
-                  title: Text('Supprimer', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  title: Text(
+                    localizations.translate('delete'),
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
                   enabled: avatarUrl != null && avatarUrl.trim().isNotEmpty,
                   onTap: avatarUrl == null || avatarUrl.trim().isEmpty
                       ? null
@@ -399,7 +405,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     if (action == null) return;
 
     if (action == 'view' && avatarUrl != null && avatarUrl.trim().isNotEmpty) {
-      await _showImageViewer(title: 'Photo de profil', imageUrl: avatarUrl);
+      await _showImageViewer(title: localizations.translate('profile_photo'), imageUrl: avatarUrl);
       return;
     }
     if (action == 'change') {
@@ -418,6 +424,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
 
   Future<void> _showCoverActions() async {
+    final localizations = AppLocalizations.of(context);
     final coverUrl = _coverUrl;
 
     final action = await showModalBottomSheet<String>(
@@ -446,7 +453,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 const SizedBox(height: 12),
                 ListTile(
                   leading: const Icon(Icons.visibility),
-                  title: const Text('Voir'),
+                  title: Text(localizations.translate('view')),
                   enabled: coverUrl != null && coverUrl.trim().isNotEmpty,
                   onTap: coverUrl == null || coverUrl.trim().isEmpty
                       ? null
@@ -454,12 +461,15 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 ),
                 ListTile(
                   leading: const Icon(Icons.photo),
-                  title: const Text('Modifier'),
+                  title: Text(localizations.translate('edit')),
                   onTap: () => Navigator.pop(context, 'change'),
                 ),
                 ListTile(
                   leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
-                  title: Text('Supprimer', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  title: Text(
+                    localizations.translate('delete'),
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
                   enabled: coverUrl != null && coverUrl.trim().isNotEmpty,
                   onTap: coverUrl == null || coverUrl.trim().isEmpty
                       ? null
@@ -475,7 +485,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     if (action == null) return;
 
     if (action == 'view' && coverUrl != null && coverUrl.trim().isNotEmpty) {
-      await _showImageViewer(title: 'Photo de couverture', imageUrl: coverUrl);
+      await _showImageViewer(title: localizations.translate('cover_photo'), imageUrl: coverUrl);
       return;
     }
     if (action == 'change') {
@@ -500,9 +510,9 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Choisir une couverture',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              Text(
+                localizations.translate('choose_cover'),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 24),
               Row(
@@ -510,12 +520,12 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 children: [
                   _buildImageSourceOption(
                     icon: FontAwesomeIcons.camera,
-                    label: 'Caméra',
+                    label: localizations.translate('camera'),
                     onTap: () => Navigator.pop(context, ImageSource.camera),
                   ),
                   _buildImageSourceOption(
                     icon: FontAwesomeIcons.images,
-                    label: 'Galerie',
+                    label: localizations.translate('gallery'),
                     onTap: () => Navigator.pop(context, ImageSource.gallery),
                   ),
                 ],
@@ -557,6 +567,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   
   Future<void> _pickImage() async {
     try {
+      final localizations = AppLocalizations.of(context);
       setState(() => _isUploadingPhoto = true);
       
       final source = await showModalBottomSheet<ImageSource>(
@@ -580,9 +591,9 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Choisir une photo',
-                style: TextStyle(
+              Text(
+                localizations.translate('choose_photo'),
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -593,12 +604,12 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 children: [
                   _buildImageSourceOption(
                     icon: FontAwesomeIcons.camera,
-                    label: 'Caméra',
+                    label: localizations.translate('camera'),
                     onTap: () => Navigator.pop(context, ImageSource.camera),
                   ),
                   _buildImageSourceOption(
                     icon: FontAwesomeIcons.images,
-                    label: 'Galerie',
+                    label: localizations.translate('gallery'),
                     onTap: () => Navigator.pop(context, ImageSource.gallery),
                   ),
                 ],
@@ -623,12 +634,12 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           
           if (avatarUrl != null) {
             _loadProfile();
-            _showSuccessMessage('Photo mise à jour avec succès!');
+            _showSuccessMessage(localizations.translate('photo_updated_success'));
           }
         }
       }
     } catch (e) {
-      _showErrorMessage('Erreur lors de la mise à jour de la photo');
+      _showErrorMessage(AppLocalizations.of(context).translate('photo_update_error'));
     } finally {
       setState(() => _isUploadingPhoto = false);
     }
@@ -683,22 +694,22 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     if (success && mounted) {
       setState(() => _isEditing = false);
       _loadProfile();
-      _showSuccessMessage('Profil mis à jour avec succès!');
+      _showSuccessMessage(AppLocalizations.of(context).translate('profile_updated_success'));
     }
   }
   
   bool _validateForm() {
     if (_firstNameController.text.isEmpty || _lastNameController.text.isEmpty) {
-      _showErrorMessage('Veuillez remplir tous les champs obligatoires');
+      _showErrorMessage(AppLocalizations.of(context).translate('fill_required_fields'));
       return false;
     }
     final phoneDigits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (phoneDigits.isNotEmpty && phoneDigits.length < 8) {
-      _showErrorMessage('Numéro de téléphone invalide');
+      _showErrorMessage(AppLocalizations.of(context).translate('invalid_phone_number'));
       return false;
     }
     if (_emailController.text.isNotEmpty && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text)) {
-      _showErrorMessage('Email invalide');
+      _showErrorMessage(AppLocalizations.of(context).translate('invalid_email'));
       return false;
     }
     return true;
@@ -843,6 +854,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildErrorState() {
+    final localizations = AppLocalizations.of(context);
     return Scaffold(
       body: Center(
         child: Column(
@@ -855,7 +867,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
             ),
             const SizedBox(height: 16),
             Text(
-              'Erreur de chargement',
+              localizations.translate('error_loading'),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -866,7 +878,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               onPressed: () {
                 _loadProfile();
               },
-              child: const Text('Réessayer'),
+              child: Text(localizations.translate('retry')),
             ),
           ],
         ),
@@ -1089,6 +1101,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   Widget _buildAnimatedStats(Map<String, dynamic> stats) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final localizations = AppLocalizations.of(context);
         final isNarrow = constraints.maxWidth < 380;
         return GridView.count(
           shrinkWrap: true,
@@ -1100,28 +1113,28 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           children: [
             _buildStatCard(
               icon: FontAwesomeIcons.bagShopping,
-              label: 'Commandes',
+              label: localizations.translate('orders'),
               value: stats['orders'].toString(),
               color: Colors.blue,
               delay: 0,
             ),
             _buildStatCard(
               icon: FontAwesomeIcons.heart,
-              label: 'Favoris',
+              label: localizations.translate('favorites'),
               value: stats['favorites'].toString(),
               color: Colors.red,
               delay: 100,
             ),
             _buildStatCard(
               icon: FontAwesomeIcons.star,
-              label: 'Avis',
+              label: localizations.translate('reviews'),
               value: stats['reviews'].toString(),
               color: Colors.amber,
               delay: 200,
             ),
             _buildStatCard(
               icon: FontAwesomeIcons.coins,
-              label: 'Points',
+              label: localizations.translate('points'),
               value: stats['points'].toString(),
               color: Colors.green,
               delay: 300,
@@ -1210,6 +1223,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   Widget _buildTabSelector() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final localizations = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -1238,7 +1252,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 ),
                 child: Center(
                   child: Text(
-                    'Informations',
+                    localizations.translate('profile_tab_info'),
                     style: TextStyle(
                       fontWeight: _selectedTab == 0 ? FontWeight.bold : FontWeight.normal,
                       color: _selectedTab == 0
@@ -1270,7 +1284,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 ),
                 child: Center(
                   child: Text(
-                    'Modifier',
+                    localizations.translate('profile_tab_edit'),
                     style: TextStyle(
                       fontWeight: _selectedTab == 1 ? FontWeight.bold : FontWeight.normal,
                       color: _selectedTab == 1
@@ -1288,25 +1302,50 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildProfileInfo(Profile? profile) {
+    final localizations = AppLocalizations.of(context);
     final email = _effectiveEmail(profile);
     return Column(
       key: const ValueKey('info'),
       children: [
         _buildInfoCard(
-          title: 'Informations personnelles',
+          title: localizations.translate('personal_information'),
           children: [
-            _buildInfoRow(FontAwesomeIcons.user, 'Nom complet', '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}'),
-            _buildInfoRow(FontAwesomeIcons.envelope, 'Email', email.isEmpty ? 'Non renseigné' : email),
-            _buildInfoRow(FontAwesomeIcons.phone, 'Téléphone', profile?.phone ?? 'Non renseigné'),
+            _buildInfoRow(
+              FontAwesomeIcons.user,
+              localizations.translate('full_name'),
+              '${profile?.firstName ?? ''} ${profile?.lastName ?? ''}',
+            ),
+            _buildInfoRow(
+              FontAwesomeIcons.envelope,
+              localizations.translate('email'),
+              email.isEmpty ? localizations.translate('not_provided') : email,
+            ),
+            _buildInfoRow(
+              FontAwesomeIcons.phone,
+              localizations.translate('phone'),
+              profile?.phone ?? localizations.translate('not_provided'),
+            ),
           ],
         ),
         const SizedBox(height: 16),
         _buildInfoCard(
-          title: 'Adresse',
+          title: localizations.translate('address'),
           children: [
-            _buildInfoRow(FontAwesomeIcons.locationDot, 'Adresse', profile?.address ?? 'Non renseignée'),
-            _buildInfoRow(FontAwesomeIcons.city, 'Ville', profile?.city ?? 'Non renseignée'),
-            _buildInfoRow(FontAwesomeIcons.mailBulk, 'Code postal', profile?.postalCode ?? 'Non renseigné'),
+            _buildInfoRow(
+              FontAwesomeIcons.locationDot,
+              localizations.translate('address'),
+              profile?.address ?? localizations.translate('not_provided'),
+            ),
+            _buildInfoRow(
+              FontAwesomeIcons.city,
+              localizations.translate('city'),
+              profile?.city ?? localizations.translate('not_provided'),
+            ),
+            _buildInfoRow(
+              FontAwesomeIcons.mailBulk,
+              localizations.translate('postal_code'),
+              profile?.postalCode ?? localizations.translate('not_provided'),
+            ),
           ],
         ),
         if (profile?.bio != null && profile!.bio!.isNotEmpty) ...[
@@ -1346,9 +1385,9 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Bio',
-                          style: TextStyle(
+                        Text(
+                          AppLocalizations.of(context).translate('bio'),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1446,6 +1485,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   Widget _buildEditForm(Profile? profile) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final localizations = AppLocalizations.of(context);
     return Container(
       key: const ValueKey('form'),
       padding: const EdgeInsets.all(20),
@@ -1464,35 +1504,35 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
         children: [
           _buildFormField(
             controller: _firstNameController,
-            label: 'Prénom *',
+            label: '${localizations.translate('first_name')} *',
             icon: FontAwesomeIcons.user,
             required: true,
           ),
           const SizedBox(height: 16),
           _buildFormField(
             controller: _lastNameController,
-            label: 'Nom *',
+            label: '${localizations.translate('last_name')} *',
             icon: FontAwesomeIcons.user,
             required: true,
           ),
           const SizedBox(height: 16),
           _buildFormField(
             controller: _emailController,
-            label: 'Email',
+            label: localizations.translate('email'),
             icon: FontAwesomeIcons.envelope,
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 16),
           _buildFormField(
             controller: _phoneController,
-            label: 'Téléphone',
+            label: localizations.translate('phone'),
             icon: FontAwesomeIcons.phone,
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 16),
           _buildFormField(
             controller: _addressController,
-            label: 'Adresse',
+            label: localizations.translate('address'),
             icon: FontAwesomeIcons.locationDot,
           ),
           const SizedBox(height: 16),
@@ -1501,7 +1541,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               Expanded(
                 child: _buildFormField(
                   controller: _cityController,
-                  label: 'Ville',
+                  label: localizations.translate('city'),
                   icon: FontAwesomeIcons.city,
                 ),
               ),
@@ -1509,7 +1549,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               Expanded(
                 child: _buildFormField(
                   controller: _postalCodeController,
-                  label: 'Code postal',
+                  label: localizations.translate('postal_code'),
                   icon: FontAwesomeIcons.mailBulk,
                   keyboardType: TextInputType.number,
                 ),
@@ -1519,7 +1559,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           const SizedBox(height: 16),
           _buildFormField(
             controller: _bioController,
-            label: 'Bio',
+            label: localizations.translate('bio'),
             icon: FontAwesomeIcons.comment,
             maxLines: 3,
           ),
@@ -1537,7 +1577,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Annuler'),
+                  child: Text(localizations.translate('cancel')),
                 ),
               ),
               const SizedBox(width: 16),
@@ -1551,7 +1591,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Enregistrer'),
+                  child: Text(localizations.translate('save')),
                 ),
               ),
             ],
@@ -1593,11 +1633,12 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   }
   
   Widget _buildQuickActions() {
+    final localizations = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Actions rapides',
+          localizations.translate('quick_actions'),
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -1616,25 +1657,25 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               children: [
                 _buildActionCard(
                   icon: FontAwesomeIcons.bagShopping,
-                  label: 'Commandes',
+                  label: localizations.translate('orders'),
                   color: Colors.blue,
                   onTap: () => context.push('/orders'),
                 ),
                 _buildActionCard(
                   icon: FontAwesomeIcons.heart,
-                  label: 'Favoris',
+                  label: localizations.translate('favorites'),
                   color: Colors.red,
                   onTap: () => context.push('/favorites'),
                 ),
                 _buildActionCard(
                   icon: FontAwesomeIcons.lock,
-                  label: 'Mot de passe',
+                  label: localizations.translate('password'),
                   color: Colors.orange,
                   onTap: () => context.push('/settings/change-password'),
                 ),
                 _buildActionCard(
                   icon: FontAwesomeIcons.gear,
-                  label: 'Paramètres',
+                  label: localizations.translate('settings'),
                   color: Colors.grey,
                   onTap: () => context.push('/settings'),
                 ),
