@@ -503,11 +503,7 @@ async def recommendations(
     top_tag_set = set(top_tags)
 
     fetch_limit = max(safe_limit * 8, 40)
-    select_cols = (
-      'id,name,slug,description,price,compare_at_price,sku,quantity,track_quantity,'
-      'category_id,brand,main_image,images,specifications,tags,rating,reviews_count,'
-      'is_featured,is_active,created_at,updated_at'
-    )
+    select_cols = '*'
 
     candidates: List[Dict[str, Any]] = []
     source_parts: List[str] = []

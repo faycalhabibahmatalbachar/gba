@@ -22,9 +22,10 @@ class AppConfig {
   static const String _fallbackFirebaseVapidKey =
       'BDdYuPBqR6VbwiyiT1xPR4NglaIJo2JUQdgYTxwFpiPatYVDdlWqlDUtz-65ChmnMQ_oeWcAcL9FRF4FdxKDjvw';
 
-  static const String _fallbackSiteUrl = 'http://localhost:8080';
+  static const String _fallbackSiteUrl = 'https://gba-vc4s.vercel.app';
 
-  static const String _fallbackBackendUrl = 'http://localhost:8000';
+  static const String _fallbackBackendUrl =
+      'https://gba-vc4s-jb288157k-gbas-projects-38754d42.vercel.app';
 
   static const String _fallbackStripePublishableKey = '';
 

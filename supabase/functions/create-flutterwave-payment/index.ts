@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
     const siteUrl = origin && origin.startsWith('http')
       ? origin
-      : (Deno.env.get('SITE_URL') ?? 'http://localhost:1282');
+      : (Deno.env.get('SITE_URL') ?? 'https://gba-vc4s.vercel.app');
 
     const redirectUrl = `${siteUrl}/#/checkout/flutterwave-return?order_id=${order.id}`;
 
