@@ -52,7 +52,7 @@ Pour chaque bucket :
 Le client Flutter lit la configuration via `--dart-define` (voir `lib/config/app_config.dart`).
 
 ```bash
-flutter run --dart-define=SUPABASE_URL=https://xxxxxxxxxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJ... --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_...
+flutter run --dart-define=SUPABASE_URL=https://xxxxxxxxxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJ... --dart-define=SITE_URL=https://gba-vc4s.vercel.app --dart-define=BACKEND_URL=https://gba-vc4s-jb288157k-gbas-projects-38754d42.vercel.app --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
 Si tu n'utilises pas Stripe, tu peux omettre `STRIPE_PUBLISHABLE_KEY`.
