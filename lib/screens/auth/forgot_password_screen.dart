@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -34,10 +35,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _loading = true);
     try {
-      final baseUrl = AppConfig.siteUrl;
+      final baseUrl = AppConfig.siteUrl.trim();
+      final normalizedBaseUrl =
+          baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+      final redirectTo = kIsWeb
+          ? '$normalizedBaseUrl/#/reset-password'
+          : 'com.gba.ecommerce_client://login-callback';
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
-        redirectTo: '$baseUrl/#/reset-password',
+        redirectTo: redirectTo,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

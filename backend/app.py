@@ -78,17 +78,19 @@ class SupabaseUser(BaseModel):
 app = FastAPI()
 
 origins_raw = _env('CORS_ALLOW_ORIGINS')
-if not origins_raw:
-  origins = ['*']
-elif origins_raw == '*':
-  origins = ['*']
-else:
+if origins_raw:
   origins = [o.strip() for o in origins_raw.split(',') if o.strip()]
+else:
+  origins = [
+    "http://localhost:4074",
+    "https://gba-vc4s.vercel.app",
+    "https://gba-vc4s-jb288157k-gbas-projects-38754d42.vercel.app",
+  ]
 
 app.add_middleware(
   CORSMiddleware,
   allow_origins=origins,
-  allow_credentials=False,
+  allow_credentials=True,
   allow_methods=['*'],
   allow_headers=['*'],
 )
