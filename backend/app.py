@@ -80,16 +80,18 @@ app = FastAPI()
 origins_raw = _env('CORS_ALLOW_ORIGINS')
 if origins_raw:
   origins = [o.strip() for o in origins_raw.split(',') if o.strip()]
+  origin_regex = None
 else:
   origins = [
-    "http://localhost:4074",
     "https://gba-vc4s.vercel.app",
     "https://gba-vc4s-jb288157k-gbas-projects-38754d42.vercel.app",
   ]
+  origin_regex = None
 
 app.add_middleware(
   CORSMiddleware,
   allow_origins=origins,
+  allow_origin_regex=origin_regex,
   allow_credentials=True,
   allow_methods=['*'],
   allow_headers=['*'],

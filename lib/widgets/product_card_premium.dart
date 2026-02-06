@@ -44,28 +44,26 @@ class PremiumProductCard extends StatelessWidget {
           context.push('/product/${product.id}');
         },
         borderRadius: BorderRadius.circular(24),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Ink(
-            width: width,
-            decoration: BoxDecoration(
-              color: scheme.surface,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: scheme.primary.withOpacity(isDark ? 0.20 : 0.12),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: (isDark ? Colors.black : scheme.primary)
-                      .withOpacity(isDark ? 0.35 : 0.08),
-                  blurRadius: 22,
-                  offset: const Offset(0, 12),
-                  spreadRadius: -5,
-                ),
-              ],
+        child: Ink(
+          width: width,
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: scheme.primary.withOpacity(isDark ? 0.20 : 0.12),
+              width: 1,
             ),
-            child: Column(
+            boxShadow: [
+              BoxShadow(
+                color: (isDark ? Colors.black : scheme.primary)
+                    .withOpacity(isDark ? 0.35 : 0.08),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+                spreadRadius: -5,
+              ),
+            ],
+          ),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image Container avec badges
@@ -432,6 +430,7 @@ class PremiumProductCard extends StatelessWidget {
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // Category & Brand
                         if (product.brand != null)
@@ -496,8 +495,6 @@ class PremiumProductCard extends StatelessWidget {
                               ),
                           ],
                         ),
-                        
-                        const Spacer(),
                         
                         // Price Section
                         Row(
