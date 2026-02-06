@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user.dart';
 import '../services/supabase_service.dart';
+import '../routes/navigation_keys.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier();
@@ -102,6 +105,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = data.session?.user;
       _log('onAuthStateChange: $event, userId=${user?.id}, hasSession=${data.session != null}');
       state = state.copyWith(user: user, needsEmailConfirmation: false, errorCode: null);
+
+      if (event == AuthChangeEvent.passwordRecovery) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = NavigationKeys.rootNavigatorKey.currentContext;
+          if (ctx == null) {
+            _log('Password recovery detected but navigator context is null');
+            return;
+          }
+          _log('Password recovery detected -> go(/reset-password)');
+          GoRouter.of(ctx).go('/reset-password');
+        });
+      }
+
       if (user != null) {
         _loadProfile();
       } else {

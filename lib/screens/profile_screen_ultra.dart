@@ -13,7 +13,7 @@ import '../models/profile.dart';
 import '../services/profile_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
-import '../routes/app_routes.dart';
+import '../routes/navigation_keys.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../localization/app_localizations.dart';
 import 'settings_screen_premium.dart';
@@ -717,7 +717,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   
   void _showSuccessMessage(String message) {
     final messenger =
-        ScaffoldMessenger.maybeOf(context) ?? AppRoutes.scaffoldMessengerKey.currentState;
+        ScaffoldMessenger.maybeOf(context) ?? NavigationKeys.scaffoldMessengerKey.currentState;
     if (messenger == null) return;
     messenger.showSnackBar(
       SnackBar(
@@ -737,7 +737,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   
   void _showErrorMessage(String message) {
     final messenger =
-        ScaffoldMessenger.maybeOf(context) ?? AppRoutes.scaffoldMessengerKey.currentState;
+        ScaffoldMessenger.maybeOf(context) ?? NavigationKeys.scaffoldMessengerKey.currentState;
     if (messenger == null) return;
     messenger.showSnackBar(
       SnackBar(

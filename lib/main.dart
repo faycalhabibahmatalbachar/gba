@@ -1,17 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:app_links/app_links.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderScope, ConsumerState, ConsumerStatefulWidget;
 import 'services/activity_tracking_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'localization/app_localizations.dart';
 import 'config/app_config.dart';
 import 'routes/app_routes.dart';
+import 'routes/navigation_keys.dart';
+import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/cart_provider.dart';
@@ -88,11 +94,12 @@ void main() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
+    authOptions: const FlutterAuthClientOptions(detectSessionInUri: true),
   );
 
   if (firebaseReady) {
     try {
-      await NotificationService().init(navigatorKey: AppRoutes.rootNavigatorKey);
+      await NotificationService().init(navigatorKey: NavigationKeys.rootNavigatorKey);
     } catch (e) {
       debugPrint('[FCM] Notification init skipped/failed: $e');
     }
@@ -118,10 +125,73 @@ void main() async {
           ChangeNotifierProvider(create: (_) => NotificationPreferencesProvider()),
           ChangeNotifierProvider(create: (_) => MessagingService()),
         ],
-        child: const MyApp(),
+        child: const AppBootstrap(),
       ),
     ),
   );
+}
+
+class AppBootstrap extends ConsumerStatefulWidget {
+  const AppBootstrap({super.key});
+
+  @override
+  ConsumerState<AppBootstrap> createState() => _AppBootstrapState();
+}
+
+class _AppBootstrapState extends ConsumerState<AppBootstrap> {
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSub;
+  String? _lastHandledLink;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(authProvider);
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+    final initialUri = await _appLinks.getInitialLink();
+    if (initialUri != null) {
+      await _handleUri(initialUri);
+    }
+
+    _linkSub = _appLinks.uriLinkStream.listen(
+      (uri) {
+        _handleUri(uri);
+      },
+      onError: (err) {
+        debugPrint('[DeepLink] uriLinkStream error: $err');
+      },
+    );
+  }
+
+  Future<void> _handleUri(Uri uri) async {
+    if (uri.scheme != 'com.gba.ecommerce_client' || uri.host != 'login-callback') {
+      return;
+    }
+
+    final link = uri.toString();
+    if (_lastHandledLink == link) return;
+    _lastHandledLink = link;
+
+    try {
+      await Supabase.instance.client.auth.getSessionFromUrl(uri);
+    } catch (e) {
+      debugPrint('[DeepLink] getSessionFromUrl failed: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _linkSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const MyApp();
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -134,7 +204,7 @@ class MyApp extends StatelessWidget {
         return MaterialApp.router(
           title: 'GBA Store',
           debugShowCheckedModeBanner: false,
-          scaffoldMessengerKey: AppRoutes.scaffoldMessengerKey,
+          scaffoldMessengerKey: NavigationKeys.scaffoldMessengerKey,
           theme: AppThemes.lightTheme.copyWith(
             textTheme: GoogleFonts.poppinsTextTheme(AppThemes.lightTheme.textTheme),
           ),
@@ -145,7 +215,7 @@ class MyApp extends StatelessWidget {
           routerConfig: AppRoutes.router,
           builder: (context, child) {
             return I18nAuditOverlay(
-              navigatorKey: AppRoutes.rootNavigatorKey,
+              navigatorKey: NavigationKeys.rootNavigatorKey,
               router: AppRoutes.router,
               child: child ?? const SizedBox.shrink(),
             );

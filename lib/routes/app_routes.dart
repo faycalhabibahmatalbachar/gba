@@ -39,14 +39,15 @@ import '../screens/settings/notification_preferences_screen.dart';
 import '../screens/onboarding_flow_screen.dart';
 import '../services/onboarding_service.dart';
 import '../localization/app_localizations.dart';
+import 'navigation_keys.dart';
 
 class AppRoutes {
-  static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> rootNavigatorKey = NavigationKeys.rootNavigatorKey;
   static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
-      GlobalKey<ScaffoldMessengerState>();
+      NavigationKeys.scaffoldMessengerKey;
 
   static final router = GoRouter(
-    navigatorKey: rootNavigatorKey,
+    navigatorKey: NavigationKeys.rootNavigatorKey,
     initialLocation: '/splash',
     errorBuilder: (context, state) {
       final localizations = AppLocalizations.of(context);
@@ -122,6 +123,7 @@ class AppRoutes {
       final session = supabase.auth.currentSession;
       final isLoggedIn = session != null;
       final isSplashRoute = state.matchedLocation == '/splash';
+      final isResetPasswordRoute = state.matchedLocation == '/reset-password';
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/splash' ||
           state.matchedLocation == '/welcome' ||
@@ -180,6 +182,9 @@ class AppRoutes {
       
       // If logged in and trying to access auth routes
       if (isLoggedIn && isAuthRoute) {
+        if (isResetPasswordRoute) {
+          return null;
+        }
         try {
           final userId = supabase.auth.currentUser?.id;
           if (userId != null) {
