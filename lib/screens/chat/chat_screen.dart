@@ -7,11 +7,17 @@ import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:gal/gal.dart';
 import '../../localization/app_localizations.dart';
 import '../../services/messaging_service.dart';
 import '../../widgets/app_drawer.dart';
+import '../../widgets/adaptive_back_button.dart';
 import '../../models/conversation.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -54,8 +60,77 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _messageController.addListener(_onTypingChanged);
   }
 
+  Future<void> _downloadImageToDevice(String imageUrl) async {
+    try {
+      // Check and request gallery permission
+      final hasAccess = await Gal.hasAccess(toAlbum: false);
+      if (!hasAccess) {
+        final granted = await Gal.requestAccess(toAlbum: false);
+        if (!granted) {
+          if (mounted) {
+            final localizations = AppLocalizations.of(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(localizations.translate('permission_denied'))),
+            );
+          }
+          return;
+        }
+      }
+      // Download to temp file then save to gallery
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'gba_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = '${tempDir.path}/$fileName';
+      await Dio().download(imageUrl, filePath);
+      await Gal.putImage(filePath);
+      if (mounted) {
+        final localizations = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localizations.translate('image_saved_to_gallery')),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final localizations = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localizations.translateParams('error_with_details', {'error': e.toString()})),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _shareUrl(String url) async {
     try {
+      // If the URL looks like an image, download it and share the file instead of the link
+      final lower = url.toLowerCase();
+      final isImage = lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.contains('content-type=image');
+      if (isImage) {
+        // Download to a temp file
+        final tempDir = await getTemporaryDirectory();
+        final fileName = 'gba_shared_${DateTime.now().millisecondsSinceEpoch}${lower.endsWith('.png') ? '.png' : '.jpg'}';
+        final filePath = '${tempDir.path}/$fileName';
+        await Dio().download(url, filePath);
+
+        // Use share_plus to share the actual image file
+        try {
+          final xfile = XFile(filePath);
+          await Share.shareXFiles([xfile]);
+          return;
+        } catch (_) {
+          // fallback to sharing the URL if file sharing isn't available on this platform
+          await Share.share(url);
+          return;
+        }
+      }
+
+      // default: share url
       await Share.share(url);
     } catch (e) {
       if (mounted) {
@@ -186,7 +261,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 IconButton(
                   tooltip: localizations.translate('download'),
                   icon: const Icon(Icons.download_rounded),
-                  onPressed: () => _launchExternal(imageUrl),
+                  onPressed: () => _downloadImageToDevice(imageUrl),
                 ),
                 IconButton(
                   tooltip: localizations.translate('share'),
@@ -222,10 +297,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _showImageActions(String imageUrl) {
+    final theme = Theme.of(context);
+    final bgColor = theme.colorScheme.surface;
+    final textColor = theme.colorScheme.onSurface;
+    final iconColor = theme.colorScheme.primary;
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      backgroundColor: Colors.white,
+      backgroundColor: bgColor,
       builder: (context) {
         final localizations = AppLocalizations.of(context);
         return SafeArea(
@@ -233,32 +312,44 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.fullscreen_rounded),
-                title: Text(localizations.translate('view_fullscreen')),
+                leading: Icon(Icons.fullscreen_rounded, color: iconColor),
+                title: Text(
+                  localizations.translate('view_fullscreen'),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _openImageFullScreen(imageUrl);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.download_rounded),
-                title: Text(localizations.translate('download')),
+                leading: Icon(Icons.download_rounded, color: iconColor),
+                title: Text(
+                  localizations.translate('download'),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
-                  _launchExternal(imageUrl);
+                  _downloadImageToDevice(imageUrl);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.share_rounded),
-                title: Text(localizations.translate('share')),
+                leading: Icon(Icons.share_rounded, color: iconColor),
+                title: Text(
+                  localizations.translate('share'),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _shareUrl(imageUrl);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.copy_rounded),
-                title: Text(localizations.translate('copy_link')),
+                leading: Icon(Icons.copy_rounded, color: iconColor),
+                title: Text(
+                  localizations.translate('copy_link'),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _copyToClipboard(imageUrl);
@@ -276,10 +367,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     try {
       final messagingService = context.read<MessagingService>();
       
+      // Always ensure conversations are loaded first
+      await messagingService.loadConversations();
+      
       if (widget.conversationId != null) {
-        // Charger conversation existante
-        _conversation = messagingService.conversations
-            .firstWhere((c) => c.id == widget.conversationId!);
+        // Try to find existing conversation, fallback to getOrCreate
+        try {
+          _conversation = messagingService.conversations
+              .firstWhere((c) => c.id == widget.conversationId!);
+        } catch (_) {
+          // Conversation not found in list, use getOrCreate
+          _conversation = await messagingService.getOrCreateConversation(
+            orderId: widget.orderId,
+          );
+        }
       } else {
         // Créer nouvelle conversation
         _conversation = await messagingService.getOrCreateConversation(
@@ -460,10 +561,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).primaryColor.withOpacity(0.05),
-              Colors.white,
-            ],
+            colors: Theme.of(context).brightness == Brightness.dark
+                ? [
+                    const Color(0xFF1a1a2e),
+                    const Color(0xFF16213e),
+                  ]
+                : [
+                    Theme.of(context).primaryColor.withOpacity(0.05),
+                    Colors.white,
+                  ],
           ),
         ),
         child: Column(
@@ -489,6 +595,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     final localizations = AppLocalizations.of(context);
     return AppBar(
       elevation: 0,
+      leading: // Use adaptive back button that respects RTL/LTR
+        AdaptiveBackButton(color: Colors.white),
       flexibleSpace: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -549,14 +657,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             Icon(
               Icons.chat_bubble_outline,
               size: 80,
-              color: Colors.grey[300],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
             ),
             const SizedBox(height: 16),
             Text(
               localizations.translate('start_conversation'),
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 8),
@@ -564,7 +672,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               localizations.translate('we_are_here_to_help'),
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ),
           ],
@@ -593,14 +701,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     _formatDate(message.createdAt),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[700],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -664,7 +772,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             ],
                           )
                         : null),
-                color: isImage ? Colors.transparent : (isMe ? null : Colors.grey[100]),
+                color: isImage ? Colors.transparent : (isMe ? null : Theme.of(context).colorScheme.surfaceContainerHighest),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
@@ -713,7 +821,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             placeholder: (context, _) => Container(
                               width: 220,
                               height: 220,
-                              color: Colors.black.withOpacity(0.06),
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               child: const Center(
                                 child: SizedBox(
                                   width: 18,
@@ -725,7 +833,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             errorWidget: (context, _, __) => Container(
                               width: 220,
                               height: 220,
-                              color: Colors.black.withOpacity(0.06),
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               child: const Center(
                                 child: Icon(Icons.broken_image_outlined),
                               ),
@@ -739,7 +847,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       contentText,
                       style: TextStyle(
                         fontSize: 15,
-                        color: isMe ? Colors.white : Colors.black87,
+                        color: isMe
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurface,
                         height: 1.4,
                       ),
                     ),
@@ -752,8 +862,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         style: TextStyle(
                           fontSize: 11,
                           color: isImage
-                              ? Colors.grey[600]
-                              : (isMe ? Colors.white.withOpacity(0.7) : Colors.grey[600]),
+                              ? Theme.of(context).colorScheme.onSurfaceVariant
+                              : (isMe
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                       ),
                       if (isMe) ...[
@@ -764,8 +876,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                               : Icons.done,
                           size: 14,
                           color: isImage
-                              ? (message.isRead ? Colors.blue[300] : Colors.grey[600])
-                              : (message.isRead ? Colors.blue[300] : Colors.white.withOpacity(0.7)),
+                              ? (message.isRead ? Colors.blue[300] : Theme.of(context).colorScheme.onSurfaceVariant)
+                              : (message.isRead ? Colors.blue[300] : Colors.white.withValues(alpha: 0.7)),
                         ),
                       ],
                     ],
@@ -781,13 +893,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   Widget _buildMessageInput() {
     final localizations = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -807,7 +920,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(25),
                 ),
                 child: TextField(
@@ -816,10 +929,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   maxLines: null,
                   keyboardType: TextInputType.multiline,
                   textCapitalization: TextCapitalization.sentences,
+                  style: TextStyle(color: cs.onSurface),
                   decoration: InputDecoration(
                     hintText: localizations.translate('type_your_message'),
+                    hintStyle: TextStyle(color: cs.onSurfaceVariant),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onSubmitted: (_) => _sendMessage(),
                 ),
@@ -843,7 +958,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                             )
                           : null,
                       color: _messageController.text.trim().isEmpty
-                          ? Colors.grey[300]
+                          ? cs.surfaceContainerHighest
                           : null,
                     ),
                     child: IconButton(
@@ -885,9 +1000,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           child: Container(
             constraints: BoxConstraints(maxHeight: maxHeight),
             padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(20),
                 topRight: Radius.circular(20),
               ),

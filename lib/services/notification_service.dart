@@ -5,7 +5,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -37,15 +36,29 @@ class NotificationService {
 
   String? _currentToken;
 
+
   final AndroidNotificationChannel _androidChannel = const AndroidNotificationChannel(
-    'default_channel',
-    'Notifications',
-    description: 'Default notifications channel',
-    importance: Importance.high,
+    'high_importance_channel',
+    'GBA Notifications',
+    description: 'Notifications de commandes, livraisons et messages',
+    importance: Importance.max,
   );
 
   bool _initialized = false;
   GlobalKey<NavigatorState>? _navigatorKey;
+
+  static const Set<String> _allowedRoutePrefixes = <String>{
+    '/home',
+    '/cart',
+    '/favorites',
+    '/orders',
+    '/messages',
+    '/promotions',
+    '/product/',
+    '/settings',
+    '/profile',
+    '/categories',
+  };
 
   AppLocalizations? _localizations() {
     final context = _navigatorKey?.currentContext;
@@ -61,6 +74,10 @@ class NotificationService {
     if (_initialized) return;
 
     _navigatorKey = navigatorKey;
+
+    if (kDebugMode) {
+      debugPrint('[FCM] ── init START (platform: ${kIsWeb ? "web" : "native"}) ──');
+    }
 
     if (kIsWeb) {
       final supported = await _messaging.isSupported();
@@ -86,10 +103,6 @@ class NotificationService {
       if (kDebugMode) {
         debugPrint('[FCM] setForegroundNotificationPresentationOptions failed: $e');
       }
-    }
-
-    if (!kIsWeb) {
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     }
 
     FirebaseMessaging.onMessage.listen((message) async {
@@ -150,7 +163,12 @@ class NotificationService {
       token = await _messaging.getToken();
     }
     if (kDebugMode) {
-      debugPrint('[FCM] token: $token');
+      if (token == null || token.isEmpty) {
+        debugPrint('[FCM] token: <empty>');
+      } else {
+        final suffix = token.length >= 8 ? token.substring(token.length - 8) : token;
+        debugPrint('[FCM] token received (suffix=...$suffix)');
+      }
     }
 
     if (token != null && token.isNotEmpty) {
@@ -160,7 +178,12 @@ class NotificationService {
 
     _messaging.onTokenRefresh.listen((newToken) async {
       if (kDebugMode) {
-        debugPrint('[FCM] token refreshed: $newToken');
+        if (newToken.isEmpty) {
+          debugPrint('[FCM] token refreshed: <empty>');
+        } else {
+          final suffix = newToken.length >= 8 ? newToken.substring(newToken.length - 8) : newToken;
+          debugPrint('[FCM] token refreshed (suffix=...$suffix)');
+        }
       }
       if (newToken.isEmpty) return;
       _currentToken = newToken;
@@ -209,28 +232,43 @@ class NotificationService {
   }
 
   Future<void> _upsertDeviceToken(String token) async {
-    try {
-      final client = Supabase.instance.client;
-      final userId = client.auth.currentUser?.id;
-      if (userId == null) return;
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) {
+      if (kDebugMode) debugPrint('[FCM] _upsertDeviceToken skipped: no user');
+      return;
+    }
 
-      final locale = await _resolveAppLocale();
-      final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toIso8601String();
+    final platform = _resolvePlatform();
+    final locale = await _resolveAppLocale();
+    // device_id: required by DB; use token hash or token prefix so upsert key stays stable
+    final deviceId = token.length >= 32 ? token.substring(0, 32) : token;
 
-      await client.from('device_tokens').upsert(
-        {
-          'user_id': userId,
-          'token': token,
-          'platform': _resolvePlatform(),
-          'locale': locale,
-          'last_seen_at': now,
-          'updated_at': now,
-        },
-        onConflict: 'token',
-      );
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[FCM] device_tokens upsert failed: $e');
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await client.from('device_tokens').upsert(
+          {
+            'user_id': userId,
+            'token': token,
+            'device_id': deviceId,
+            'platform': platform,
+            'locale': locale,
+            'updated_at': now,
+          },
+          onConflict: 'token',
+        );
+        if (kDebugMode) {
+          debugPrint('[FCM] device_tokens upsert OK (attempt $attempt, platform=$platform, userId=$userId)');
+        }
+        return;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[FCM] device_tokens upsert failed (attempt $attempt/3): $e');
+        }
+        if (attempt < 3) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
       }
     }
   }
@@ -242,11 +280,15 @@ class NotificationService {
     final template = data['template']?.toString();
     switch (template) {
       case 'order_status':
+      case 'order':
         return 'orders';
       case 'cart_abandoned':
-        return 'promotions';
       case 'promotion':
         return 'promotions';
+      case 'message':
+      case 'chat':
+      case 'new_message':
+        return 'chat';
       default:
         return null;
     }
@@ -364,18 +406,47 @@ class NotificationService {
     );
   }
 
+  /// Public entry point for requesting permissions after showing a rationale dialog.
+  Future<void> requestPermissionExplicit() => _requestPermissions();
+
   Future<void> _requestPermissions() async {
-    await _messaging.requestPermission(
+    final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
+
+    if (kDebugMode) {
+      debugPrint('[FCM] permission status: ${settings.authorizationStatus}');
+    }
 
     if (!kIsWeb) {
       final androidPlugin = _localNotifications
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
     }
+  }
+
+  String? _sanitizeRoute(String? rawRoute) {
+    if (rawRoute == null) return null;
+    final route = rawRoute.trim();
+    if (route.isEmpty) return null;
+
+    // Only allow in-app routes.
+    if (!route.startsWith('/')) return null;
+    if (route.startsWith('//')) return null;
+    if (route.contains('://')) return null;
+    if (route.contains('..')) return null;
+
+    for (final prefix in _allowedRoutePrefixes) {
+      if (prefix.endsWith('/')) {
+        if (route.startsWith(prefix)) return route;
+      } else {
+        if (route == prefix || route.startsWith('$prefix/')) return route;
+      }
+    }
+
+    return null;
   }
 
   Future<void> _initLocalNotifications() async {
@@ -409,20 +480,70 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(_androidChannel);
   }
 
+  void _goTo(String rawRoute) {
+    final route = _sanitizeRoute(rawRoute);
+    if (route == null) return;
+
+    final context = _navigatorKey?.currentContext;
+    if (context == null) return;
+
+    try {
+      Navigator.of(context).pushNamed(route);
+    } catch (_) {
+      try {
+        final navigator = _navigatorKey?.currentState;
+        navigator?.pushNamed(route);
+      } catch (_) {}
+    }
+  }
+
   void _handleMessageTap(RemoteMessage message, GlobalKey<NavigatorState> navigatorKey) {
     if (kDebugMode) {
       debugPrint('[FCM] message opened: ${message.messageId} data=${message.data}');
     }
 
-    final route = message.data['route']?.toString();
-    if (route == null || route.isEmpty) return;
+    final route = _sanitizeRoute(message.data['route']?.toString());
+    if (route == null) return;
 
     _goTo(route);
   }
 
-  void _goTo(String route) {
-    final context = _navigatorKey?.currentContext;
-    if (context == null) return;
-    context.go(route);
+  /// Debug helper: simulate an incoming notification payload for testing
+  /// Usage: NotificationService().debugReceive({'title': 'Test', 'body': 'Hello', 'route': '/messages'});
+  void debugReceive(Map<String, dynamic> data) {
+    if (kDebugMode) debugPrint('[FCM][DEBUG] debugReceive payload=$data');
+    final title = data['title']?.toString() ?? _templateTitle(data) ?? (AppLocalizations.of(_navigatorKey!.currentContext!)?.translate('notification_default_title') ?? 'Notification');
+    final body = data['body']?.toString() ?? _templateBody(data) ?? '';
+    final route = data['route']?.toString();
+
+    // Show in-app
+    try {
+      _showInAppNotification(title: title, body: body, route: route);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[FCM][DEBUG] _showInAppNotification failed: $e');
+    }
+
+    // Also display a local system notification when possible
+    if (!kIsWeb) {
+      try {
+        _localNotifications.show(
+          DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          title,
+          body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              _androidChannel.id,
+              _androidChannel.name,
+              channelDescription: _androidChannel.description,
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+          ),
+          payload: jsonEncode(data),
+        );
+      } catch (e) {
+        if (kDebugMode) debugPrint('[FCM][DEBUG] local notification failed: $e');
+      }
+    }
   }
 }

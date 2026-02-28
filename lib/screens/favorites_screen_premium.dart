@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart' as classic_provider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
@@ -13,16 +15,17 @@ import '../animations/app_animations.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/app_animation.dart';
 import 'product/product_detail_screen.dart';
 
-class FavoritesScreenPremium extends StatefulWidget {
+class FavoritesScreenPremium extends ConsumerStatefulWidget {
   const FavoritesScreenPremium({super.key});
 
   @override
-  State<FavoritesScreenPremium> createState() => _FavoritesScreenPremiumState();
+  ConsumerState<FavoritesScreenPremium> createState() => _FavoritesScreenPremiumState();
 }
 
-class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
+class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     with TickerProviderStateMixin {
   
   String _getCorrectImageUrl(String url) {
@@ -144,9 +147,9 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
 
   @override
   Widget build(BuildContext context) {
-    final favoritesProvider = Provider.of<FavoritesProvider>(context);
-    final productsProvider = Provider.of<ProductProvider>(context);
-    final favoriteIds = favoritesProvider.favoriteIds;
+    final favoritesState = ref.watch(favoritesProvider);
+    final productsProvider = classic_provider.Provider.of<ProductProvider>(context);
+    final favoriteIds = favoritesState.favoriteIds;
 
     final productsById = <String, Product>{
       for (final p in productsProvider.products) p.id: p,
@@ -188,22 +191,8 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                   );
                 }
 
-                if (favoriteIds.isEmpty) {
+                if (favoriteIds.isEmpty || favorites.isEmpty) {
                   return _buildEmptyFavorites(localizations);
-                }
-
-                if (favorites.isEmpty) {
-                  return AppStateView(
-                    state: AppViewState.empty,
-                    animationId: AppAnimations.searchNoResult,
-                    title: localizations.translate('favorites_not_found_title'),
-                    subtitle: localizations.translate('favorites_not_found_hint'),
-                    primaryActionLabel: localizations.translate('refresh'),
-                    onPrimaryAction: () {
-                      HapticFeedback.lightImpact();
-                      productsProvider.loadProducts(force: true);
-                    },
-                  );
                 }
 
                 final sortedFavorites = _sortFavorites(List<Product>.from(favorites));
@@ -214,8 +203,8 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                     _buildControlsSection(localizations),
                     Expanded(
                       child: _selectedView == 'grid'
-                          ? _buildGridView(sortedFavorites, favoritesProvider, theme)
-                          : _buildListView(sortedFavorites, favoritesProvider, localizations, theme),
+                          ? _buildGridView(sortedFavorites, favoritesState, theme)
+                          : _buildListView(sortedFavorites, favoritesState, localizations, theme),
                     ),
                   ],
                 );
@@ -270,34 +259,12 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
           ),
         ),
       ),
-      actions: [
-        IconButton(
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            _showCollectionsDialog();
-          },
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.purple.withOpacity(0.2),
-                  Colors.pink.withOpacity(0.2),
-                ],
-              ),
-            ),
-            child: const Icon(FontAwesomeIcons.folderPlus, size: 16),
-          ),
-        ),
-        const SizedBox(width: 8),
-      ],
+      actions: const [],
     );
   }
 
   Widget _buildAnimatedBackground() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AnimatedBuilder(
       animation: _rotationController,
       builder: (context, child) {
@@ -306,11 +273,9 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.pink.shade50,
-                Colors.red.shade50,
-                Colors.purple.shade50,
-              ],
+              colors: isDark
+                  ? [const Color(0xFF1A1D21), const Color(0xFF2C3036), const Color(0xFF1A1D21)]
+                  : [Colors.pink.shade50, Colors.red.shade50, Colors.purple.shade50],
               transform: GradientRotation(_rotationController.value * 2 * math.pi),
             ),
           ),
@@ -330,30 +295,14 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.pink.shade300,
-                    Colors.red.shade400,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.pink.withOpacity(0.3),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: const Icon(
+            AppAnimation(
+              id: AppAnimations.emptyBox,
+              width: 200,
+              height: 200,
+              fallback: Icon(
                 FontAwesomeIcons.heartCrack,
-                size: 48,
-                color: Colors.white,
+                size: 80,
+                color: Colors.pink.shade300,
               ),
             ),
             const SizedBox(height: 24),
@@ -367,6 +316,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
             const SizedBox(height: 8),
             Text(
               localizations.translate('favorites_empty_hint'),
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -374,7 +324,14 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
             ),
             const SizedBox(height: 32),
             _buildGlassmorphicButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
               icon: FontAwesomeIcons.magnifyingGlass,
               label: localizations.translate('explore_products'),
             ),
@@ -385,6 +342,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
   }
 
   Widget _buildHeaderSection(int count, AppLocalizations localizations) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -393,10 +351,9 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.9),
-            Colors.white.withOpacity(0.7),
-          ],
+          colors: isDark
+              ? [const Color(0xFF2C3036).withOpacity(0.95), const Color(0xFF1A1D21).withOpacity(0.9)]
+              : [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.7)],
         ),
         boxShadow: [
           BoxShadow(
@@ -411,25 +368,14 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildStatCard(
                 icon: FontAwesomeIcons.heart,
                 value: count.toString(),
                 label: localizations.translate('favorites'),
                 color: Colors.red,
-              ),
-              _buildStatCard(
-                icon: FontAwesomeIcons.layerGroup,
-                value: '3',
-                label: localizations.translate('collections'),
-                color: Colors.purple,
-              ),
-              _buildStatCard(
-                icon: FontAwesomeIcons.share,
-                value: '12',
-                label: localizations.translate('shared'),
-                color: Colors.blue,
+                isDark: isDark,
               ),
             ],
           ),
@@ -443,6 +389,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
     required String value,
     required String label,
     required Color color,
+    bool isDark = false,
   }) {
     return Column(
       children: [
@@ -464,16 +411,17 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF2D3436),
           ),
         ),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: isDark ? Colors.white70 : Colors.grey[600],
           ),
         ),
       ],
@@ -481,6 +429,8 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
   }
 
   Widget _buildControlsSection(AppLocalizations localizations) {
+    final theme = Theme.of(context);
+    final surfaceColor = theme.colorScheme.surface;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -490,10 +440,10 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
+              color: surfaceColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.black.withOpacity(0.08),
                   blurRadius: 10,
                 ),
               ],
@@ -510,10 +460,10 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
+              color: surfaceColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.black.withOpacity(0.08),
                   blurRadius: 10,
                 ),
               ],
@@ -641,7 +591,9 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
         transform: Matrix4.identity()..scale(isPressed ? 0.95 : 1.0),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF2C3036)
+              : Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(isPressed ? 0.15 : 0.1),
@@ -737,9 +689,12 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                       children: [
                         Text(
                           product.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black87,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -757,7 +712,7 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                           ),
                         const SizedBox(height: 4),
                         Text(
-                          '${(product.price * 655.957).toStringAsFixed(0)} FCFA',
+                          '${product.price.toStringAsFixed(0)} FCFA',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -787,7 +742,9 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF2C3036)
+            : Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -861,9 +818,12 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                   children: [
                     Text(
                       product.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black87,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -872,13 +832,15 @@ class _FavoritesScreenPremiumState extends State<FavoritesScreenPremium>
                     Text(
                       product.brand ?? localizations.translate('no_brand'),
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white60
+                            : Colors.grey[600],
                         fontSize: 14,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${(product.price * 655.957).toStringAsFixed(0)} FCFA',
+                      '${product.price.toStringAsFixed(0)} FCFA',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -12,14 +12,14 @@ import '../models/cart_item.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/adaptive_scaffold.dart';
 
-class CartScreenPremium extends StatefulWidget {
+class CartScreenPremium extends ConsumerStatefulWidget {
   const CartScreenPremium({super.key});
 
   @override
-  State<CartScreenPremium> createState() => _CartScreenPremiumState();
+  ConsumerState<CartScreenPremium> createState() => _CartScreenPremiumState();
 }
 
-class _CartScreenPremiumState extends State<CartScreenPremium>
+class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
     with TickerProviderStateMixin {
   static const bool _debugImageLogs = false;
   late AnimationController _fadeController;
@@ -108,85 +108,81 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final cartState = ref.watch(cartProvider);
 
     final appBar = _buildAppBar(context, localizations);
-    final topPadding = math.max(0.0, appBar.preferredSize.height - 8);
 
     return AdaptiveScaffold(
       currentIndex: 2,
-      extendBodyBehindAppBar: true,
       appBar: appBar,
+      extendBodyBehindAppBar: true,
       body: Stack(
         children: [
           // Animated gradient background
           _buildAnimatedBackground(),
           // Main content
           SafeArea(
-            child: Consumer<CartProvider>(
-              builder: (context, cartProvider, _) {
-                final cartItems = cartProvider.items;
+            child: Builder(
+              builder: (context) {
+                final cartItems = cartState.items;
                 final total = cartItems.fold(
                   0.0,
                   (sum, item) => sum + ((item.product?.price ?? 0) * item.quantity),
                 );
 
-                if (cartProvider.isLoading) {
+                if (cartState.isLoading) {
                   return _buildLoadingState(localizations);
                 }
 
-                if (cartProvider.error != null) {
-                  return _buildErrorState(cartProvider.error!, localizations, cartProvider);
+                if (cartState.error != null) {
+                  return _buildErrorState(cartState.error!, localizations, cartState);
                 }
 
                 if (cartItems.isEmpty) {
-                  return Padding(
-                    padding: EdgeInsets.only(top: topPadding),
-                    child: RefreshIndicator(
-                      onRefresh: () => cartProvider.loadCart(),
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.7,
+                  return RefreshIndicator(
+                    onRefresh: () => cartState.loadCart(),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: constraints.maxHeight),
                             child: _buildEmptyCart(localizations),
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   );
                 }
 
-                return Padding(
-                  padding: EdgeInsets.only(top: topPadding),
-                  child: Column(
-                    children: [
-                      _buildCartSummary(cartProvider.itemCount, total, localizations, theme),
-                      Expanded(
-                        child: RefreshIndicator(
-                          onRefresh: () => cartProvider.loadCart(),
-                          child: ListView.builder(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            itemCount: cartItems.length,
-                            itemBuilder: (context, index) {
-                              final item = cartItems[index];
-                              return KeyedSubtree(
-                                key: ValueKey(item.id),
-                                child: SlideTransition(
-                                  position: _slideAnimation,
-                                  child: FadeTransition(
-                                    opacity: _fadeAnimation,
-                                    child: _buildCartItem(item, cartProvider, localizations, theme),
-                                  ),
+                return Column(
+                  children: [
+                    _buildCartSummary(cartState.itemCount, total, localizations, theme),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: () => cartState.loadCart(),
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          itemCount: cartItems.length,
+                          itemBuilder: (context, index) {
+                            final item = cartItems[index];
+                            return KeyedSubtree(
+                              key: ValueKey(item.id),
+                              child: SlideTransition(
+                                position: _slideAnimation,
+                                child: FadeTransition(
+                                  opacity: _fadeAnimation,
+                                  child: _buildCartItem(item, cartState, localizations, theme),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            );
+                          },
                         ),
                       ),
-                      _buildCheckoutSection(total, localizations, theme),
-                    ],
-                  ),
+                    ),
+                    _buildCheckoutSection(total, localizations, theme),
+                  ],
                 );
               },
             ),
@@ -271,47 +267,50 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      toolbarHeight: 72,
+      toolbarHeight: 80,
       titleSpacing: 0,
       title: Padding(
         padding: const EdgeInsets.only(left: 16),
-        child: Consumer<CartProvider>(
-          builder: (context, cartProvider, _) {
-            final count = cartProvider.itemCount;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+        child: Builder(
+          builder: (context) {
+            final count = ref.watch(cartProvider).itemCount;
+            return Row(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      FontAwesomeIcons.cartShopping,
-                      size: 20,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      localizations.translate('cart'),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+                Icon(
+                  FontAwesomeIcons.cartShopping,
+                  size: 22,
+                  color: theme.colorScheme.onSurface,
                 ),
-                if (count > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 32, top: 2),
-                    child: Text(
-                      localizations.translateParams(
-                        'items_count',
-                        {'count': count.toString()},
+                const SizedBox(width: 12),
+                Text(
+                  localizations.translate('cart'),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (count > 0) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 52, minHeight: 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                       ),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
-                        fontWeight: FontWeight.w600,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Center(
+                      child: Text(
+                        count > 99 ? '99+' : count.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
+                ],
               ],
             );
           },
@@ -341,16 +340,23 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
     return AnimatedBuilder(
       animation: _rotationController,
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.blue.shade50,
-                Colors.purple.shade50,
-                Colors.pink.shade50,
-              ],
+              colors: isDark
+                  ? [
+                      const Color(0xFF1a1a2e),
+                      const Color(0xFF16213e),
+                      const Color(0xFF1a1a2e),
+                    ]
+                  : [
+                      Colors.blue.shade50,
+                      Colors.purple.shade50,
+                      Colors.pink.shade50,
+                    ],
               transform: GradientRotation(_rotationController.value * 2 * math.pi),
             ),
           ),
@@ -399,9 +405,10 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
             const SizedBox(height: 24),
             Text(
               localizations.translate('cart_empty'),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -409,7 +416,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
               localizations.translate('discover_products'),
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 32),
@@ -427,7 +434,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
   Widget _buildCartSummary(int itemCount, double total, AppLocalizations localizations, ThemeData theme) {
     final isDark = theme.brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
@@ -457,65 +464,85 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF667eea).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    itemCount > 99 ? '99+' : itemCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       localizations.translateParams('items_count', {'count': itemCount.toString()}),
                       style: TextStyle(
-                        fontSize: 14,
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Wrap(
-                        spacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              '${(total * 655.957).toStringAsFixed(0)} FCFA',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
-                              ),
+                    Row(
+                      children: [
+                        Text(
+                          '${(total * 655.957).toStringAsFixed(0)} FCFA',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade600.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            localizations.translate('delivery'),
+                            style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Colors.green.shade400, Colors.green.shade600],
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              localizations.translate('delivery'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(12),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
