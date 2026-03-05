@@ -82,6 +82,11 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
     _fadeController.forward();
     _slideController.forward();
     _scaleController.forward();
+
+    // Always reload cart when screen mounts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(cartProvider).loadCart();
+    });
   }
 
   @override

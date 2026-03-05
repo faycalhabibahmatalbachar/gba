@@ -2,19 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/category.dart';
-import '../models/product.dart';
 import '../animations/app_animations.dart';
 import '../providers/categories_provider.dart';
-import '../providers/products_provider.dart' as prod_provider;
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/app_state_view.dart';
-import '../services/supabase_service.dart';
 import '../localization/app_localizations.dart';
 import 'products_by_category_screen.dart';
 
@@ -34,8 +30,8 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _pulseAnimation;
-  String _selectedFilter = 'all';
   final Map<String, bool> _hoveredCategories = {};
+  final Map<String, int> _productCounts = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -269,9 +265,15 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.55),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? theme.colorScheme.surface.withOpacity(0.7)
+                  : Colors.white.withOpacity(0.55),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withOpacity(0.35)),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? theme.dividerColor
+                    : Colors.white.withOpacity(0.35),
+              ),
             ),
             child: Row(
               children: [
@@ -326,7 +328,6 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
         ],
       ),
       actions: [
-        _buildFilterButton(localizations),
         const SizedBox(width: 16),
       ],
       flexibleSpace: ClipRect(
@@ -337,10 +338,15 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.1),
-                  Colors.white.withOpacity(0.05),
-                ],
+                colors: Theme.of(context).brightness == Brightness.dark
+                    ? [
+                        Theme.of(context).colorScheme.surface.withOpacity(0.1),
+                        Theme.of(context).colorScheme.surface.withOpacity(0.05),
+                      ]
+                    : [
+                        Colors.white.withOpacity(0.1),
+                        Colors.white.withOpacity(0.05),
+                      ],
               ),
             ),
           ),
@@ -349,134 +355,22 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     );
   }
 
-  Widget _buildFilterButton(AppLocalizations localizations) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.2),
-            Colors.white.withOpacity(0.1),
-          ],
-        ),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            _showFilterDialog();
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                const Icon(FontAwesomeIcons.filter, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  localizations.translate('filter'),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showFilterDialog() {
-    final localizations = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.9),
-                  Colors.white.withOpacity(0.8),
-                ],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  localizations.translate('filter_categories'),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildFilterOption(localizations.translate('all'), 'all'),
-                _buildFilterOption(localizations.translate('popular'), 'popular'),
-                _buildFilterOption(localizations.translate('new'), 'new'),
-                _buildFilterOption(localizations.translate('promotions'), 'sale'),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(localizations.translate('cancel')),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(localizations.translate('apply')),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterOption(String label, String value) {
-    return RadioListTile<String>(
-      title: Text(label),
-      value: value,
-      groupValue: _selectedFilter,
-      onChanged: (newValue) {
-        setState(() {
-          _selectedFilter = newValue!;
-        });
-      },
-      activeColor: Theme.of(context).primaryColor,
-    );
+  Future<int> _getProductCount(String categoryId) async {
+    if (_productCounts.containsKey(categoryId)) {
+      return _productCounts[categoryId]!;
+    }
+    try {
+      final response = await Supabase.instance.client
+          .from('products')
+          .select('id')
+          .eq('category_id', categoryId)
+          .eq('is_active', true);
+      final count = (response as List).length;
+      _productCounts[categoryId] = count;
+      return count;
+    } catch (e) {
+      return 0;
+    }
   }
 
   Widget _buildAnimatedBackground() {
@@ -488,11 +382,17 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.purple.shade50,
-                Colors.blue.shade50,
-                Colors.pink.shade50,
-              ],
+              colors: Theme.of(context).brightness == Brightness.dark
+                ? [
+                    Colors.purple.shade900.withOpacity(0.3),
+                    Colors.blue.shade900.withOpacity(0.3),
+                    Colors.pink.shade900.withOpacity(0.3),
+                  ]
+                : [
+                    Colors.purple.shade50,
+                    Colors.blue.shade50,
+                    Colors.pink.shade50,
+                  ],
               transform: GradientRotation(_rotationController.value * 2 * math.pi),
             ),
           ),
@@ -556,10 +456,15 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.9),
-            Colors.white.withOpacity(0.7),
-          ],
+          colors: Theme.of(context).brightness == Brightness.dark
+              ? [
+                  Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                  Theme.of(context).colorScheme.surface.withOpacity(0.7),
+                ]
+              : [
+                  Colors.white.withOpacity(0.9),
+                  Colors.white.withOpacity(0.7),
+                ],
         ),
         boxShadow: [
           BoxShadow(
@@ -641,7 +546,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -660,8 +565,6 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
     AppLocalizations localizations,
   ) {
     final color = _getCategoryColor(index);
-    // TODO: Load products by category
-    final products = <Product>[];
     
     return GestureDetector(
       onTapDown: (_) {
@@ -693,8 +596,8 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white,
-              Colors.white.withOpacity(0.95),
+              theme.colorScheme.surface,
+              theme.colorScheme.surface.withOpacity(0.95),
             ],
           ),
           boxShadow: [
@@ -703,11 +606,12 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
               blurRadius: isHovered ? 25 : 20,
               offset: Offset(0, isHovered ? 8 : 10),
             ),
-            BoxShadow(
-              color: Colors.white,
-              blurRadius: 20,
-              offset: const Offset(-5, -5),
-            ),
+            if (theme.brightness != Brightness.dark)
+              BoxShadow(
+                color: Colors.white,
+                blurRadius: 20,
+                offset: const Offset(-5, -5),
+              ),
           ],
         ),
         child: ClipRRect(
@@ -785,20 +689,36 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        localizations.translateParams('products_count', {'count': '0'}),  // TODO: Load actual count
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: color,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                    FutureBuilder<int>(
+                      future: _getProductCount(category['id'].toString()),
+                      builder: (context, snapshot) {
+                        final count = snapshot.data ?? 0;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: snapshot.connectionState == ConnectionState.waiting
+                              ? SizedBox(
+                                  width: 40,
+                                  height: 14,
+                                  child: LinearProgressIndicator(
+                                    minHeight: 2,
+                                    color: color,
+                                    backgroundColor: color.withOpacity(0.2),
+                                  ),
+                                )
+                              : Text(
+                                  localizations.translateParams('products_count', {'count': count.toString()}),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: color,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        );
+                      },
                     ),
                   ],
                 ),

@@ -725,7 +725,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           children: [
             const Icon(FontAwesomeIcons.circleCheck, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Text(message),
+            Expanded(child: Text(message)),
           ],
         ),
         backgroundColor: Colors.green,
@@ -745,7 +745,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
           children: [
             const Icon(FontAwesomeIcons.circleExclamation, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Text(message),
+            Expanded(child: Text(message)),
           ],
         ),
         backgroundColor: Colors.red,
@@ -831,7 +831,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                           ),
                           const SizedBox(height: 32),
                           _buildQuickActions(),
-                          const SizedBox(height: 100),
+                          const SizedBox(height: 24),
                         ],
                       ),
                     ),
@@ -1644,44 +1644,44 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
               ),
         ),
         const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final crossAxisCount = constraints.maxWidth < 360 ? 2 : 3;
-            return GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: crossAxisCount,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1,
-              children: [
-                _buildActionCard(
-                  icon: FontAwesomeIcons.bagShopping,
-                  label: localizations.translate('orders'),
-                  color: Colors.blue,
-                  onTap: () => context.push('/orders'),
-                ),
-                _buildActionCard(
-                  icon: FontAwesomeIcons.heart,
-                  label: localizations.translate('favorites'),
-                  color: Colors.red,
-                  onTap: () => context.push('/favorites'),
-                ),
-                _buildActionCard(
-                  icon: FontAwesomeIcons.lock,
-                  label: localizations.translate('password'),
-                  color: Colors.orange,
-                  onTap: () => context.push('/settings/change-password'),
-                ),
-                _buildActionCard(
-                  icon: FontAwesomeIcons.gear,
-                  label: localizations.translate('settings'),
-                  color: Colors.grey,
-                  onTap: () => context.push('/settings'),
-                ),
-              ],
-            );
-          },
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: FontAwesomeIcons.bagShopping,
+                label: localizations.translate('orders'),
+                color: Colors.blue,
+                onTap: () => context.push('/orders'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                icon: FontAwesomeIcons.heart,
+                label: localizations.translate('favorites'),
+                color: Colors.red,
+                onTap: () => context.push('/favorites'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                icon: FontAwesomeIcons.lock,
+                label: localizations.translate('password'),
+                color: Colors.orange,
+                onTap: () => context.push('/settings/change-password'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                icon: FontAwesomeIcons.gear,
+                label: localizations.translate('settings'),
+                color: Colors.grey,
+                onTap: () => context.push('/settings'),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -1697,24 +1697,27 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     final isDark = theme.brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           color: isDark
               ? theme.colorScheme.surface
               : color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
             Text(
               label,
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: isDark ? theme.colorScheme.onSurface : color,
               ),

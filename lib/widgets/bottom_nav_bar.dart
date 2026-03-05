@@ -23,40 +23,19 @@ class BottomNavBar extends StatefulWidget {
   State<BottomNavBar> createState() => _BottomNavBarState();
 }
 
-class _BottomNavBarState extends State<BottomNavBar> 
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  bool _isDisposed = false;
-  
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-  }
+class _BottomNavBarState extends State<BottomNavBar> {
+  int? _tappedIndex;
   
   @override
   void dispose() {
-    _isDisposed = true;
-    _animationController.dispose();
     super.dispose();
   }
   
   void _onItemTapped(int index) {
     HapticFeedback.lightImpact();
-    _animationController.forward().then((_) {
-      if (_isDisposed || !mounted) return;
-      _animationController.reverse();
+    setState(() => _tappedIndex = index);
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _tappedIndex = null);
     });
     
     switch (index) {
@@ -87,12 +66,15 @@ class _BottomNavBarState extends State<BottomNavBar>
     final cartItemCount = cartProvider.itemCount;
     final localizations = AppLocalizations.of(context);
     
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF1a1a2e) : Colors.white;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: surfaceColor.withOpacity(0.95),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667eea).withOpacity(0.1),
+            color: const Color(0xFF667eea).withOpacity(isDark ? 0.05 : 0.1),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -107,13 +89,13 @@ class _BottomNavBarState extends State<BottomNavBar>
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.white.withOpacity(0.9),
-                  Colors.white.withOpacity(0.95),
+                  surfaceColor.withOpacity(0.9),
+                  surfaceColor.withOpacity(0.95),
                 ],
               ),
               border: Border(
                 top: BorderSide(
-                  color: const Color(0xFF667eea).withOpacity(0.1),
+                  color: const Color(0xFF667eea).withOpacity(isDark ? 0.05 : 0.1),
                   width: 0.5,
                 ),
               ),
@@ -206,18 +188,22 @@ class _BottomNavBarState extends State<BottomNavBar>
             child: FaIcon(
               isActive ? activeIcon : icon,
               size: isActive ? 22 : 20,
-              color: isActive ? Colors.white : Colors.grey.shade600,
+              color: isActive ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
           )
         : FaIcon(
             isActive ? activeIcon : icon,
             size: isActive ? 22 : 20,
-            color: isActive ? Colors.white : Colors.grey.shade600,
+            color: isActive ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
           );
 
+    final isTapped = _tappedIndex == index;
+
     return Expanded(
-      child: ScaleTransition(
-        scale: _scaleAnimation,
+      child: AnimatedScale(
+        scale: isTapped ? 0.90 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeInOut,
         child: InkWell(
           onTap: () => _onItemTapped(index),
           child: AnimatedContainer(
@@ -289,7 +275,7 @@ class _BottomNavBarState extends State<BottomNavBar>
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                     color: isActive
                         ? const Color(0xFF667eea)
-                        : Colors.grey.shade600,
+                        : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
                   ),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,

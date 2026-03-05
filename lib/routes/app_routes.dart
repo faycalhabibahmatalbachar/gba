@@ -279,22 +279,66 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/orders',
-        builder: (context, state) => const MyOrdersScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const MyOrdersScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+                  .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: child,
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/special-order',
-        builder: (context, state) => const SpecialOrderScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const SpecialOrderScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
+                  .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/special-orders',
-        builder: (context, state) => const MySpecialOrdersScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const MySpecialOrdersScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+                  .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+              child: child,
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/special-order/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return SpecialOrderDetailsScreen(specialOrderId: id);
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: SpecialOrderDetailsScreen(specialOrderId: id),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+                    .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                child: child,
+              );
+            },
+          );
         },
+      ),
+      GoRoute(
+        path: '/search',
+        redirect: (context, state) => '/categories',
       ),
       GoRoute(
         path: '/promotions',
@@ -375,73 +419,23 @@ class AppRoutes {
         path: '/profile',
         pageBuilder: (context, state) => CustomTransitionPage(
           child: const ProfileScreenUltra(),
-          transitionDuration: const Duration(milliseconds: 900),
+          transitionDuration: const Duration(milliseconds: 400),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            // Animation Parallax + Zoom spectaculaire
-            final curvedAnimation = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutExpo,
-            );
-            
-            // Effet de zoom explosif
-            final zoomAnimation = Tween<double>(
-              begin: 0.0,
-              end: 1.0,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: const Interval(0.0, 0.7, curve: Curves.elasticOut),
-            ));
-            
-            // Effet parallax sur la page précédente
-            return Stack(
-              children: [
-                // Page précédente avec effet parallax
-                if (secondaryAnimation.status != AnimationStatus.dismissed)
-                  AnimatedBuilder(
-                    animation: secondaryAnimation,
-                    builder: (context, _) {
-                      return Transform(
-                        transform: Matrix4.identity()
-                          ..setEntry(3, 2, 0.002)
-                          ..translate(
-                            -MediaQuery.of(context).size.width * 0.3 * secondaryAnimation.value,
-                            0.0,
-                            -100 * secondaryAnimation.value,
-                          )
-                          ..scale(1.0 - (0.2 * secondaryAnimation.value)),
-                        child: Container(
-                          color: Colors.black.withOpacity(0.5 * secondaryAnimation.value),
-                        ),
-                      );
-                    },
-                  ),
-                // Nouvelle page avec effet zoom explosif
-                Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.002)
-                    ..scale(zoomAnimation.value)
-                    ..rotateZ(0.05 * (1 - animation.value)),
-                  child: FadeTransition(
-                    opacity: CurvedAnimation(
-                      parent: animation,
-                      curve: const Interval(0.3, 1.0),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3 * animation.value),
-                            blurRadius: 30 * animation.value,
-                            spreadRadius: 10 * animation.value,
-                          ),
-                        ],
-                      ),
-                      child: child,
-                    ),
-                  ),
-                ),
-              ],
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.05),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                )),
+                child: child,
+              ),
             );
           },
         ),

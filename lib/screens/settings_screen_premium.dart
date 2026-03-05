@@ -106,11 +106,16 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.blue.shade50,
-                  Colors.purple.shade50,
-                  Colors.pink.shade50,
-                ],
+                colors: theme.brightness == Brightness.dark
+                    ? [
+                        Colors.deepPurple.shade900.withOpacity(0.3),
+                        Colors.purple.shade900.withOpacity(0.3),
+                      ]
+                    : [
+                        Colors.blue.shade50,
+                        Colors.purple.shade50,
+                        Colors.pink.shade50,
+                      ],
               ),
             ),
           ),
@@ -128,12 +133,12 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
         icon: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(
+          child: Icon(
             FontAwesomeIcons.arrowLeft,
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
             size: 16,
           ),
         ),
@@ -141,13 +146,13 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
       ),
       title: Row(
         children: [
-          const Icon(FontAwesomeIcons.gear, size: 20, color: Colors.black87),
+          Icon(FontAwesomeIcons.gear, size: 20, color: Theme.of(context).colorScheme.onSurface),
           const SizedBox(width: 12),
           Text(
             localizations.translate('settings'),
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -189,6 +194,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   }
 
   Widget _buildSectionTitle(String title, IconData icon) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -206,10 +212,10 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           const SizedBox(width: 12),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ],
@@ -219,14 +225,15 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
 
   Widget _buildNotificationSettings() {
     final localizations = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -288,14 +295,15 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
 
   Widget _buildAppearanceSettings() {
     final localizations = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -319,14 +327,15 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
   Widget _buildLanguageSettings() {
     final localizations = AppLocalizations.of(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -338,11 +347,11 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
         children: [
           Row(
             children: [
-              Icon(FontAwesomeIcons.language, size: 16, color: Colors.grey.shade600),
+              Icon(FontAwesomeIcons.language, size: 16, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 12),
               Text(
                 localizations.translate('app_language'),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
               ),
             ],
           ),
@@ -350,7 +359,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: theme.dividerColor),
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButton<String>(
@@ -388,14 +397,15 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
 
   Widget _buildPrivacySettings() {
     final localizations = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -439,14 +449,18 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
 
   Widget _buildDangerZone() {
     final localizations = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.red.shade50, Colors.orange.shade50],
+          colors: isDark
+              ? [Colors.red.shade900.withOpacity(0.3), Colors.orange.shade900.withOpacity(0.3)]
+              : [Colors.red.shade50, Colors.orange.shade50],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: isDark ? Colors.red.shade800 : Colors.red.shade200),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -454,14 +468,14 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
         children: [
           Row(
             children: [
-              Icon(FontAwesomeIcons.triangleExclamation, color: Colors.red.shade600, size: 20),
+              Icon(FontAwesomeIcons.triangleExclamation, color: isDark ? Colors.red.shade300 : Colors.red.shade600, size: 20),
               const SizedBox(width: 12),
               Text(
                 localizations.translate('danger_zone'),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.red.shade700,
+                  color: isDark ? Colors.red.shade300 : Colors.red.shade700,
                 ),
               ),
             ],
@@ -487,7 +501,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
                     children: [
                       const Icon(FontAwesomeIcons.check, color: Colors.white, size: 16),
                       const SizedBox(width: 12),
-                      Text(localizations.translate('cache_cleared_success')),
+                      Expanded(child: Text(localizations.translate('cache_cleared_success'))),
                     ],
                   ),
                   backgroundColor: Colors.green.shade600,
@@ -511,17 +525,19 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.purple.shade50,
+          color: isDark ? Colors.purple.shade900.withOpacity(0.3) : Colors.purple.shade50,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, size: 16, color: Colors.purple.shade400),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface)),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
@@ -536,18 +552,20 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
+          color: isDark ? Colors.blue.shade900.withOpacity(0.3) : Colors.blue.shade50,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, size: 16, color: Colors.blue.shade400),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-      trailing: Icon(FontAwesomeIcons.chevronRight, size: 12, color: Colors.grey.shade400),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface)),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+      trailing: Icon(FontAwesomeIcons.chevronRight, size: 12, color: theme.colorScheme.onSurfaceVariant),
       onTap: onTap,
     );
   }
@@ -557,29 +575,31 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
     required String title,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? theme.colorScheme.surface : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.red.shade200),
+          border: Border.all(color: isDark ? Colors.red.shade800 : Colors.red.shade200),
         ),
         child: Row(
           children: [
-            Icon(icon, color: Colors.red.shade600, size: 16),
+            Icon(icon, color: isDark ? Colors.red.shade300 : Colors.red.shade600, size: 16),
             const SizedBox(width: 12),
             Text(
               title,
               style: TextStyle(
-                color: Colors.red.shade700,
+                color: isDark ? Colors.red.shade300 : Colors.red.shade700,
                 fontWeight: FontWeight.w500,
               ),
             ),
             const Spacer(),
-            Icon(FontAwesomeIcons.chevronRight, size: 12, color: Colors.red.shade400),
+            Icon(FontAwesomeIcons.chevronRight, size: 12, color: isDark ? Colors.red.shade400 : Colors.red.shade400),
           ],
         ),
       ),
@@ -610,7 +630,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
             onPressed: () async {
               await SupabaseService.client.auth.signOut();
               if (mounted) {
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                context.go('/login');
               }
             },
             style: ElevatedButton.styleFrom(
