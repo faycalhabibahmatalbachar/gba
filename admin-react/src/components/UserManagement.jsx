@@ -433,7 +433,7 @@ const UserManagement = () => {
                     <h6>Statistiques détaillées</h6>
                     <p>Connexions aujourd'hui: {selectedUser.stats.connections_today || 0}</p>
                     <p>Connexions ce mois: {selectedUser.stats.connections_this_month || 0}</p>
-                    <p>Total dépensé: {selectedUser.stats.total_spent || 0}€</p>
+                    <p>Total dépensé: {selectedUser.stats.total_spent || 0} FCFA</p>
                     <p>Points de fidélité: {selectedUser.stats.loyalty_points || 0}</p>
                   </div>
                 </div>

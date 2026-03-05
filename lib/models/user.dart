@@ -19,6 +19,8 @@ class UserProfile with _$UserProfile {
     @JsonKey(name: 'avatar_url') String? avatarUrl,
     @JsonKey(name: 'loyalty_points') @Default(0) int loyaltyPoints,
     @JsonKey(name: 'is_premium') @Default(false) bool isPremium,
+    @JsonKey(name: 'is_suspended') @Default(false) bool isSuspended,
+    @JsonKey(name: 'is_blocked') @Default(false) bool isBlocked,
     @JsonKey(name: 'notification_preferences') Map<String, dynamic>? notificationPreferences,
     @JsonKey(name: 'member_since') DateTime? memberSince,
     @JsonKey(name: 'created_at') DateTime? createdAt,

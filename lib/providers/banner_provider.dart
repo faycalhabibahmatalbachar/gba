@@ -38,6 +38,11 @@ class BannerProvider extends ChangeNotifier {
     return firstActive;
   }
 
+  List<AppBanner> get activeBanners {
+    final now = DateTime.now();
+    return _banners.where((b) => b.isCurrentlyActive(now)).toList();
+  }
+
   BannerProvider() {
     _hydrateFromCache();
     loadBanners();

@@ -85,6 +85,40 @@ Deno.serve(async (req) => {
 
     const status = verifyJson?.data?.status?.toString();
 
+    let orderAlreadyPaid = false;
+    if (orderId) {
+      const { data: existingOrder } = await supabase
+        .from('orders')
+        .select('payment_status')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      const existingPaymentStatus = (existingOrder?.payment_status ?? '')
+        .toString()
+        .toLowerCase();
+      orderAlreadyPaid = existingPaymentStatus === 'paid';
+    }
+
+    if (orderId) {
+      if (status === 'successful') {
+        await supabase
+          .from('payments')
+          .update({
+            status: 'succeeded',
+          })
+          .eq('order_id', orderId)
+          .eq('provider', 'flutterwave');
+      } else if (!orderAlreadyPaid && (status === 'failed' || status === 'cancelled')) {
+        await supabase
+          .from('payments')
+          .update({
+            status: 'failed',
+          })
+          .eq('order_id', orderId)
+          .eq('provider', 'flutterwave');
+      }
+    }
+
     if (orderId) {
       if (status === 'successful') {
         const { error: updErr1 } = await supabase
@@ -94,6 +128,7 @@ Deno.serve(async (req) => {
             status: 'processing',
             payment_provider: 'flutterwave',
             payment_method: 'card',
+            paid_at: new Date().toISOString(),
           })
           .eq('id', orderId);
 
@@ -105,7 +140,7 @@ Deno.serve(async (req) => {
             })
             .eq('id', orderId);
         }
-      } else if (status === 'failed' || status === 'cancelled') {
+      } else if (!orderAlreadyPaid && (status === 'failed' || status === 'cancelled')) {
         const { error: updErr1 } = await supabase
           .from('orders')
           .update({

@@ -31,6 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late final AnimationController _bgController;
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _rememberMe = true;
 
   @override
   void initState() {
@@ -39,6 +40,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       duration: const Duration(seconds: 20),
       vsync: this,
     )..repeat();
+    _loadSavedPreferences();
+  }
+
+  Future<void> _loadSavedPreferences() async {
+    final notifier = ref.read(authProvider.notifier);
+    final remember = await notifier.getRememberMe();
+    final savedEmail = await notifier.getSavedEmail();
+    if (!mounted) return;
+    setState(() {
+      _rememberMe = remember;
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        _emailController.text = savedEmail;
+      }
+    });
   }
 
   @override
@@ -65,15 +80,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
       debugPrint('[Login] submit: email=$email');
-      await ref.read(authProvider.notifier).signIn(email, password);
+      await ref.read(authProvider.notifier).signIn(email, password, rememberMe: _rememberMe);
       if (!mounted) return;
       final authState = ref.read(authProvider);
       if (authState.user != null) {
         context.go('/home');
-      } else if (authState.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(authState.error!)),
-        );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -176,16 +187,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 },
                                 animDelay: 420.ms,
                               ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () => context.push('/forgot-password'),
-                                  style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 4),
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                                  child: Text(localizations.translate('auth_forgot_password_link'),
-                                      style: TextStyle(color: _g1, fontSize: 13, fontWeight: FontWeight.w600)),
-                                ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => setState(() => _rememberMe = !_rememberMe),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: Checkbox(
+                                            value: _rememberMe,
+                                            onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                                            activeColor: _g1,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            visualDensity: VisualDensity.compact,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          localizations.translate('remember_me'),
+                                          style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => context.push('/forgot-password'),
+                                    style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 4),
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                                    child: Text(localizations.translate('auth_forgot_password_link'),
+                                        style: TextStyle(color: _g1, fontSize: 13, fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
                               ).animate().fadeIn(delay: 490.ms),
                               const SizedBox(height: 8),
                               _PremiumButton(
@@ -435,11 +476,11 @@ class _MeshPainter extends CustomPainter {
     final a = t * 2 * math.pi;
     void circle(Paint p, double x, double y, double r) =>
         canvas.drawCircle(Offset(size.width * x, size.height * y), size.width * r, p);
-    circle(Paint()..color = Colors.white.withOpacity(0.12)..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.09),
+    circle(Paint()..color = Colors.white.withOpacity(0.10),
         0.18 + 0.06 * math.sin(a * 0.9), 0.24 + 0.06 * math.cos(a * 1.1), 0.44 + 0.03 * math.sin(a * 1.2));
-    circle(Paint()..color = const Color(0xFFFFD54F).withOpacity(0.12)..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.11),
+    circle(Paint()..color = const Color(0xFFFFD54F).withOpacity(0.10),
         0.88 + 0.05 * math.cos(a * 0.8), 0.22 + 0.06 * math.sin(a * 0.7), 0.34 + 0.03 * math.cos(a * 1.3));
-    circle(Paint()..color = const Color(0xFF69F0AE).withOpacity(0.09)..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.13),
+    circle(Paint()..color = const Color(0xFF69F0AE).withOpacity(0.08),
         0.62 + 0.06 * math.sin(a * 0.8), 0.84 + 0.05 * math.cos(a * 1.0), 0.46 + 0.03 * math.sin(a * 1.1));
   }
   @override

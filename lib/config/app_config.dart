@@ -24,6 +24,10 @@ class AppConfig {
 
   static const String _fallbackSiteUrl = 'https://gba-vc4s.vercel.app';
 
+  /// Production URL used for all auth redirects (confirm signup, magic link, reset password, invite, change email).
+  /// No localhost — production only.
+  static const String authRedirectBaseUrl = 'https://gba-vc4s.vercel.app';
+
   static const String _fallbackBackendUrl =
       'https://gba-vc4s-jb288157k-gbas-projects-38754d42.vercel.app';
 

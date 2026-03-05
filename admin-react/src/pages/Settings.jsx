@@ -1,102 +1,93 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Switch,
-  FormControlLabel,
-  Divider,
-  Grid,
-  Card,
-  CardContent,
-  Avatar,
-  IconButton,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemSecondaryAction,
-  Tabs,
-  Tab,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
-  Alert,
-} from '@mui/material';
-import {
-  Person,
-  Security,
-  Notifications,
-  Palette,
-  Language,
-  Store,
-  Email,
-  Phone,
-  Lock,
-  Edit,
-  Save,
-  Cancel,
-  CloudUpload,
-  Brightness4,
-  Brightness7,
-  NotificationsActive,
-  NotificationsOff,
-  VpnKey,
-  Payment,
-  LocalShipping,
-  Receipt,
-} from '@mui/icons-material';
-import { useSnackbar } from 'notistack';
+  User, Shield, Bell, Palette, Store, Mail, Phone,
+  Lock, Pencil, Save, X, Upload, Sun, Moon,
+  Key, ShoppingBag, Info,
+} from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useDark } from '../components/Layout';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
 
-function TabPanel({ children, value, index }) {
+const inputCls = "w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent bg-white dark:bg-slate-800 dark:text-slate-100 transition disabled:bg-gray-50 dark:disabled:bg-slate-900 disabled:text-gray-500 dark:disabled:text-slate-500";
+const selectCls = "w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-slate-800 dark:text-slate-100 transition";
+
+function SettingRow({ icon: Icon, label, desc, children }) {
   return (
-    <Box hidden={value !== index} sx={{ pt: 3 }}>
-      {value === index && children}
-    </Box>
+    <div className="flex items-center justify-between py-3 border-b border-gray-50 dark:border-slate-700/50 last:border-0">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+          <Icon size={15} className="text-indigo-600 dark:text-indigo-400" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{label}</p>
+          {desc && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{desc}</p>}
+        </div>
+      </div>
+      <div className="shrink-0 ml-4">{children}</div>
+    </div>
   );
 }
 
+function Toggle({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-slate-600'}`}
+    >
+      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-5' : ''}`} />
+    </button>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const TABS = [
+  { label: 'Profil', Icon: User },
+  { label: 'Notifications', Icon: Bell },
+  { label: 'Sécurité', Icon: Shield },
+  { label: 'Boutique', Icon: Store },
+  { label: 'Apparence', Icon: Palette },
+];
+
 function Settings() {
-  const [tabValue, setTabValue] = useState(0);
+  const { dark, toggle: toggleDarkMode } = useDark();
+  const [tab, setTab] = useState(0);
   const [editMode, setEditMode] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [selectedColor, setSelectedColor] = useState('#667eea');
   const { user } = useAuth();
-  const { enqueueSnackbar } = useSnackbar();
 
   const [profile, setProfile] = useState({
     name: 'Faycal Habib',
-    email: 'faycalhabibahmat@gmail.com',
+    email: user?.email || 'faycalhabibahmat@gmail.com',
     phone: '+1 234 567 8900',
     bio: 'Admin at GBA Store',
-    avatar: null,
   });
 
   const [notifications, setNotifications] = useState({
-    emailOrders: true,
-    emailProducts: true,
-    emailUsers: false,
-    pushOrders: true,
-    pushProducts: false,
-    pushUsers: false,
-    smsOrders: false,
-    smsProducts: false,
+    emailOrders: true, emailProducts: true, emailUsers: false,
+    pushOrders: true, pushProducts: false, pushUsers: false,
   });
 
   const [storeSettings, setStoreSettings] = useState({
     storeName: 'GBA Store',
     storeEmail: 'support@gbastore.com',
     storePhone: '+1 234 567 8900',
-    storeAddress: '123 Main St, City, State 12345',
-    currency: 'USD',
-    language: 'en',
-    timezone: 'UTC-5',
-    taxRate: '10',
+    storeAddress: '123 Main St, City',
+    currency: 'XAF',
+    language: 'fr',
+    timezone: 'UTC+1',
+    taxRate: '19.25',
   });
 
   const [security, setSecurity] = useState({
@@ -106,632 +97,195 @@ function Settings() {
     ipRestriction: false,
   });
 
-  const handleSaveProfile = () => {
-    setEditMode(false);
-    enqueueSnackbar('Profile updated successfully', { variant: 'success' });
-  };
-
-  const handleSaveNotifications = () => {
-    enqueueSnackbar('Notification settings saved', { variant: 'success' });
-  };
-
-  const handleSaveStoreSettings = () => {
-    enqueueSnackbar('Store settings updated successfully', { variant: 'success' });
-  };
-
-  const handleSaveSecurity = () => {
-    enqueueSnackbar('Security settings updated successfully', { variant: 'success' });
-  };
+  const handleSaveProfile    = () => { setEditMode(false); toast.success('Profil mis à jour'); };
+  const handleSaveNotifications = () => toast.success('Notifications sauvegardées');
+  const handleSaveStore      = () => toast.success('Paramètres boutique sauvegardés');
+  const handleSaveSecurity   = () => toast.success('Sécurité sauvegardée');
 
   return (
-    <Box>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Settings
-        </Typography>
-        <Typography variant="body1" color="text.secondary" paragraph>
-          Manage your account and application preferences
-        </Typography>
+    <div className="space-y-5">
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+        <h1 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'text-gray-900'}`}>Paramètres</h1>
+        <p className={`text-sm mt-0.5 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Gérez votre compte et les préférences de l'application</p>
       </motion.div>
 
-      <Paper sx={{ mt: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={(e, v) => setTabValue(v)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab label="Profile" icon={<Person />} iconPosition="start" />
-          <Tab label="Notifications" icon={<Notifications />} iconPosition="start" />
-          <Tab label="Security" icon={<Security />} iconPosition="start" />
-          <Tab label="Store Settings" icon={<Store />} iconPosition="start" />
-          <Tab label="Appearance" icon={<Palette />} iconPosition="start" />
-        </Tabs>
+      <Card className="overflow-hidden">
+        <div className={`flex overflow-x-auto border-b ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
+          {TABS.map((t, i) => (
+            <button key={i} onClick={() => setTab(i)}
+              className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${tab === i ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : `border-transparent ${dark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'}`}`}>
+              <t.Icon size={15} />{t.label}
+            </button>
+          ))}
+        </div>
 
-        <Box sx={{ p: 3 }}>
-          <TabPanel value={tabValue} index={0}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent sx={{ textAlign: 'center' }}>
-                    <Avatar
-                      sx={{
-                        width: 120,
-                        height: 120,
-                        margin: '0 auto',
-                        mb: 2,
-                        bgcolor: 'primary.main',
-                        fontSize: '3rem',
-                      }}
-                    >
-                      {profile.name[0]}
-                    </Avatar>
-                    <Button
-                      variant="outlined"
-                      startIcon={<CloudUpload />}
-                      fullWidth
-                    >
-                      Change Avatar
-                    </Button>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      Allowed JPG, PNG or GIF. Max size of 2MB
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={8}>
-                <Card>
-                  <CardContent>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                      <Typography variant="h6">Profile Information</Typography>
-                      {!editMode ? (
-                        <Button
-                          startIcon={<Edit />}
-                          onClick={() => setEditMode(true)}
-                        >
-                          Edit
-                        </Button>
-                      ) : (
-                        <Box display="flex" gap={1}>
-                          <Button
-                            startIcon={<Cancel />}
-                            onClick={() => setEditMode(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            variant="contained"
-                            startIcon={<Save />}
-                            onClick={handleSaveProfile}
-                          >
-                            Save
-                          </Button>
-                        </Box>
-                      )}
-                    </Box>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Full Name"
-                          value={profile.name}
-                          onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                          disabled={!editMode}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Email"
-                          value={profile.email}
-                          onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                          disabled={!editMode}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Phone"
-                          value={profile.phone}
-                          onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                          disabled={!editMode}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="Role"
-                          value="Administrator"
-                          disabled
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Bio"
-                          multiline
-                          rows={3}
-                          value={profile.bio}
-                          onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                          disabled={!editMode}
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </TabPanel>
+        <div className="p-6">
+          {/* ── Profil ── */}
+          {tab === 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className={`rounded-2xl p-6 flex flex-col items-center text-center ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold mb-4 shadow-lg">
+                  {profile.name[0]}
+                </div>
+                <label className="w-full cursor-pointer">
+                  <Button variant="outline" size="sm" className="w-full" asChild><span><Upload size={14} /> Changer l'avatar</span></Button>
+                  <input type="file" className="hidden" accept="image/*" />
+                </label>
+                <p className={`text-xs mt-2 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>JPG, PNG ou GIF. Max 2 Mo</p>
+              </div>
+              <div className={`md:col-span-2 rounded-2xl p-6 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className={`font-semibold ${dark ? 'text-white' : 'text-gray-800'}`}>Informations du profil</h2>
+                  {!editMode
+                    ? <Button variant="ghost" size="sm" onClick={() => setEditMode(true)}><Pencil size={14} /> Modifier</Button>
+                    : <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setEditMode(false)}><X size={14} /> Annuler</Button>
+                        <Button size="sm" onClick={handleSaveProfile}><Save size={14} /> Enregistrer</Button>
+                      </div>}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Nom complet"><input className={inputCls} value={profile.name} disabled={!editMode} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} /></Field>
+                  <Field label="Email"><input className={inputCls} value={profile.email} disabled={!editMode} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} /></Field>
+                  <Field label="Téléphone"><input className={inputCls} value={profile.phone} disabled={!editMode} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} /></Field>
+                  <Field label="Rôle"><input className={inputCls} value="Administrateur" disabled /></Field>
+                  <div className="sm:col-span-2">
+                    <Field label="Bio"><textarea className={inputCls} rows={3} value={profile.bio} disabled={!editMode} onChange={e => setProfile(p => ({ ...p, bio: e.target.value }))} /></Field>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-          <TabPanel value={tabValue} index={1}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Email Notifications
-                    </Typography>
-                    <List>
-                      <ListItem>
-                        <ListItemIcon>
-                          <Email />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Order Updates"
-                          secondary="Receive emails for new orders"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={notifications.emailOrders}
-                            onChange={(e) => setNotifications({
-                              ...notifications,
-                              emailOrders: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon>
-                          <Email />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Product Updates"
-                          secondary="Receive emails for product changes"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={notifications.emailProducts}
-                            onChange={(e) => setNotifications({
-                              ...notifications,
-                              emailProducts: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon>
-                          <Email />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="User Activities"
-                          secondary="Receive emails for user registrations"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={notifications.emailUsers}
-                            onChange={(e) => setNotifications({
-                              ...notifications,
-                              emailUsers: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Push Notifications
-                    </Typography>
-                    <List>
-                      <ListItem>
-                        <ListItemIcon>
-                          <NotificationsActive />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Order Updates"
-                          secondary="Receive push notifications for orders"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={notifications.pushOrders}
-                            onChange={(e) => setNotifications({
-                              ...notifications,
-                              pushOrders: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon>
-                          <NotificationsActive />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Product Updates"
-                          secondary="Receive push notifications for products"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={notifications.pushProducts}
-                            onChange={(e) => setNotifications({
-                              ...notifications,
-                              pushProducts: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon>
-                          <NotificationsActive />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="User Activities"
-                          secondary="Receive push notifications for users"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={notifications.pushUsers}
-                            onChange={(e) => setNotifications({
-                              ...notifications,
-                              pushUsers: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12}>
-                <Box display="flex" justifyContent="flex-end">
-                  <Button
-                    variant="contained"
-                    onClick={handleSaveNotifications}
-                    startIcon={<Save />}
-                  >
-                    Save Notification Settings
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </TabPanel>
+          {/* ── Notifications ── */}
+          {tab === 1 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className={`rounded-2xl p-5 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold mb-4 ${dark ? 'text-white' : 'text-gray-800'}`}>Notifications email</h2>
+                <SettingRow icon={Mail} label="Nouvelles commandes" desc="Email pour chaque commande">
+                  <Toggle checked={notifications.emailOrders} onChange={v => setNotifications(p => ({ ...p, emailOrders: v }))} />
+                </SettingRow>
+                <SettingRow icon={ShoppingBag} label="Changements produits" desc="Alertes de modification">
+                  <Toggle checked={notifications.emailProducts} onChange={v => setNotifications(p => ({ ...p, emailProducts: v }))} />
+                </SettingRow>
+                <SettingRow icon={User} label="Activité utilisateurs" desc="Nouvelles inscriptions">
+                  <Toggle checked={notifications.emailUsers} onChange={v => setNotifications(p => ({ ...p, emailUsers: v }))} />
+                </SettingRow>
+              </div>
+              <div className={`rounded-2xl p-5 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold mb-4 ${dark ? 'text-white' : 'text-gray-800'}`}>Notifications push</h2>
+                <SettingRow icon={Bell} label="Nouvelles commandes" desc="Push pour commandes">
+                  <Toggle checked={notifications.pushOrders} onChange={v => setNotifications(p => ({ ...p, pushOrders: v }))} />
+                </SettingRow>
+                <SettingRow icon={ShoppingBag} label="Changements produits" desc="Push pour produits">
+                  <Toggle checked={notifications.pushProducts} onChange={v => setNotifications(p => ({ ...p, pushProducts: v }))} />
+                </SettingRow>
+                <SettingRow icon={User} label="Activité utilisateurs" desc="Push pour utilisateurs">
+                  <Toggle checked={notifications.pushUsers} onChange={v => setNotifications(p => ({ ...p, pushUsers: v }))} />
+                </SettingRow>
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <Button size="sm" onClick={handleSaveNotifications}><Save size={15} /> Enregistrer</Button>
+              </div>
+            </div>
+          )}
 
-          <TabPanel value={tabValue} index={2}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  Enhance your account security by enabling additional security features
-                </Alert>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Security Options
-                    </Typography>
-                    <List>
-                      <ListItem>
-                        <ListItemIcon>
-                          <VpnKey />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Two-Factor Authentication"
-                          secondary="Add an extra layer of security"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={security.twoFactor}
-                            onChange={(e) => setSecurity({
-                              ...security,
-                              twoFactor: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon>
-                          <Lock />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="IP Restriction"
-                          secondary="Restrict access to specific IPs"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={security.ipRestriction}
-                            onChange={(e) => setSecurity({
-                              ...security,
-                              ipRestriction: e.target.checked
-                            })}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Password & Session
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12}>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          startIcon={<Lock />}
-                        >
-                          Change Password
-                        </Button>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Session Timeout (minutes)"
-                          type="number"
-                          value={security.sessionTimeout}
-                          onChange={(e) => setSecurity({
-                            ...security,
-                            sessionTimeout: e.target.value
-                          })}
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Password Expiry (days)"
-                          type="number"
-                          value={security.passwordExpiry}
-                          onChange={(e) => setSecurity({
-                            ...security,
-                            passwordExpiry: e.target.value
-                          })}
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12}>
-                <Box display="flex" justifyContent="flex-end">
-                  <Button
-                    variant="contained"
-                    onClick={handleSaveSecurity}
-                    startIcon={<Save />}
-                  >
-                    Save Security Settings
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </TabPanel>
+          {/* ── Sécurité ── */}
+          {tab === 2 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className={`md:col-span-2 flex items-start gap-3 p-3 rounded-xl text-sm ${dark ? 'bg-blue-900/30 border border-blue-800 text-blue-300' : 'bg-blue-50 border border-blue-100 text-blue-700'}`}>
+                <Info size={15} className="shrink-0 mt-0.5" />
+                Renforcez la sécurité de votre compte en activant les options ci-dessous.
+              </div>
+              <div className={`rounded-2xl p-5 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold mb-4 ${dark ? 'text-white' : 'text-gray-800'}`}>Options de sécurité</h2>
+                <SettingRow icon={Key} label="Double authentification" desc="Couche de sécurité supplémentaire">
+                  <Toggle checked={security.twoFactor} onChange={v => setSecurity(p => ({ ...p, twoFactor: v }))} />
+                </SettingRow>
+                <SettingRow icon={Shield} label="Restriction IP" desc="Restreindre l'accès à des IPs spécifiques">
+                  <Toggle checked={security.ipRestriction} onChange={v => setSecurity(p => ({ ...p, ipRestriction: v }))} />
+                </SettingRow>
+              </div>
+              <div className={`rounded-2xl p-5 space-y-4 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold ${dark ? 'text-white' : 'text-gray-800'}`}>Mot de passe & Session</h2>
+                <Button variant="outline" className="w-full"><Lock size={14} /> Changer le mot de passe</Button>
+                <Field label="Timeout session (min)"><input type="number" className={inputCls} value={security.sessionTimeout} onChange={e => setSecurity(p => ({ ...p, sessionTimeout: e.target.value }))} /></Field>
+                <Field label="Expiration mot de passe (jours)"><input type="number" className={inputCls} value={security.passwordExpiry} onChange={e => setSecurity(p => ({ ...p, passwordExpiry: e.target.value }))} /></Field>
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <Button size="sm" onClick={handleSaveSecurity}><Save size={15} /> Enregistrer</Button>
+              </div>
+            </div>
+          )}
 
-          <TabPanel value={tabValue} index={3}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Store Information
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Store Name"
-                          value={storeSettings.storeName}
-                          onChange={(e) => setStoreSettings({
-                            ...storeSettings,
-                            storeName: e.target.value
-                          })}
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Store Email"
-                          value={storeSettings.storeEmail}
-                          onChange={(e) => setStoreSettings({
-                            ...storeSettings,
-                            storeEmail: e.target.value
-                          })}
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Store Phone"
-                          value={storeSettings.storePhone}
-                          onChange={(e) => setStoreSettings({
-                            ...storeSettings,
-                            storePhone: e.target.value
-                          })}
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Store Address"
-                          multiline
-                          rows={2}
-                          value={storeSettings.storeAddress}
-                          onChange={(e) => setStoreSettings({
-                            ...storeSettings,
-                            storeAddress: e.target.value
-                          })}
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Regional Settings
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12}>
-                        <FormControl fullWidth>
-                          <InputLabel>Currency</InputLabel>
-                          <Select
-                            value={storeSettings.currency}
-                            onChange={(e) => setStoreSettings({
-                              ...storeSettings,
-                              currency: e.target.value
-                            })}
-                            label="Currency"
-                          >
-                            <MenuItem value="USD">USD - US Dollar</MenuItem>
-                            <MenuItem value="EUR">EUR - Euro</MenuItem>
-                            <MenuItem value="GBP">GBP - British Pound</MenuItem>
-                            <MenuItem value="JPY">JPY - Japanese Yen</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <FormControl fullWidth>
-                          <InputLabel>Language</InputLabel>
-                          <Select
-                            value={storeSettings.language}
-                            onChange={(e) => setStoreSettings({
-                              ...storeSettings,
-                              language: e.target.value
-                            })}
-                            label="Language"
-                          >
-                            <MenuItem value="en">English</MenuItem>
-                            <MenuItem value="es">Spanish</MenuItem>
-                            <MenuItem value="fr">French</MenuItem>
-                            <MenuItem value="de">German</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <FormControl fullWidth>
-                          <InputLabel>Timezone</InputLabel>
-                          <Select
-                            value={storeSettings.timezone}
-                            onChange={(e) => setStoreSettings({
-                              ...storeSettings,
-                              timezone: e.target.value
-                            })}
-                            label="Timezone"
-                          >
-                            <MenuItem value="UTC-5">Eastern Time (UTC-5)</MenuItem>
-                            <MenuItem value="UTC-6">Central Time (UTC-6)</MenuItem>
-                            <MenuItem value="UTC-7">Mountain Time (UTC-7)</MenuItem>
-                            <MenuItem value="UTC-8">Pacific Time (UTC-8)</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Tax Rate (%)"
-                          type="number"
-                          value={storeSettings.taxRate}
-                          onChange={(e) => setStoreSettings({
-                            ...storeSettings,
-                            taxRate: e.target.value
-                          })}
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12}>
-                <Box display="flex" justifyContent="flex-end">
-                  <Button
-                    variant="contained"
-                    onClick={handleSaveStoreSettings}
-                    startIcon={<Save />}
-                  >
-                    Save Store Settings
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </TabPanel>
+          {/* ── Boutique ── */}
+          {tab === 3 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className={`rounded-2xl p-5 space-y-4 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold ${dark ? 'text-white' : 'text-gray-800'}`}>Informations boutique</h2>
+                <Field label="Nom de la boutique"><input className={inputCls} value={storeSettings.storeName} onChange={e => setStoreSettings(p => ({ ...p, storeName: e.target.value }))} /></Field>
+                <Field label="Email boutique"><input className={inputCls} value={storeSettings.storeEmail} onChange={e => setStoreSettings(p => ({ ...p, storeEmail: e.target.value }))} /></Field>
+                <Field label="Téléphone boutique"><input className={inputCls} value={storeSettings.storePhone} onChange={e => setStoreSettings(p => ({ ...p, storePhone: e.target.value }))} /></Field>
+                <Field label="Adresse"><textarea className={inputCls} rows={2} value={storeSettings.storeAddress} onChange={e => setStoreSettings(p => ({ ...p, storeAddress: e.target.value }))} /></Field>
+              </div>
+              <div className={`rounded-2xl p-5 space-y-4 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold ${dark ? 'text-white' : 'text-gray-800'}`}>Paramètres régionaux</h2>
+                <Field label="Devise">
+                  <select className={selectCls} value={storeSettings.currency} onChange={e => setStoreSettings(p => ({ ...p, currency: e.target.value }))}>
+                    <option value="XAF">XAF - Franc CFA</option>
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="GBP">GBP - British Pound</option>
+                  </select>
+                </Field>
+                <Field label="Langue">
+                  <select className={selectCls} value={storeSettings.language} onChange={e => setStoreSettings(p => ({ ...p, language: e.target.value }))}>
+                    <option value="fr">Français</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                  </select>
+                </Field>
+                <Field label="Fuseau horaire">
+                  <select className={selectCls} value={storeSettings.timezone} onChange={e => setStoreSettings(p => ({ ...p, timezone: e.target.value }))}>
+                    <option value="UTC+1">UTC+1 (Afrique Centrale)</option>
+                    <option value="UTC">UTC</option>
+                    <option value="UTC-5">UTC-5 (Est USA)</option>
+                  </select>
+                </Field>
+                <Field label="Taux de TVA (%)"><input type="number" className={inputCls} value={storeSettings.taxRate} onChange={e => setStoreSettings(p => ({ ...p, taxRate: e.target.value }))} /></Field>
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <Button size="sm" onClick={handleSaveStore}><Save size={15} /> Enregistrer</Button>
+              </div>
+            </div>
+          )}
 
-          <TabPanel value={tabValue} index={4}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Theme Settings
-                    </Typography>
-                    <List>
-                      <ListItem>
-                        <ListItemIcon>
-                          {darkMode ? <Brightness7 /> : <Brightness4 />}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Dark Mode"
-                          secondary="Toggle between light and dark theme"
-                        />
-                        <ListItemSecondaryAction>
-                          <Switch
-                            checked={darkMode}
-                            onChange={(e) => setDarkMode(e.target.checked)}
-                          />
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    </List>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle1" gutterBottom>
-                      Primary Color
-                    </Typography>
-                    <Box display="flex" gap={1} mb={2}>
-                      {['#667eea', '#f093fb', '#30cfd0', '#f5576c', '#764ba2'].map((color) => (
-                        <Box
-                          key={color}
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            bgcolor: color,
-                            borderRadius: 1,
-                            cursor: 'pointer',
-                            border: 2,
-                            borderColor: 'transparent',
-                            '&:hover': {
-                              borderColor: 'primary.main',
-                            },
-                          }}
-                        />
-                      ))}
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </TabPanel>
-        </Box>
-      </Paper>
-    </Box>
+          {/* ── Apparence ── */}
+          {tab === 4 && (
+            <div className="max-w-lg space-y-5">
+              <div className={`rounded-2xl p-5 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold mb-4 ${dark ? 'text-white' : 'text-gray-800'}`}>Thème</h2>
+                <SettingRow icon={dark ? Sun : Moon} label="Mode sombre" desc="Basculer entre clair et sombre">
+                  <Toggle checked={dark} onChange={toggleDarkMode} />
+                </SettingRow>
+              </div>
+              <div className={`rounded-2xl p-5 ${dark ? 'bg-slate-800/60' : 'bg-gray-50'}`}>
+                <h2 className={`font-semibold mb-3 ${dark ? 'text-white' : 'text-gray-800'}`}>Couleur principale</h2>
+                <div className="flex gap-3">
+                  {['#667eea', '#f093fb', '#30cfd0', '#f5576c', '#764ba2'].map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setSelectedColor(color)}
+                      className="w-10 h-10 rounded-xl transition-all hover:scale-110"
+                      style={{ background: color, outline: selectedColor === color ? `3px solid ${color}` : 'none', outlineOffset: 2 }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
   );
 }
 

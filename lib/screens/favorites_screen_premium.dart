@@ -296,7 +296,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AppAnimation(
-              id: AppAnimations.emptyBox,
+              id: AppAnimations.addToFavorites,
               width: 200,
               height: 200,
               fallback: Icon(

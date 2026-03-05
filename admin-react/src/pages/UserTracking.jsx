@@ -1,89 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Grid,
-  Paper,
-  Typography,
-  Card,
-  CardContent,
-  Avatar,
-  Chip,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  CircularProgress,
-  LinearProgress,
-  IconButton,
-  Button,
-  Alert,
-  Badge,
-  Tabs,
-  Tab
-} from '@mui/material';
-import {
-  ArrowBack,
-  ShoppingCart,
-  Favorite,
-  Visibility,
-  Person,
-  Lock,
-  Inventory,
-  Message,
-  Search,
-  TrendingUp,
-  AccessTime,
-  TouchApp,
-  Category,
-  CreditCard,
-  Cancel,
-  CheckCircle,
-  Star,
-  Share,
-  PhoneAndroid,
-  Timeline as TimelineIcon,
-  Psychology,
-  DataUsage,
-  DeviceHub,
-  Map,
-  Fingerprint,
-  Refresh,
-  Download,
-  WifiTethering,
-  AttachMoney,
-  MouseOutlined
-} from '@mui/icons-material';
-import { Line, Doughnut, Radar } from 'react-chartjs-2';
+import { ArrowLeft, ShoppingCart, Heart, Eye, User, Lock, Package, MessageSquare, Search, TrendingUp, Clock, Tag, CreditCard, X, CheckCircle, Star, Share2, Smartphone, Wifi, Fingerprint, RefreshCw, Download, Loader2 } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, formatDistanceToNow, subDays } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useDark } from '../components/Layout';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
 
-// Action configurations
 const actionConfig = {
-  cart_add: { icon: <ShoppingCart />, label: 'Ajout panier', color: '#4CAF50', weight: 5 },
-  cart_remove: { icon: <ShoppingCart />, label: 'Retrait panier', color: '#F44336', weight: 2 },
-  favorite_add: { icon: <Favorite />, label: 'Ajout favoris', color: '#E91E63', weight: 3 },
-  favorite_remove: { icon: <Favorite />, label: 'Retrait favoris', color: '#9E9E9E', weight: 1 },
-  product_view: { icon: <Visibility />, label: 'Produit consulté', color: '#2196F3', weight: 2 },
-  profile_update: { icon: <Person />, label: 'Profil mis à jour', color: '#9C27B0', weight: 3 },
-  login: { icon: <Lock />, label: 'Connexion', color: '#00BCD4', weight: 2 },
-  logout: { icon: <Lock />, label: 'Déconnexion', color: '#607D8B', weight: 1 },
-  order_placed: { icon: <Inventory />, label: 'Commande passée', color: '#FF9800', weight: 10 },
-  message_sent: { icon: <Message />, label: 'Message envoyé', color: '#3F51B5', weight: 3 },
-  search: { icon: <Search />, label: 'Recherche', color: '#795548', weight: 1 },
-  category_view: { icon: <Category />, label: 'Catégorie vue', color: '#009688', weight: 1 },
-  checkout_started: { icon: <CreditCard />, label: 'Checkout commencé', color: '#FFC107', weight: 4 },
-  checkout_abandoned: { icon: <Cancel />, label: 'Checkout abandonné', color: '#F44336', weight: -5 },
-  payment_completed: { icon: <CheckCircle />, label: 'Paiement effectué', color: '#4CAF50', weight: 8 },
-  review_posted: { icon: <Star />, label: 'Avis posté', color: '#FFD700', weight: 6 },
-  share_product: { icon: <Share />, label: 'Produit partagé', color: '#673AB7', weight: 4 },
-  app_opened: { icon: <PhoneAndroid />, label: 'App ouverte', color: '#00E676', weight: 1 },
-  app_closed: { icon: <PhoneAndroid />, label: 'App fermée', color: '#FF5252', weight: 0 }
+  cart_add: { label: 'Ajout panier', dot: 'bg-green-500' },
+  cart_remove: { label: 'Retrait panier', dot: 'bg-red-400' },
+  favorite_add: { label: 'Ajout favoris', dot: 'bg-rose-500' },
+  favorite_remove: { label: 'Retrait favoris', dot: 'bg-gray-400' },
+  product_view: { label: 'Produit consulté', dot: 'bg-blue-500' },
+  profile_update: { label: 'Profil mis à jour', dot: 'bg-purple-500' },
+  login: { label: 'Connexion', dot: 'bg-cyan-500' },
+  logout: { label: 'Déconnexion', dot: 'bg-slate-400' },
+  order_placed: { label: 'Commande passée', dot: 'bg-orange-500' },
+  message_sent: { label: 'Message envoyé', dot: 'bg-indigo-500' },
+  search: { label: 'Recherche', dot: 'bg-amber-700' },
+  category_view: { label: 'Catégorie vue', dot: 'bg-teal-500' },
+  checkout_started: { label: 'Checkout commencé', dot: 'bg-yellow-500' },
+  checkout_abandoned: { label: 'Checkout abandonné', dot: 'bg-red-500' },
+  payment_completed: { label: 'Paiement effectué', dot: 'bg-green-600' },
+  review_posted: { label: 'Avis posté', dot: 'bg-yellow-400' },
+  share_product: { label: 'Produit partagé', dot: 'bg-violet-500' },
+  app_opened: { label: 'App ouverte', dot: 'bg-emerald-400' },
+  app_closed: { label: 'App fermée', dot: 'bg-red-300' },
 };
 
 function UserTracking() {
+  const { dark } = useDark();
   const { userId } = useParams();
   const navigate = useNavigate();
   
@@ -97,6 +46,8 @@ function UserTracking() {
   const [metrics, setMetrics] = useState(null);
   const [digitalFootprint, setDigitalFootprint] = useState(null);
   const [liveActivity, setLiveActivity] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [ordersTotalSpent, setOrdersTotalSpent] = useState(0);
   
   useEffect(() => {
     if (userId) {
@@ -134,7 +85,8 @@ function UserTracking() {
         fetchActivities(),
         fetchSessions(),
         fetchMetrics(),
-        buildDigitalFootprint()
+        buildDigitalFootprint(),
+        fetchOrders()
       ]);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -162,23 +114,40 @@ function UserTracking() {
   };
   
   const fetchSessions = async () => {
-    const { data } = await supabase
-      .from('user_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('started_at', { ascending: false })
-      .limit(30);
-    setSessions(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('started_at', { ascending: false })
+        .limit(30);
+      if (!error) setSessions(data || []);
+    } catch (_) { /* table may not exist */ }
   };
   
   const fetchMetrics = async () => {
-    const { data } = await supabase
-      .from('user_activity_metrics')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('period_type', 'all_time')
-      .single();
-    setMetrics(data);
+    try {
+      const { data, error } = await supabase
+        .from('user_activity_metrics')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('period_type', 'all_time')
+        .single();
+      if (!error) setMetrics(data);
+    } catch (_) { /* table may not exist */ }
+  };
+
+  const fetchOrders = async () => {
+    try {
+      const { data } = await supabase
+        .from('orders')
+        .select('id, status, total_amount, created_at, order_items(id, quantity, unit_price, products(name))')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      const list = data || [];
+      setOrders(list);
+      setOrdersTotalSpent(list.reduce((s, o) => s + (o.total_amount || 0), 0));
+    } catch (_) {}
   };
   
   const buildDigitalFootprint = async () => {
@@ -250,159 +219,225 @@ function UserTracking() {
   
   const engagementScore = calculateEngagementScore();
   
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <CircularProgress size={60} />
-      </Box>
-    );
-  }
-  
-  if (!user) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Utilisateur non trouvé</Alert>
-      </Box>
-    );
-  }
-  
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 size={40} className="animate-spin text-indigo-400" />
+    </div>
+  );
+  if (!user) return (
+    <div className={`p-4 rounded-2xl text-sm ${dark ? 'bg-red-900/20 border border-red-800 text-red-400' : 'bg-red-50 border border-red-200 text-red-700'}`}>Utilisateur non trouvé</div>
+  );
+  const scoreLabel = engagementScore >= 80 ? 'Très actif' : engagementScore >= 60 ? 'Actif' : engagementScore >= 40 ? 'Modéré' : engagementScore >= 20 ? 'Peu actif' : 'Inactif';
+
   return (
-    <Box sx={{ p: 3, background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)', minHeight: '100vh' }}>
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <Box display="flex" alignItems="center" gap={2} mb={3}>
-          <IconButton onClick={() => navigate('/users')}>
-            <ArrowBack />
-          </IconButton>
-          <Avatar src={user.avatar_url} sx={{ width: 64, height: 64, bgcolor: '#667eea' }}>
-            {user.first_name?.[0] || user.email?.[0]}
-          </Avatar>
-          <Box flex={1}>
-            <Typography variant="h4" fontWeight="bold">
-              {user.first_name} {user.last_name}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              {user.email} • ID: {user.id.slice(0, 8)}...
-            </Typography>
-          </Box>
-          <Button variant="outlined" startIcon={<Refresh />} onClick={() => fetchAllData()}>
-            Actualiser
-          </Button>
-          <Button variant="contained" startIcon={<Download />}>
-            Exporter
-          </Button>
-        </Box>
+    <div>
+      <motion.div initial={{ opacity:0, y:-16 }} animate={{ opacity:1, y:0 }} className="flex items-center gap-3 mb-6">
+        <button onClick={() => navigate('/users')} className={`p-2 rounded-xl ${dark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-gray-100'}`}><ArrowLeft size={18} className={dark ? 'text-slate-400' : 'text-gray-600'} /></button>
+        {user.avatar_url
+          ? <img src={user.avatar_url} alt="" className="w-14 h-14 rounded-full object-cover" />
+          : <div className="w-14 h-14 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xl font-bold">{(user.first_name || user.email || 'U')[0].toUpperCase()}</div>}
+        <div className="flex-1">
+          <h1 className={`text-xl font-bold ${dark ? 'text-white' : 'text-gray-900'}`}>{user.first_name} {user.last_name}</h1>
+          <p className={`text-sm ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{user.email} · ID: {user.id.slice(0, 8)}…</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => fetchAllData()}><RefreshCw size={13} /> Actualiser</Button>
+        <Button size="sm"><Download size={13} /> Exporter</Button>
       </motion.div>
-      
-      {/* Live Activity */}
+
       <AnimatePresence>
         {liveActivity && (
-          <motion.div initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -100 }}>
-            <Alert severity="info" sx={{ mb: 2 }} icon={<WifiTethering />}>
-              <strong>Activité en temps réel:</strong> {actionConfig[liveActivity.action_type]?.label}
-            </Alert>
+          <motion.div initial={{ opacity:0, x:80 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-80 }}
+            className={`flex items-center gap-2 p-3 mb-4 rounded-2xl text-sm ${dark ? 'bg-blue-900/20 border border-blue-800 text-blue-300' : 'bg-blue-50 border border-blue-200 text-blue-800'}`}>
+            <Wifi size={15} className="text-blue-500 shrink-0" />
+            <span><strong>Activité en temps réel:</strong> {actionConfig[liveActivity.action_type]?.label}</span>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-5">
+        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 text-white">
+          <p className="text-sm font-medium opacity-80 mb-2">Score d'Engagement</p>
+          <p className="text-5xl font-extrabold">{engagementScore}</p>
+          <p className="text-sm opacity-70 mb-3">/100</p>
+          <span className="inline-block text-xs font-semibold px-3 py-1 rounded-full bg-white/20">{scoreLabel}</span>
+        </div>
+        <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+          {[
+            { label:'Empreinte Digitale', value:digitalFootprint?.totalInteractions||0, Icon:Fingerprint, bg:'bg-blue-50', c:'text-blue-600' },
+            { label:'Produits Explorés', value:digitalFootprint?.uniqueProducts||0, Icon:Eye, bg:'bg-green-50', c:'text-green-600' },
+            { label:'Temps Total', value:`${Math.round((metrics?.total_time_spent_seconds||0)/60)} min`, Icon:Clock, bg:'bg-amber-50', c:'text-amber-600' },
+            { label:'Taux Conversion', value:`${Math.round((metrics?.orders_placed||0)/Math.max(1,metrics?.total_sessions||1)*100)}%`, Icon:TrendingUp, bg:'bg-purple-50', c:'text-purple-600' },
+            { label:'Valeur Lifetime', value:`${ordersTotalSpent.toLocaleString('fr-FR')} F`, Icon:Tag, bg:'bg-rose-50', c:'text-rose-500' },
+            { label:'Dernière Activité', value:metrics?.last_activity_at ? formatDistanceToNow(new Date(metrics.last_activity_at),{locale:fr,addSuffix:true}) : 'Jamais', Icon:Clock, bg:'bg-cyan-50', c:'text-cyan-600' },
+          ].map(({label,value,Icon,bg,c},i) => (
+            <div key={i} className={`rounded-2xl border p-4 flex items-start gap-3 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`}>
+              <div className={`p-2 rounded-lg ${bg} shrink-0`}><Icon size={16} className={c} /></div>
+              <div><p className={`text-xs ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{label}</p><p className={`font-bold text-sm mt-0.5 truncate ${dark ? 'text-white' : 'text-gray-800'}`}>{value}</p></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`flex gap-1 p-1 rounded-xl mb-5 w-fit ${dark ? 'bg-slate-800' : 'bg-gray-100'}`}>
+        {['Timeline', 'Commandes', 'Comportement', 'Sessions'].map((tab, i) => (
+          <button key={i} onClick={() => setTabValue(i)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tabValue === i ? (dark ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-600 shadow-sm') : (dark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700')}`}>
+            {tab}
+          </button>
+        ))}
+      </div>
       
-      {/* Metrics */}
-      <Grid container spacing={3} mb={3}>
-        <Grid item xs={12} lg={3}>
-          <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Score d'Engagement</Typography>
-              <Typography variant="h2" fontWeight="bold">{engagementScore}</Typography>
-              <Typography>/100</Typography>
-              <Chip
-                label={engagementScore >= 80 ? 'Très actif' : engagementScore >= 60 ? 'Actif' : engagementScore >= 40 ? 'Modéré' : engagementScore >= 20 ? 'Peu actif' : 'Inactif'}
-                sx={{ mt: 2, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
-              />
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} lg={9}>
-          <Grid container spacing={2}>
-            {[
-              { label: 'Empreinte Digitale', value: digitalFootprint?.totalInteractions || 0, icon: <Fingerprint />, color: '#2196F3' },
-              { label: 'Produits Explorés', value: digitalFootprint?.uniqueProducts || 0, icon: <Visibility />, color: '#4CAF50' },
-              { label: 'Temps Total', value: `${Math.round((metrics?.total_time_spent_seconds || 0) / 60)} min`, icon: <AccessTime />, color: '#FF9800' },
-              { label: 'Taux de Conversion', value: `${Math.round((metrics?.orders_placed || 0) / Math.max(1, metrics?.total_sessions || 1) * 100)}%`, icon: <TrendingUp />, color: '#9C27B0' },
-              { label: 'Valeur Lifetime', value: `${(metrics?.orders_placed || 0) * 50000} FCFA`, icon: <AttachMoney />, color: '#E91E63' },
-              { label: 'Dernière Activité', value: metrics?.last_activity_at ? formatDistanceToNow(new Date(metrics.last_activity_at), { locale: fr, addSuffix: true }) : 'Jamais', icon: <TouchApp />, color: '#00BCD4' }
-            ].map((metric, index) => (
-              <Grid item xs={6} md={4} key={index}>
-                <Card>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={1}>
-                      <Avatar sx={{ bgcolor: metric.color, width: 32, height: 32 }}>
-                        {React.cloneElement(metric.icon, { sx: { fontSize: 18 } })}
-                      </Avatar>
-                      <Typography variant="body2" color="textSecondary">{metric.label}</Typography>
-                    </Box>
-                    <Typography variant="h5" fontWeight="bold">{metric.value}</Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </Grid>
-      </Grid>
-      
-      {/* Tabs */}
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
-          <Tab label="Timeline" icon={<TimelineIcon />} iconPosition="start" />
-          <Tab label="Comportement" icon={<Psychology />} iconPosition="start" />
-          <Tab label="Sessions" icon={<DeviceHub />} iconPosition="start" />
-        </Tabs>
-      </Paper>
-      
-      {/* Content */}
       {tabValue === 0 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>Chronologie des Activités</Typography>
-          <List>
-            {activities.length === 0 ? (
-              <Alert severity="info">Aucune activité enregistrée</Alert>
-            ) : (
-              activities.slice(0, 50).map((activity, index) => {
-                const config = actionConfig[activity.action_type] || {};
-                return (
-                  <ListItem key={activity.id} sx={{ mb: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                    <ListItemAvatar>
-                      <Badge
-                        badgeContent={
-                          <Avatar sx={{ width: 20, height: 20, bgcolor: config.color }}>
-                            {React.cloneElement(config.icon || <MouseOutlined />, { sx: { fontSize: 12 } })}
-                          </Avatar>
-                        }
-                        overlap="circular"
-                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                      >
-                        <Avatar sx={{ bgcolor: 'grey.200' }}>{index + 1}</Avatar>
-                      </Badge>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Typography fontWeight="medium">{config.label || activity.action_type}</Typography>
-                          {activity.entity_name && <Chip label={activity.entity_name} size="small" variant="outlined" />}
-                        </Box>
-                      }
-                      secondary={format(new Date(activity.created_at), 'dd MMMM yyyy à HH:mm:ss', { locale: fr })}
-                    />
-                    <Typography variant="caption" color="textSecondary">
-                      {formatDistanceToNow(new Date(activity.created_at), { locale: fr, addSuffix: true })}
-                    </Typography>
-                  </ListItem>
-                );
-              })
-            )}
-          </List>
-        </Paper>
+        <Card className="p-5">
+          <h3 className={`text-sm font-bold mb-4 ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Chronologie des Activités</h3>
+          {activities.length === 0
+            ? <p className={`text-center py-8 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Aucune activité enregistrée</p>
+            : <div className="space-y-1">
+                {activities.slice(0, 50).map((activity, i) => {
+                  const cfg = actionConfig[activity.action_type] || {};
+                  return (
+                    <div key={activity.id || i} className={`flex items-center gap-3 py-2 border-b ${dark ? 'border-slate-700/50' : 'border-gray-50'}`}>
+                      <div className="relative shrink-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${dark ? 'bg-slate-700 text-slate-400' : 'bg-gray-100 text-gray-500'}`}>{i + 1}</div>
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${cfg.dot || 'bg-gray-300'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-sm font-medium ${dark ? 'text-slate-200' : 'text-gray-800'}`}>{cfg.label || activity.action_type}</span>
+                          {activity.entity_name && <span className={`text-[11px] px-2 py-0.5 border rounded-full ${dark ? 'border-slate-600 text-slate-400' : 'border-gray-200 text-gray-500'}`}>{activity.entity_name}</span>}
+                        </div>
+                        <p className={`text-xs ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{format(new Date(activity.created_at), 'dd MMMM yyyy à HH:mm:ss', { locale: fr })}</p>
+                      </div>
+                      <span className={`text-xs shrink-0 hidden sm:block ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{formatDistanceToNow(new Date(activity.created_at), { locale: fr, addSuffix: true })}</span>
+                    </div>
+                  );
+                })}
+              </div>}
+        </Card>
       )}
-    </Box>
+
+      {tabValue === 1 && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-sm font-bold ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Commandes ({orders.length})</h3>
+            <span className={`text-sm ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Total: <strong className="text-indigo-500">{ordersTotalSpent.toLocaleString('fr-FR')} FCFA</strong></span>
+          </div>
+          {orders.length === 0
+            ? <p className={`text-center py-8 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Aucune commande enregistrée</p>
+            : <div className="space-y-1">
+                {orders.map((order) => {
+                  const sc = order.status === 'delivered' ? (dark ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') : order.status === 'cancelled' ? (dark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-600') : (dark ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700');
+                  return (
+                    <div key={order.id} className={`flex items-center gap-3 py-2.5 border-b ${dark ? 'border-slate-700/50' : 'border-gray-50'}`}>
+                      <ShoppingCart size={15} className={`shrink-0 ${dark ? 'text-slate-500' : 'text-gray-400'}`} />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-sm font-semibold ${dark ? 'text-slate-200' : 'text-gray-800'}`}>#{order.id.slice(0, 8)}</span>
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc}`}>{order.status}</span>
+                        </div>
+                        <p className={`text-xs ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{format(new Date(order.created_at), 'dd MMM yyyy HH:mm', { locale: fr })} · {order.order_items?.length || 0} article(s)</p>
+                      </div>
+                      <span className="font-bold text-indigo-500 text-sm shrink-0">{(order.total_amount || 0).toLocaleString('fr-FR')} FCFA</span>
+                    </div>
+                  );
+                })}
+              </div>}
+        </Card>
+      )}
+
+      {tabValue === 2 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="p-5">
+            <h3 className={`text-sm font-bold mb-4 ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Distribution des actions</h3>
+            {activities.length === 0
+              ? <p className={`text-center py-8 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Aucune activité</p>
+              : (() => {
+                  const counts = {};
+                  activities.forEach(a => { const l = actionConfig[a.action_type]?.label || a.action_type; counts[l] = (counts[l] || 0) + 1; });
+                  return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([label, count]) => (
+                    <div key={label} className="mb-3">
+                      <div className="flex justify-between mb-1"><span className={`text-xs ${dark ? 'text-slate-400' : 'text-gray-600'}`}>{label}</span><span className={`text-xs font-bold ${dark ? 'text-slate-200' : 'text-gray-800'}`}>{count}</span></div>
+                      <div className={`h-2 rounded-full overflow-hidden ${dark ? 'bg-slate-700' : 'bg-gray-100'}`}><div className="h-full bg-indigo-400 rounded-full" style={{ width: `${Math.min(100, count / activities.length * 100)}%` }} /></div>
+                    </div>
+                  ));
+                })()}
+          </Card>
+          <Card className="p-5">
+            <h3 className={`text-sm font-bold mb-4 ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Métriques comportementales</h3>
+            {metrics
+              ? <div className="space-y-2">
+                  {[
+                    { label:'Total actions', value:metrics.total_actions||0 },
+                    { label:'Commandes passées', value:metrics.orders_placed||0 },
+                    { label:'Produits consultés', value:metrics.products_viewed||0 },
+                    { label:'Messages envoyés', value:metrics.messages_sent||0 },
+                    { label:'Favoris ajoutés', value:metrics.favorites_added||0 },
+                    { label:'Sessions totales', value:metrics.total_sessions||0 },
+                    { label:'Temps total', value:`${Math.round((metrics.total_time_spent_seconds||0)/60)} min` },
+                    { label:'Montant total dépensé', value:`${(metrics.total_amount_spent||0).toLocaleString('fr-FR')} FCFA` },
+                  ].map((item, i) => (
+                    <div key={i} className={`flex justify-between py-1.5 border-b ${dark ? 'border-slate-700/50' : 'border-gray-50'}`}>
+                      <span className={`text-sm ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{item.label}</span>
+                      <span className={`text-sm font-bold ${dark ? 'text-white' : 'text-gray-800'}`}>{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              : <p className={`text-center py-8 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Aucune métrique disponible</p>}
+          </Card>
+          <Card className="p-5 md:col-span-2">
+            <h3 className={`text-sm font-bold mb-4 ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Empreinte digitale</h3>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {[
+                { label:'Interactions', value:digitalFootprint?.totalInteractions||0, bg:'bg-indigo-50', c:'text-indigo-600' },
+                { label:'Produits', value:digitalFootprint?.uniqueProducts||0, bg:'bg-green-50', c:'text-green-600' },
+                { label:'Catégories', value:digitalFootprint?.uniqueCategories||0, bg:'bg-amber-50', c:'text-amber-600' },
+                { label:'Recherches', value:digitalFootprint?.searchQueries?.length||0, bg:'bg-purple-50', c:'text-purple-600' },
+                { label:'Messages', value:digitalFootprint?.messagingActivity||0, bg:'bg-blue-50', c:'text-blue-600' },
+                { label:'Avis', value:digitalFootprint?.reviewsPosted||0, bg:'bg-yellow-50', c:'text-yellow-600' },
+              ].map((item, i) => (
+                <div key={i} className={`${dark ? 'bg-slate-700/50' : item.bg} rounded-2xl p-3 text-center`}>
+                  <p className={`text-2xl font-extrabold ${item.c}`}>{item.value}</p>
+                  <p className={`text-xs mt-0.5 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{item.label}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tabValue === 3 && (
+        <Card className="p-5">
+          <h3 className={`text-sm font-bold mb-4 ${dark ? 'text-slate-200' : 'text-gray-700'}`}>Historique des sessions</h3>
+          {sessions.length === 0
+            ? <div>
+                <p className={`text-sm mb-1 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Aucune session enregistrée pour cet utilisateur.</p>
+                <p className={`text-xs ${dark ? 'text-slate-600' : 'text-gray-300'}`}>Les sessions sont tracées uniquement si la table <code className={dark ? 'bg-slate-700 px-1 rounded' : ''}>user_sessions</code> est active dans la base.</p>
+              </div>
+            : <div className="space-y-1">
+                {sessions.map((session, i) => {
+                  const duration = session.ended_at && session.started_at ? Math.round((new Date(session.ended_at) - new Date(session.started_at)) / 60000) : null;
+                  return (
+                    <div key={session.id || i} className={`flex items-center gap-3 py-2.5 border-b ${dark ? 'border-slate-700/50' : 'border-gray-50'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${session.ended_at ? 'bg-green-400' : 'bg-amber-400'}`}>{i + 1}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-sm font-semibold ${dark ? 'text-slate-200' : 'text-gray-800'}`}>{format(new Date(session.started_at), 'dd MMM yyyy HH:mm', { locale: fr })}</span>
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${session.ended_at ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{session.ended_at ? 'Terminée' : 'En cours'}</span>
+                        </div>
+                        <p className={`text-xs mt-0.5 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>
+                          {duration !== null && <span>{duration < 60 ? `${duration} min` : `${Math.round(duration/60)}h ${duration%60}min`}</span>}
+                          {session.device_type && <span className="ml-2">· {session.device_type}</span>}
+                          {session.ip_address && <span className="ml-2">· {session.ip_address}</span>}
+                        </p>
+                      </div>
+                      <span className={`text-xs shrink-0 hidden sm:block ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{formatDistanceToNow(new Date(session.started_at), { locale: fr, addSuffix: true })}</span>
+                    </div>
+                  );
+                })}
+              </div>}
+        </Card>
+      )}
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/cart_item.dart';
 import '../models/product.dart';
 import '../services/activity_tracking_service.dart';
+import '../services/cache_service.dart';
 
 final cartProvider = ChangeNotifierProvider<CartProvider>((ref) {
   return CartProvider();
@@ -11,18 +12,51 @@ final cartProvider = ChangeNotifierProvider<CartProvider>((ref) {
 
 class CartProvider extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
+  final _cache = CacheService.instance;
   List<CartItem> _items = [];
   bool _isLoading = false;
   String? _error;
-  
+
   List<CartItem> get items => _items;
   int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
   bool get isLoading => _isLoading;
   String? get error => _error;
   double get totalAmount => _items.fold(0, (sum, item) => sum + ((item.product?.price ?? 0) * item.quantity));
-  
+
+  String? get _cacheKey {
+    final uid = _supabase.auth.currentUser?.id;
+    return uid != null ? 'cart_$uid' : null;
+  }
+
   CartProvider() {
-    loadCart();
+    _hydrateFromCache().then((_) => loadCart());
+  }
+
+  Future<void> _hydrateFromCache() async {
+    final key = _cacheKey;
+    if (key == null) return;
+    try {
+      final decoded = await _cache.get(key, CacheService.ttlCart);
+      if (decoded is! List || decoded.isEmpty) return;
+      _items = decoded
+          .whereType<Map>()
+          .map((e) => CartItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[CartProvider] cache hydrate error: $e');
+    }
+  }
+
+  Future<void> _persistToCache() async {
+    final key = _cacheKey;
+    if (key == null) return;
+    try {
+      final payload = _items.map((i) => i.toJson()).toList();
+      await _cache.set(key, payload, CacheService.ttlCart);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[CartProvider] cache persist error: $e');
+    }
   }
 
   Future<void> loadCart({bool silent = false}) async {
@@ -104,11 +138,12 @@ class CartProvider extends ChangeNotifier {
       
     } catch (e) {
       _error = e.toString();
-      print('Erreur chargement panier: $e');
+      if (kDebugMode) debugPrint('[CartProvider] load error: $e');
     } finally {
       if (!silent) {
         _isLoading = false;
       }
+      await _persistToCache();
       notifyListeners();
     }
   }
@@ -276,16 +311,18 @@ class CartProvider extends ChangeNotifier {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
-      
+
       await _supabase
           .from('cart_items')
           .delete()
           .eq('user_id', user.id);
-      
+
       _items = [];
+      final key = _cacheKey;
+      if (key != null) await _cache.invalidate(key);
       notifyListeners();
     } catch (e) {
-      print('Erreur vidage panier: $e');
+      if (kDebugMode) debugPrint('[CartProvider] clearCart error: $e');
     }
   }
 }

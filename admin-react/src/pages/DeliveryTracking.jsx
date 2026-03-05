@@ -1,210 +1,292 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Box,
-  Paper,
-  Typography,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
-  Chip,
-} from '@mui/material';
-import { Refresh as RefreshIcon } from '@mui/icons-material';
-import { useSnackbar } from 'notistack';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { RefreshCw, MapPin, Clock } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { supabase } from '../config/supabase';
+import { useDark } from '../components/Layout';
+import { Button } from '../components/ui/button';
 
-function buildOsmEmbedUrl(lat, lng) {
-  const latNum = Number(lat);
-  const lngNum = Number(lng);
-  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+// Fix leaflet default icon path (Vite/webpack issue)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
-  const d = 0.01;
-  const left = lngNum - d;
-  const right = lngNum + d;
-  const top = latNum + d;
-  const bottom = latNum - d;
+// Icône livreur (camion violet animé)
+const driverIcon = L.divIcon({
+  className: '',
+  html: `<div style="
+    width:38px;height:38px;border-radius:50%;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 6px rgba(102,126,234,.25);
+    font-size:18px;border:2px solid #fff;">🚚</div>`,
+  iconSize: [38, 38], iconAnchor: [19, 19], popupAnchor: [0, -22],
+});
 
-  const params = new URLSearchParams({
-    bbox: `${left},${bottom},${right},${top}`,
-    layer: 'mapnik',
-    marker: `${latNum},${lngNum}`,
-  });
+// Icône client (épingle bleue)
+const clientIcon = L.divIcon({
+  className: '',
+  html: `<div style="
+    width:34px;height:34px;border-radius:50%;
+    background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 5px rgba(59,130,246,.25);
+    font-size:16px;border:2px solid #fff;">👤</div>`,
+  iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -20],
+});
 
-  return `https://www.openstreetmap.org/export/embed.html?${params.toString()}`;
+// Composant auxiliaire : ajuste le zoom quand les positions changent
+function MapFitter({ positions }) {
+  const map = useMap();
+  useEffect(() => {
+    const pts = positions.filter(Boolean);
+    if (!pts.length) return;
+    if (pts.length === 1) { map.setView([pts[0].lat, pts[0].lng], 15); return; }
+    const bounds = L.latLngBounds(pts.map(p => [p.lat, p.lng]));
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+  }, [positions, map]);
+  return null;
 }
 
+const TRAIL_MAX = 10;
+
 export default function DeliveryTracking() {
-  const { enqueueSnackbar } = useSnackbar();
+  const { dark } = useDark();
+  const enqueueSnackbar = (msg, { variant } = {}) => { variant === 'error' ? toast.error(msg) : toast.success(msg); };
 
-  const [loading, setLoading] = useState(true);
-  const [drivers, setDrivers] = useState([]);
-  const [selectedDriverId, setSelectedDriverId] = useState('');
-  const [lastLocation, setLastLocation] = useState(null);
+  const [loading, setLoading]            = useState(true);
+  const [drivers, setDrivers]            = useState([]);
+  const [selectedDriverId, setSelDriver] = useState('');
+  const [driverLoc, setDriverLoc]        = useState(null);
+  const [clientLoc, setClientLoc]        = useState(null);
+  const [trail, setTrail]                = useState([]);
+  const [orders, setOrders]              = useState([]);
+  const [selectedOrderId, setSelOrder]   = useState('');
+  const driverChRef = useRef(null);
+  const clientChRef = useRef(null);
 
-  const channelRef = useRef(null);
+  const mapName = d => `${d.first_name||''} ${d.last_name||''}`.trim() || d.email || d.phone || `Livreur ${d.id.slice(0,8)}`;
 
-  const fetchDrivers = async () => {
+  const fetchDrivers = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('id,name,is_active')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('profiles')
+        .select('id, first_name, last_name, email, phone').eq('role','driver').order('created_at',{ascending:false});
+      const rows = error
+        ? (await supabase.from('profiles').select('id, first_name, last_name, email, phone').order('created_at',{ascending:false})).data || []
+        : data || [];
+      const mapped = rows.map(d => ({ ...d, name: mapName(d) }));
+      setDrivers(mapped);
+      if (!selectedDriverId && mapped.length) setSelDriver(mapped[0].id);
+    } catch { enqueueSnackbar('Erreur chargement livreurs', { variant:'error' }); }
+    finally { setLoading(false); }
+  }, [selectedDriverId]);
 
-      if (error) throw error;
-      setDrivers(data || []);
-
-      if (!selectedDriverId && data && data.length > 0) {
-        setSelectedDriverId(data[0].id);
-      }
-    } catch (e) {
-      enqueueSnackbar('Erreur chargement livreurs', { variant: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchLastLocation = async (driverId) => {
+  const fetchOrders = useCallback(async (driverId) => {
     if (!driverId) return;
-    try {
-      const { data, error } = await supabase
-        .from('driver_locations')
-        .select('*')
-        .eq('driver_id', driverId)
-        .order('captured_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      setLastLocation(data || null);
-    } catch (e) {
-      // silencieux
+    const { data: ordersRaw } = await supabase.from('orders')
+      .select('id, user_id, status, order_number, customer_name').eq('driver_id', driverId)
+      .in('status',['confirmed','shipped','processing']).order('created_at',{ascending:false}).limit(10);
+    const rows = ordersRaw || [];
+    // Fetch client names for orders without customer_name
+    const missingIds = [...new Set(rows.filter(o => !o.customer_name && o.user_id).map(o => o.user_id))];
+    let profileMap = {};
+    if (missingIds.length) {
+      const { data: profs } = await supabase.from('profiles')
+        .select('id, first_name, last_name, email').in('id', missingIds);
+      (profs||[]).forEach(p => { profileMap[p.id] = `${p.first_name||''} ${p.last_name||''}`.trim() || p.email || p.id.slice(0,8); });
     }
-  };
+    const enriched = rows.map(o => ({
+      ...o,
+      displayName: o.customer_name || profileMap[o.user_id] || `Client ${o.user_id?.slice(0,8)||'?'}`,
+      displayNum:  o.order_number || `#${o.id.slice(0,8)}`,
+    }));
+    setOrders(enriched);
+    if (enriched.length) setSelOrder(enriched[0].id); else { setSelOrder(''); setClientLoc(null); }
+  }, []);
+
+  const fetchDriverLoc = useCallback(async (driverId) => {
+    if (!driverId) return;
+    const { data } = await supabase.from('driver_locations').select('*')
+      .eq('driver_id', driverId).order('captured_at',{ascending:false}).limit(TRAIL_MAX);
+    if (data?.length) { setDriverLoc(data[0]); setTrail(data.reverse().map(p=>[p.lat,p.lng])); }
+    else { setDriverLoc(null); setTrail([]); }
+  }, []);
+
+  const fetchClientLoc = useCallback(async (orderId, orderList) => {
+    const order = (orderList || orders).find(o => o.id === orderId);
+    if (!order?.user_id) return;
+    const { data } = await supabase.from('user_locations').select('*').eq('user_id', order.user_id).maybeSingle();
+    setClientLoc(data || null);
+  }, [orders]);
+
+  const subscribeDriver = useCallback((driverId) => {
+    driverChRef.current?.unsubscribe();
+    driverChRef.current = supabase.channel(`dt-drv-${driverId}`)
+      .on('postgres_changes', { event:'*', schema:'public', table:'driver_locations', filter:`driver_id=eq.${driverId}` },
+        ({ new: loc }) => {
+          if (!loc?.lat) return;
+          setDriverLoc(loc);
+          setTrail(p => [...p.slice(-(TRAIL_MAX-1)), [loc.lat, loc.lng]]);
+        })
+      .subscribe();
+  }, []);
+
+  const subscribeClient = useCallback((userId) => {
+    clientChRef.current?.unsubscribe();
+    if (!userId) return;
+    clientChRef.current = supabase.channel(`dt-cli-${userId}`)
+      .on('postgres_changes', { event:'*', schema:'public', table:'user_locations', filter:`user_id=eq.${userId}` },
+        ({ new: loc }) => { if (loc?.lat) setClientLoc(loc); })
+      .subscribe();
+  }, []);
 
   useEffect(() => {
     fetchDrivers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { driverChRef.current?.unsubscribe(); clientChRef.current?.unsubscribe(); };
   }, []);
 
   useEffect(() => {
     if (!selectedDriverId) return;
-
-    fetchLastLocation(selectedDriverId);
-
-    if (channelRef.current) {
-      channelRef.current.unsubscribe();
-      channelRef.current = null;
-    }
-
-    const channel = supabase
-      .channel(`driver_locations_${selectedDriverId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'driver_locations',
-          filter: `driver_id=eq.${selectedDriverId}`,
-        },
-        (payload) => {
-          setLastLocation(payload.new);
-        }
-      )
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      channel.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchDriverLoc(selectedDriverId);
+    fetchOrders(selectedDriverId);
+    subscribeDriver(selectedDriverId);
   }, [selectedDriverId]);
 
-  const selectedDriver = useMemo(() => {
-    return (drivers || []).find((d) => d.id === selectedDriverId) || null;
-  }, [drivers, selectedDriverId]);
+  useEffect(() => {
+    if (!selectedOrderId || !orders.length) return;
+    fetchClientLoc(selectedOrderId, orders);
+    const order = orders.find(o => o.id === selectedOrderId);
+    if (order?.user_id) subscribeClient(order.user_id);
+  }, [selectedOrderId, orders]);
 
-  const embedUrl = useMemo(() => {
-    if (!lastLocation) return null;
-    return buildOsmEmbedUrl(lastLocation.lat, lastLocation.lng);
-  }, [lastLocation]);
+  const selectedDriver = drivers.find(d => d.id === selectedDriverId) || null;
+  const mapH = 'calc(100vh - 200px)';
+  const fitterPos = [
+    driverLoc ? { lat: driverLoc.lat, lng: driverLoc.lng } : null,
+    clientLoc ? { lat: clientLoc.lat, lng: clientLoc.lng } : null,
+  ].filter(Boolean);
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h4" fontWeight={800} gutterBottom>
-            Tracking GPS Live
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Carte OpenStreetMap (gratuite) + Realtime Supabase.
-          </Typography>
-        </Box>
-        <Button startIcon={<RefreshIcon />} onClick={fetchDrivers} variant="outlined">
-          Actualiser
-        </Button>
-      </Box>
+    <div className="space-y-5">
+      <motion.div initial={{ opacity:0, y:-12 }} animate={{ opacity:1, y:0 }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent'}`}>📡 Tracking GPS Live</h1>
+            <p className={`text-sm mt-0.5 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Carte interactive OpenStreetMap + Supabase Realtime</p>
+          </div>
+          <Button size="sm" onClick={fetchDrivers}><RefreshCw size={15} /> Actualiser</Button>
+        </div>
+      </motion.div>
 
-      <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={5}>
-            <FormControl fullWidth>
-              <InputLabel>Livreur</InputLabel>
-              <Select
-                value={selectedDriverId}
-                label="Livreur"
-                onChange={(e) => setSelectedDriverId(e.target.value)}
-              >
-                {(drivers || []).map((d) => (
-                  <MenuItem key={d.id} value={d.id}>
-                    {d.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={7}>
-            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-              <Chip
-                label={selectedDriver ? `Livreur: ${selectedDriver.name}` : '—'}
-                color="primary"
-                variant="outlined"
-              />
-              <Chip
-                label={lastLocation?.captured_at ? `Dernière position: ${new Date(lastLocation.captured_at).toLocaleString()}` : 'Dernière position: —'}
-                variant="outlined"
-              />
-              <Chip
-                label={lastLocation?.accuracy != null ? `Accuracy: ${Number(lastLocation.accuracy).toFixed(0)}m` : 'Accuracy: —'}
-                variant="outlined"
-              />
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
+      <div className="flex flex-col lg:flex-row gap-4" style={{ minHeight: mapH }}>
+        {/* Sidebar */}
+        <motion.div initial={{ opacity:0, x:-16 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.1 }}
+          className="w-full lg:w-72 shrink-0 flex flex-col gap-3">
 
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden', height: 640 }}>
-        {embedUrl ? (
-          <iframe
-            title="OpenStreetMap"
-            width="100%"
-            height="640"
-            frameBorder="0"
-            scrolling="no"
-            src={embedUrl}
-          />
-        ) : (
-          <Box sx={{ p: 3 }}>
-            <Typography color="text.secondary">
-              Aucune position reçue. Le mobile livreur doit envoyer des positions vers `driver_locations`.
-            </Typography>
-          </Box>
-        )}
-      </Paper>
-    </Box>
+          <div className={`rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+            <p className={`text-xs font-semibold uppercase mb-2 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>🚚 Sélectionner un livreur</p>
+            <select value={selectedDriverId} onChange={e => setSelDriver(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-gray-200'}`}>
+              <option value="" disabled>Choisir un livreur...</option>
+              {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            {selectedDriver && <p className={`text-xs mt-1.5 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{selectedDriver.phone || selectedDriver.email || ''}</p>}
+          </div>
+
+          {orders.length > 0 && (
+            <div className={`rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-blue-100'}`}>
+              <p className={`text-xs font-semibold uppercase mb-2 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>👤 Commande / Client</p>
+              <select value={selectedOrderId} onChange={e => setSelOrder(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-gray-200'}`}>
+                <option value="" disabled>Choisir...</option>
+                {orders.map(o => <option key={o.id} value={o.id}>{o.displayNum} — {o.displayName}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div className={`rounded-2xl border p-4 flex items-center gap-3 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+            <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shrink-0"><MapPin size={18} /></div>
+            <div>
+              <p className={`text-xs ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Précision GPS</p>
+              <p className={`text-xl font-extrabold ${driverLoc ? 'text-indigo-500' : dark ? 'text-slate-600' : 'text-gray-300'}`}>
+                {driverLoc?.accuracy != null ? `±${Number(driverLoc.accuracy).toFixed(0)} m` : '—'}
+              </p>
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border p-4 flex items-center gap-3 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+            <div className="p-2.5 rounded-xl bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 shrink-0"><Clock size={18} /></div>
+            <div>
+              <p className={`text-xs ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Dernière position</p>
+              <p className={`text-sm font-bold ${driverLoc ? (dark ? 'text-slate-100' : 'text-gray-800') : (dark ? 'text-slate-600' : 'text-gray-300')}`}>
+                {driverLoc?.captured_at ? new Date(driverLoc.captured_at).toLocaleString('fr-FR') : '—'}
+              </p>
+            </div>
+          </div>
+
+          {driverLoc?.lat != null && (
+            <div className={`rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <p className={`text-xs font-semibold uppercase mb-2 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Coordonnées</p>
+              <p className={`text-xs font-mono ${dark ? 'text-slate-300' : 'text-gray-700'}`}>🚚 {Number(driverLoc.lat).toFixed(6)}, {Number(driverLoc.lng).toFixed(6)}</p>
+              {clientLoc?.lat != null && <p className={`text-xs font-mono mt-1 ${dark ? 'text-slate-300' : 'text-gray-700'}`}>👤 {Number(clientLoc.lat).toFixed(6)}, {Number(clientLoc.lng).toFixed(6)}</p>}
+            </div>
+          )}
+
+          <div className={`rounded-2xl border p-4 text-center ${driverLoc ? (dark ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50') : (dark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white')}`}>
+            <span className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${driverLoc ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+            <span className={`text-sm font-semibold ${driverLoc ? (dark ? 'text-green-400' : 'text-green-700') : (dark ? 'text-slate-500' : 'text-gray-400')}`}>
+              {driverLoc ? 'Signal actif' : 'En attente de signal'}
+            </span>
+            {clientLoc && <p className="mt-1.5 text-xs text-indigo-600 font-medium">👤 Client localisé</p>}
+          </div>
+        </motion.div>
+
+        {/* Carte Leaflet */}
+        <motion.div initial={{ opacity:0, scale:.98 }} animate={{ opacity:1, scale:1 }} transition={{ delay:0.2 }}
+          className={`flex-1 rounded-2xl overflow-hidden shadow-md border ${dark ? 'border-slate-700' : 'border-gray-200'}`} style={{ minHeight: 400 }}>
+          {driverLoc?.lat != null ? (
+            <MapContainer center={[driverLoc.lat, driverLoc.lng]} zoom={14} style={{ width:'100%', height:'100%', minHeight:400 }}>
+              <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <MapFitter positions={fitterPos} />
+              {trail.length > 1 && <Polyline positions={trail} pathOptions={{ color:'#667eea', weight:3, opacity:0.6, dashArray:'6 4' }} />}
+              <Marker position={[driverLoc.lat, driverLoc.lng]} icon={driverIcon}>
+                <Popup>
+                  <strong>🚚 {selectedDriver?.name || 'Livreur'}</strong><br />
+                  Lat: {Number(driverLoc.lat).toFixed(6)}<br />Lng: {Number(driverLoc.lng).toFixed(6)}<br />
+                  {driverLoc.accuracy != null && <>Précision: ±{Number(driverLoc.accuracy).toFixed(0)} m<br /></>}
+                  {driverLoc.captured_at && <small>{new Date(driverLoc.captured_at).toLocaleString('fr-FR')}</small>}
+                </Popup>
+              </Marker>
+              {clientLoc?.lat != null && (
+                <Marker position={[clientLoc.lat, clientLoc.lng]} icon={clientIcon}>
+                  <Popup>
+                    <strong>👤 Client</strong><br />
+                    Lat: {Number(clientLoc.lat).toFixed(6)}<br />Lng: {Number(clientLoc.lng).toFixed(6)}<br />
+                    {clientLoc.captured_at && <small>{new Date(clientLoc.captured_at).toLocaleString('fr-FR')}</small>}
+                  </Popup>
+                </Marker>
+              )}
+            </MapContainer>
+          ) : (
+            <div className={`h-full flex flex-col items-center justify-center p-8 text-center ${dark ? 'bg-slate-900' : ''}`} style={{ minHeight:400 }}>
+              <MapPin size={64} className={`mb-4 ${dark ? 'text-slate-600' : 'text-gray-200'}`} />
+              <p className={`text-lg font-bold ${dark ? 'text-slate-400' : 'text-gray-400'}`}>Aucune position reçue</p>
+              <p className={`text-sm mt-2 max-w-sm ${dark ? 'text-slate-500' : 'text-gray-400'}`}>
+                Le mobile livreur doit envoyer sa position GPS vers la table{' '}
+                <code className={`px-1.5 py-0.5 rounded text-xs ${dark ? 'bg-slate-800 text-slate-300' : 'bg-gray-100'}`}>driver_locations</code>{' '}
+                via l'application mobile GBA.
+              </p>
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </div>
   );
 }

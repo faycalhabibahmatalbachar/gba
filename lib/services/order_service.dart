@@ -1,15 +1,20 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'cache_service.dart';
 
 class OrderService {
   final _supabase = Supabase.instance.client;
+  final _cache = CacheService.instance;
   static const String _cacheKeyPrefix = 'cache_orders_v1_';
   static const String _cacheAtKeyPrefix = 'cache_orders_v1_at_';
 
   Future<void> _persistOrdersCache(String userId, List<Map<String, dynamic>> orders) async {
     try {
+      await _cache.set('orders_$userId', orders, CacheService.ttlOrders);
+      // Keep legacy SharedPreferences keys in sync for backward compat
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('$_cacheKeyPrefix$userId', jsonEncode(orders));
       await prefs.setInt(
@@ -17,7 +22,7 @@ class OrderService {
         DateTime.now().millisecondsSinceEpoch,
       );
     } catch (e) {
-      print('Erreur cache commandes (persist): $e');
+      if (kDebugMode) debugPrint('[OrderService] cache persist error: $e');
     }
   }
 
@@ -26,17 +31,33 @@ class OrderService {
     if (userId == null) return [];
 
     try {
+      // Try new TTL-aware cache first
+      final decoded = await _cache.get('orders_$userId', CacheService.ttlOrders);
+      if (decoded is List && decoded.isNotEmpty) {
+        return decoded
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+      // Legacy fallback: check SharedPreferences with manual TTL (10min)
       final prefs = await SharedPreferences.getInstance();
+      final cachedAtMs = prefs.getInt('$_cacheAtKeyPrefix$userId');
+      if (cachedAtMs != null) {
+        final age = DateTime.now().difference(
+          DateTime.fromMillisecondsSinceEpoch(cachedAtMs),
+        );
+        if (age > CacheService.ttlOrders) return [];
+      }
       final raw = prefs.getString('$_cacheKeyPrefix$userId');
       if (raw == null || raw.trim().isEmpty) return [];
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
-      return decoded
+      final legacyDecoded = jsonDecode(raw);
+      if (legacyDecoded is! List) return [];
+      return legacyDecoded
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
     } catch (e) {
-      print('Erreur cache commandes (hydrate): $e');
+      if (kDebugMode) debugPrint('[OrderService] cache read error: $e');
       return [];
     }
   }
@@ -45,7 +66,9 @@ class OrderService {
   Future<Map<String, dynamic>> createOrder(Map<String, dynamic> orderData) async {
     try {
       final currentUserId = _supabase.auth.currentUser?.id;
-      print('[OrderService] createOrder start: auth.userId=$currentUserId');
+      if (kDebugMode) {
+        debugPrint('[OrderService] createOrder start: auth.userId=$currentUserId');
+      }
 
       final now = DateTime.now().toUtc();
       final yyyymmdd = '${now.year.toString().padLeft(4, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
@@ -80,9 +103,11 @@ class OrderService {
 
       insertData.removeWhere((key, value) => value == null);
 
-      print('[OrderService] orders.insert payload: ${jsonEncode(insertData)}');
-      final userIdValue = insertData['user_id'];
-      print('[OrderService] orders.insert user_id value=$userIdValue runtimeType=${userIdValue.runtimeType}');
+      if (kDebugMode) {
+        debugPrint('[OrderService] orders.insert payload: ${jsonEncode(insertData)}');
+        final userIdValue = insertData['user_id'];
+        debugPrint('[OrderService] orders.insert user_id value=$userIdValue runtimeType=${userIdValue.runtimeType}');
+      }
 
       // Créer la commande principale
       Map<String, dynamic> orderResponse;
@@ -97,11 +122,15 @@ class OrderService {
           break;
         } catch (e) {
           if (e is PostgrestException) {
-            print(
-              '[OrderService] orders.insert PostgrestException: code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}',
-            );
+            if (kDebugMode) {
+              debugPrint(
+                '[OrderService] orders.insert PostgrestException: code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}',
+              );
+            }
           } else {
-            print('[OrderService] orders.insert exception: $e');
+            if (kDebugMode) {
+              debugPrint('[OrderService] orders.insert exception: $e');
+            }
           }
 
           // Si le schéma côté Supabase n'a pas certaines colonnes, on réessaie en les retirant.
@@ -150,16 +179,43 @@ class OrderService {
       };
     } catch (e) {
       if (e is PostgrestException) {
-        print(
-          '[OrderService] Erreur création commande (PostgrestException): code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[OrderService] Erreur création commande (PostgrestException): code=${e.code}, message=${e.message}, details=${e.details}, hint=${e.hint}',
+          );
+        }
       } else {
-        print('[OrderService] Erreur création commande: $e');
+        if (kDebugMode) {
+          debugPrint('[OrderService] Erreur création commande: $e');
+        }
       }
       return {
         'success': false,
         'error': e.toString(),
       };
+    }
+  }
+
+  Future<bool> updatePaymentStatus({
+    required String orderId,
+    required String paymentStatus,
+    String? orderStatus,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'payment_status': paymentStatus,
+      };
+      if (orderStatus != null && orderStatus.trim().isNotEmpty) {
+        payload['status'] = orderStatus.trim();
+      }
+
+      await _supabase.from('orders').update(payload).eq('id', orderId);
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[OrderService] updatePaymentStatus failed: $e');
+      }
+      return false;
     }
   }
 
@@ -179,7 +235,9 @@ class OrderService {
       await _persistOrdersCache(userId, orders);
       return orders;
     } catch (e) {
-      print('Erreur récupération commandes: $e');
+      if (kDebugMode) {
+        debugPrint('Erreur récupération commandes: $e');
+      }
       return [];
     }
   }
@@ -195,7 +253,9 @@ class OrderService {
 
       return response;
     } catch (e) {
-      print('Erreur récupération commande: $e');
+      if (kDebugMode) {
+        debugPrint('Erreur récupération commande: $e');
+      }
       return null;
     }
   }
@@ -210,7 +270,9 @@ class OrderService {
 
       return true;
     } catch (e) {
-      print('Erreur mise à jour statut: $e');
+      if (kDebugMode) {
+        debugPrint('Erreur mise à jour statut: $e');
+      }
       return false;
     }
   }
@@ -225,7 +287,9 @@ class OrderService {
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Erreur récupération toutes les commandes: $e');
+      if (kDebugMode) {
+        debugPrint('Erreur récupération toutes les commandes: $e');
+      }
       return [];
     }
   }
@@ -241,7 +305,9 @@ class OrderService {
       }
       return {};
     } catch (e) {
-      print('Erreur récupération statistiques: $e');
+      if (kDebugMode) {
+        debugPrint('Erreur récupération statistiques: $e');
+      }
       return {};
     }
   }

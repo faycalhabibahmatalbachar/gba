@@ -39,6 +39,10 @@ mixin _$UserProfile {
   int get loyaltyPoints => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_premium')
   bool get isPremium => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_suspended')
+  bool get isSuspended => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_blocked')
+  bool get isBlocked => throw _privateConstructorUsedError;
   @JsonKey(name: 'notification_preferences')
   Map<String, dynamic>? get notificationPreferences =>
       throw _privateConstructorUsedError;
@@ -79,6 +83,8 @@ abstract class $UserProfileCopyWith<$Res> {
       @JsonKey(name: 'avatar_url') String? avatarUrl,
       @JsonKey(name: 'loyalty_points') int loyaltyPoints,
       @JsonKey(name: 'is_premium') bool isPremium,
+      @JsonKey(name: 'is_suspended') bool isSuspended,
+      @JsonKey(name: 'is_blocked') bool isBlocked,
       @JsonKey(name: 'notification_preferences')
       Map<String, dynamic>? notificationPreferences,
       @JsonKey(name: 'member_since') DateTime? memberSince,
@@ -114,6 +120,8 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? avatarUrl = freezed,
     Object? loyaltyPoints = null,
     Object? isPremium = null,
+    Object? isSuspended = null,
+    Object? isBlocked = null,
     Object? notificationPreferences = freezed,
     Object? memberSince = freezed,
     Object? createdAt = freezed,
@@ -172,6 +180,14 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.isPremium
           : isPremium // ignore: cast_nullable_to_non_nullable
               as bool,
+      isSuspended: null == isSuspended
+          ? _value.isSuspended
+          : isSuspended // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isBlocked: null == isBlocked
+          ? _value.isBlocked
+          : isBlocked // ignore: cast_nullable_to_non_nullable
+              as bool,
       notificationPreferences: freezed == notificationPreferences
           ? _value.notificationPreferences
           : notificationPreferences // ignore: cast_nullable_to_non_nullable
@@ -214,6 +230,8 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       @JsonKey(name: 'avatar_url') String? avatarUrl,
       @JsonKey(name: 'loyalty_points') int loyaltyPoints,
       @JsonKey(name: 'is_premium') bool isPremium,
+      @JsonKey(name: 'is_suspended') bool isSuspended,
+      @JsonKey(name: 'is_blocked') bool isBlocked,
       @JsonKey(name: 'notification_preferences')
       Map<String, dynamic>? notificationPreferences,
       @JsonKey(name: 'member_since') DateTime? memberSince,
@@ -247,6 +265,8 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? avatarUrl = freezed,
     Object? loyaltyPoints = null,
     Object? isPremium = null,
+    Object? isSuspended = null,
+    Object? isBlocked = null,
     Object? notificationPreferences = freezed,
     Object? memberSince = freezed,
     Object? createdAt = freezed,
@@ -305,6 +325,14 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.isPremium
           : isPremium // ignore: cast_nullable_to_non_nullable
               as bool,
+      isSuspended: null == isSuspended
+          ? _value.isSuspended
+          : isSuspended // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isBlocked: null == isBlocked
+          ? _value.isBlocked
+          : isBlocked // ignore: cast_nullable_to_non_nullable
+              as bool,
       notificationPreferences: freezed == notificationPreferences
           ? _value._notificationPreferences
           : notificationPreferences // ignore: cast_nullable_to_non_nullable
@@ -342,6 +370,8 @@ class _$UserProfileImpl implements _UserProfile {
       @JsonKey(name: 'avatar_url') this.avatarUrl,
       @JsonKey(name: 'loyalty_points') this.loyaltyPoints = 0,
       @JsonKey(name: 'is_premium') this.isPremium = false,
+      @JsonKey(name: 'is_suspended') this.isSuspended = false,
+      @JsonKey(name: 'is_blocked') this.isBlocked = false,
       @JsonKey(name: 'notification_preferences')
       final Map<String, dynamic>? notificationPreferences,
       @JsonKey(name: 'member_since') this.memberSince,
@@ -384,6 +414,12 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @JsonKey(name: 'is_premium')
   final bool isPremium;
+  @override
+  @JsonKey(name: 'is_suspended')
+  final bool isSuspended;
+  @override
+  @JsonKey(name: 'is_blocked')
+  final bool isBlocked;
   final Map<String, dynamic>? _notificationPreferences;
   @override
   @JsonKey(name: 'notification_preferences')
@@ -408,7 +444,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(id: $id, email: $email, firstName: $firstName, lastName: $lastName, phone: $phone, bio: $bio, address: $address, city: $city, postalCode: $postalCode, country: $country, avatarUrl: $avatarUrl, loyaltyPoints: $loyaltyPoints, isPremium: $isPremium, notificationPreferences: $notificationPreferences, memberSince: $memberSince, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'UserProfile(id: $id, email: $email, firstName: $firstName, lastName: $lastName, phone: $phone, bio: $bio, address: $address, city: $city, postalCode: $postalCode, country: $country, avatarUrl: $avatarUrl, loyaltyPoints: $loyaltyPoints, isPremium: $isPremium, isSuspended: $isSuspended, isBlocked: $isBlocked, notificationPreferences: $notificationPreferences, memberSince: $memberSince, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -435,6 +471,10 @@ class _$UserProfileImpl implements _UserProfile {
                 other.loyaltyPoints == loyaltyPoints) &&
             (identical(other.isPremium, isPremium) ||
                 other.isPremium == isPremium) &&
+            (identical(other.isSuspended, isSuspended) ||
+                other.isSuspended == isSuspended) &&
+            (identical(other.isBlocked, isBlocked) ||
+                other.isBlocked == isBlocked) &&
             const DeepCollectionEquality().equals(
                 other._notificationPreferences, _notificationPreferences) &&
             (identical(other.memberSince, memberSince) ||
@@ -447,25 +487,28 @@ class _$UserProfileImpl implements _UserProfile {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      email,
-      firstName,
-      lastName,
-      phone,
-      bio,
-      address,
-      city,
-      postalCode,
-      country,
-      avatarUrl,
-      loyaltyPoints,
-      isPremium,
-      const DeepCollectionEquality().hash(_notificationPreferences),
-      memberSince,
-      createdAt,
-      updatedAt);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        email,
+        firstName,
+        lastName,
+        phone,
+        bio,
+        address,
+        city,
+        postalCode,
+        country,
+        avatarUrl,
+        loyaltyPoints,
+        isPremium,
+        isSuspended,
+        isBlocked,
+        const DeepCollectionEquality().hash(_notificationPreferences),
+        memberSince,
+        createdAt,
+        updatedAt
+      ]);
 
   /// Create a copy of UserProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -498,6 +541,8 @@ abstract class _UserProfile implements UserProfile {
           @JsonKey(name: 'avatar_url') final String? avatarUrl,
           @JsonKey(name: 'loyalty_points') final int loyaltyPoints,
           @JsonKey(name: 'is_premium') final bool isPremium,
+          @JsonKey(name: 'is_suspended') final bool isSuspended,
+          @JsonKey(name: 'is_blocked') final bool isBlocked,
           @JsonKey(name: 'notification_preferences')
           final Map<String, dynamic>? notificationPreferences,
           @JsonKey(name: 'member_since') final DateTime? memberSince,
@@ -540,6 +585,12 @@ abstract class _UserProfile implements UserProfile {
   @override
   @JsonKey(name: 'is_premium')
   bool get isPremium;
+  @override
+  @JsonKey(name: 'is_suspended')
+  bool get isSuspended;
+  @override
+  @JsonKey(name: 'is_blocked')
+  bool get isBlocked;
   @override
   @JsonKey(name: 'notification_preferences')
   Map<String, dynamic>? get notificationPreferences;

@@ -1,0 +1,27 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Binary files - prevent Git from corrupting them
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.bmp binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.jar binary
+*.keystore binary
+*.jks binary
+*.so binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.apk binary
+*.aab binary
+*.ipa binary
+*.pdf binary

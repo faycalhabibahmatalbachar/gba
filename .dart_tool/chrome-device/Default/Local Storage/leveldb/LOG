@@ -1,0 +1,9 @@
+2026/03/05-00:02:13.637 434 Reusing MANIFEST C:\Users\FAYCAL~1\AppData\Local\Temp\flutter_tools.294f4d2\flutter_tools_chrome_device.cd420f82\Default\Local Storage\leveldb/MANIFEST-000001
+2026/03/05-00:02:13.653 434 Recovering log #10
+2026/03/05-00:02:13.659 434 Reusing old log C:\Users\FAYCAL~1\AppData\Local\Temp\flutter_tools.294f4d2\flutter_tools_chrome_device.cd420f82\Default\Local Storage\leveldb/000010.log 
+2026/03/05-00:02:13.661 434 Delete type=0 #3
+2026/03/05-00:02:13.662 434 Delete type=0 #4
+2026/03/05-00:02:13.662 434 Delete type=0 #7
+2026/03/05-00:08:38.684 bc4 Level-0 table #14: started
+2026/03/05-00:08:38.710 bc4 Level-0 table #14: 235020 bytes OK
+2026/03/05-00:08:38.720 bc4 Delete type=0 #10

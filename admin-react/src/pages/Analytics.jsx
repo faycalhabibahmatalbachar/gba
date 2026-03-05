@@ -97,7 +97,7 @@ const MetricCard = ({ title, value, change, icon, color }) => (
                 {Math.abs(change)}%
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                vs last period
+                vs période précédente
               </Typography>
             </Box>
           </Box>
@@ -115,29 +115,29 @@ function Analytics() {
 
   const metrics = [
     {
-      title: 'Total Revenue',
-      value: '$124,563',
+      title: 'Chiffre d\'affaires',
+      value: '124 563 FCFA',
       change: 12.5,
       icon: <AttachMoney />,
       color: '#667eea',
     },
     {
-      title: 'Total Orders',
-      value: '8,543',
+      title: 'Total Commandes',
+      value: '8 543',
       change: -3.2,
       icon: <ShoppingCart />,
       color: '#f093fb',
     },
     {
-      title: 'Conversion Rate',
-      value: '3.45%',
+      title: 'Taux de Conversion',
+      value: '3,45%',
       change: 8.1,
       icon: <TrendingUp />,
       color: '#30cfd0',
     },
     {
-      title: 'Avg. Order Value',
-      value: '$85.50',
+      title: 'Panier Moyen',
+      value: '85 500 FCFA',
       change: 15.3,
       icon: <Star />,
       color: '#f5576c',
@@ -145,10 +145,10 @@ function Analytics() {
   ];
 
   const revenueData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
     datasets: [
       {
-        label: 'Revenue',
+        label: 'Chiffre d\'affaires',
         data: [45000, 52000, 48000, 61000, 58000, 67000, 71000, 69000, 73000, 78000, 82000, 91000],
         borderColor: '#667eea',
         backgroundColor: 'rgba(102, 126, 234, 0.1)',
@@ -156,7 +156,7 @@ function Analytics() {
         tension: 0.4,
       },
       {
-        label: 'Profit',
+        label: 'Bénéfice',
         data: [12000, 15000, 13000, 18000, 17000, 21000, 24000, 22000, 25000, 28000, 31000, 35000],
         borderColor: '#f093fb',
         backgroundColor: 'rgba(240, 147, 251, 0.1)',
@@ -167,10 +167,10 @@ function Analytics() {
   };
 
   const salesByCategoryData = {
-    labels: ['Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books', 'Toys'],
+    labels: ['Électronique', 'Vêtements', 'Maison & Jardin', 'Sports', 'Livres', 'Jouets'],
     datasets: [
       {
-        label: 'Sales',
+        label: 'Ventes',
         data: [35, 25, 20, 10, 7, 3],
         backgroundColor: [
           '#667eea',
@@ -185,10 +185,10 @@ function Analytics() {
   };
 
   const trafficSourcesData = {
-    labels: ['Organic Search', 'Direct', 'Social Media', 'Referral', 'Email'],
+    labels: ['Recherche Organique', 'Direct', 'Réseaux Sociaux', 'Référencement', 'Email'],
     datasets: [
       {
-        label: 'Traffic',
+        label: 'Trafic',
         data: [40, 25, 20, 10, 5],
         backgroundColor: [
           'rgba(102, 126, 234, 0.8)',
@@ -202,16 +202,16 @@ function Analytics() {
   };
 
   const customerSatisfactionData = {
-    labels: ['Product Quality', 'Shipping', 'Customer Service', 'Price', 'Website', 'Overall'],
+    labels: ['Qualité Produit', 'Livraison', 'Service Client', 'Prix', 'Site Web', 'Global'],
     datasets: [
       {
-        label: 'Current Month',
+        label: 'Mois en cours',
         data: [85, 75, 90, 70, 88, 82],
         borderColor: '#667eea',
         backgroundColor: 'rgba(102, 126, 234, 0.2)',
       },
       {
-        label: 'Previous Month',
+        label: 'Mois précédent',
         data: [80, 70, 85, 72, 82, 78],
         borderColor: '#f093fb',
         backgroundColor: 'rgba(240, 147, 251, 0.2)',
@@ -220,23 +220,23 @@ function Analytics() {
   };
 
   const topProducts = [
-    { name: 'Wireless Headphones Pro', sales: 1234, revenue: '$45,234', growth: 23 },
-    { name: 'Smart Watch Ultra', sales: 987, revenue: '$38,123', growth: 15 },
-    { name: 'Laptop Stand Premium', sales: 756, revenue: '$28,456', growth: -5 },
-    { name: 'USB-C Hub Multi', sales: 623, revenue: '$21,789', growth: 12 },
-    { name: 'Wireless Mouse Advanced', sales: 512, revenue: '$18,234', growth: 8 },
+    { name: 'Casque Sans Fil Pro', sales: 1234, revenue: '45 234 FCFA', growth: 23 },
+    { name: 'Montre Connectée Ultra', sales: 987, revenue: '38 123 FCFA', growth: 15 },
+    { name: 'Support Laptop Premium', sales: 756, revenue: '28 456 FCFA', growth: -5 },
+    { name: 'Hub USB-C Multi', sales: 623, revenue: '21 789 FCFA', growth: 12 },
+    { name: 'Souris Sans Fil Avancée', sales: 512, revenue: '18 234 FCFA', growth: 8 },
   ];
 
   const topCountries = [
-    { name: 'United States', visitors: 45234, percentage: 35 },
-    { name: 'United Kingdom', visitors: 23456, percentage: 18 },
-    { name: 'Germany', visitors: 18234, percentage: 14 },
-    { name: 'France', visitors: 15678, percentage: 12 },
-    { name: 'Canada', visitors: 12345, percentage: 10 },
+    { name: 'Tchad', visitors: 45234, percentage: 35 },
+    { name: 'Cameroun', visitors: 23456, percentage: 18 },
+    { name: 'Sénégal', visitors: 18234, percentage: 14 },
+    { name: 'Côte d\'Ivoire', visitors: 15678, percentage: 12 },
+    { name: 'Mali', visitors: 12345, percentage: 10 },
   ];
 
   const deviceData = {
-    labels: ['Desktop', 'Mobile', 'Tablet'],
+    labels: ['Ordinateur', 'Mobile', 'Tablette'],
     datasets: [
       {
         data: [55, 35, 10],
@@ -249,7 +249,7 @@ function Analytics() {
     labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
     datasets: [
       {
-        label: 'Visitors',
+        label: 'Visiteurs',
         data: [120, 98, 87, 76, 65, 78, 145, 234, 345, 456, 512, 534, 498, 476, 512, 534, 567, 543, 487, 398, 312, 234, 187, 145],
         borderColor: '#667eea',
         backgroundColor: 'rgba(102, 126, 234, 0.1)',
@@ -268,24 +268,24 @@ function Analytics() {
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Box>
             <Typography variant="h4" fontWeight="bold" gutterBottom>
-              Analytics Dashboard
+              Tableau de Bord Analytics
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Track your store performance and customer insights
+              Suivez les performances de votre boutique et les comportements clients
             </Typography>
           </Box>
           <Box display="flex" gap={2}>
             <FormControl size="small">
-              <InputLabel>Time Range</InputLabel>
+              <InputLabel>Période</InputLabel>
               <Select
                 value={timeRange}
-                label="Time Range"
+                label="Période"
                 onChange={(e) => setTimeRange(e.target.value)}
               >
-                <MenuItem value="week">Last Week</MenuItem>
-                <MenuItem value="month">Last Month</MenuItem>
-                <MenuItem value="quarter">Last Quarter</MenuItem>
-                <MenuItem value="year">Last Year</MenuItem>
+                <MenuItem value="week">7 derniers jours</MenuItem>
+                <MenuItem value="month">30 derniers jours</MenuItem>
+                <MenuItem value="quarter">Ce trimestre</MenuItem>
+                <MenuItem value="year">Cette année</MenuItem>
               </Select>
             </FormControl>
             <IconButton>
@@ -310,7 +310,7 @@ function Analytics() {
           <Paper sx={{ p: 3, height: 400 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6" fontWeight="bold">
-                Revenue & Profit Trends
+                Évolution Chiffre d'Affaires & Bénéfice
               </Typography>
               <IconButton size="small">
                 <MoreVert />
@@ -331,7 +331,7 @@ function Analytics() {
                     y: {
                       beginAtZero: true,
                       ticks: {
-                        callback: (value) => `$${value / 1000}k`,
+                        callback: (value) => `${(value / 1000).toFixed(0)}k FCFA`,
                       },
                     },
                   },
@@ -343,7 +343,7 @@ function Analytics() {
         <Grid item xs={12} lg={4}>
           <Paper sx={{ p: 3, height: 400 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Sales by Category
+              Ventes par Catégorie
             </Typography>
             <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Doughnut
@@ -368,7 +368,7 @@ function Analytics() {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Top Products
+              Meilleurs Produits
             </Typography>
             <List>
               {topProducts.map((product, index) => (
@@ -380,7 +380,7 @@ function Analytics() {
                   </ListItemAvatar>
                   <ListItemText
                     primary={product.name}
-                    secondary={`${product.sales} sales`}
+                    secondary={`${product.sales} ventes`}
                   />
                   <ListItemSecondaryAction>
                     <Box textAlign="right">
@@ -410,7 +410,7 @@ function Analytics() {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Traffic Sources
+              Sources de Trafic
             </Typography>
             <Box sx={{ height: 300 }}>
               <Bar
@@ -428,7 +428,7 @@ function Analytics() {
                     x: {
                       beginAtZero: true,
                       ticks: {
-                        callback: (value) => `${value}%`,
+                        callback: (value) => `${value} %`,
                       },
                     },
                   },
@@ -444,7 +444,7 @@ function Analytics() {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Top Countries
+              Principaux Pays
             </Typography>
             <List>
               {topCountries.map((country, index) => (
@@ -456,7 +456,7 @@ function Analytics() {
                   </ListItemAvatar>
                   <ListItemText
                     primary={country.name}
-                    secondary={`${country.visitors.toLocaleString()} visitors`}
+                    secondary={`${country.visitors.toLocaleString('fr-FR')} visiteurs`}
                   />
                   <Box sx={{ width: 100 }}>
                     <LinearProgress
@@ -476,7 +476,7 @@ function Analytics() {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Device Analytics
+              Appareils Utilisés
             </Typography>
             <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Doughnut
@@ -501,7 +501,7 @@ function Analytics() {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Customer Satisfaction
+              Satisfaction Client
             </Typography>
             <Box sx={{ height: 300 }}>
               <Radar
@@ -523,7 +523,7 @@ function Analytics() {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Hourly Traffic
+              Trafic Horaire
             </Typography>
             <Box sx={{ height: 300 }}>
               <Line

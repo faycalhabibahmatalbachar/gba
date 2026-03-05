@@ -196,7 +196,7 @@ class MessagingService extends ChangeNotifier {
     }
   }
 
-  // Créer ou récupérer une conversation
+  // Créer ou récupérer une conversation — UNIQUE par utilisateur (style WhatsApp)
   Future<Conversation> getOrCreateConversation({
     String? orderId,
   }) async {
@@ -204,57 +204,87 @@ class MessagingService extends ChangeNotifier {
     if (userId == null) throw Exception('Non connecté');
 
     try {
-      _log('Création/récupération conversation - Order: $orderId');
-      
-      // Vérifier si une conversation existe déjà
-      if (orderId != null) {
-        final existing = _conversations.firstWhere(
-          (c) => c.orderId == orderId,
-          orElse: () => Conversation.empty(),
-        );
-        
-        if (existing.id.isNotEmpty) {
-          _log('Conversation existante trouvée: ${existing.id}');
-          return existing;
+      _log('getOrCreateConversation - userId: $userId, orderId: $orderId');
+
+      // 1) Check in-memory cache first
+      if (_conversations.isNotEmpty) {
+        if (orderId != null) {
+          final cached = _conversations.firstWhere(
+            (c) => c.orderId == orderId,
+            orElse: () => Conversation.empty(),
+          );
+          if (cached.id.isNotEmpty) {
+            _log('Conversation cache trouvée par orderId: ${cached.id}', level: 'SUCCESS');
+            return cached;
+          }
+        } else {
+          // Support chat: return the unique existing conversation for this user
+          _log('Conversation cache trouvée (support): ${_conversations.first.id}', level: 'SUCCESS');
+          return _conversations.first;
         }
       }
 
-      // Créer nouvelle conversation
-      _log('Création nouvelle conversation');
-      _log('Colonnes à insérer: user_id, status');
-      
-      final data = {
+      // 2) Check database — always look for existing conversation before creating
+      var dbQuery = _supabase
+          .from('chat_conversations')
+          .select('id, user_id, admin_id, status, created_at, updated_at')
+          .eq('user_id', userId);
+
+      if (orderId != null) {
+        // Try to filter by order_id if column exists
+        try {
+          final existingByOrder = await _supabase
+              .from('chat_conversations')
+              .select('id, user_id, admin_id, status, created_at, updated_at')
+              .eq('user_id', userId)
+              .eq('order_id', orderId)
+              .limit(1)
+              .maybeSingle();
+          if (existingByOrder != null) {
+            final conv = Conversation.fromJson(existingByOrder);
+            _conversations.insert(0, conv);
+            _log('Conversation DB trouvée par orderId: ${conv.id}', level: 'SUCCESS');
+            return conv;
+          }
+        } catch (_) {}
+      }
+
+      // General support chat — find ANY existing conversation for this user
+      final existingList = await dbQuery
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      if (existingList != null && (existingList as List).isNotEmpty) {
+        final conv = Conversation.fromJson(existingList.first);
+        if (!_conversations.any((c) => c.id == conv.id)) {
+          _conversations.insert(0, conv);
+        }
+        _log('Conversation DB trouvée: ${conv.id}', level: 'SUCCESS');
+        notifyListeners();
+        return conv;
+      }
+
+      // 3) Nothing found — create ONE new conversation
+      _log('Aucune conversation existante — création', level: 'WARNING');
+      final insertData = <String, dynamic>{
         'user_id': userId,
         'status': 'active',
       };
-      
-      _log('Données à insérer: $data');
 
       final response = await _supabase
           .from('chat_conversations')
-          .insert(data)
+          .insert(insertData)
           .select('id, user_id, admin_id, status, created_at, updated_at')
           .single();
-      
-      _log('Conversation créée avec succès: $response');
 
       final newConversation = Conversation.fromJson(response);
       _conversations.insert(0, newConversation);
-      
       _log('Nouvelle conversation créée: ${newConversation.id}', level: 'SUCCESS');
       notifyListeners();
-      
       return newConversation;
     } catch (e, stackTrace) {
-      _log('Erreur création conversation: $e', level: 'ERROR');
-      _log('Type d\'erreur: ${e.runtimeType}', level: 'ERROR');
-      if (e.toString().contains('PGRST204')) {
-        _log('Colonne manquante détectée dans la requête', level: 'ERROR');
-      }
-      if (e.toString().contains('PGRST205')) {
-        _log('Table manquante détectée dans la requête', level: 'ERROR');
-      }
-      _log('Stack trace: $stackTrace', level: 'ERROR');
+      _log('Erreur getOrCreateConversation: $e', level: 'ERROR');
+      _log('Stack: $stackTrace', level: 'ERROR');
       rethrow;
     }
   }

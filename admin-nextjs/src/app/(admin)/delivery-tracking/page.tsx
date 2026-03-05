@@ -29,6 +29,8 @@ import {
   CarOutlined,
   ExclamationCircleOutlined,
   CheckCircleOutlined,
+  MenuOutlined,
+  MenuFoldOutlined,
 } from '@ant-design/icons';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
@@ -76,6 +78,7 @@ export default function DeliveryTrackingPage() {
   const [clientLoc, setClientLoc] = useState<DriverLocation | null>(null);
   const [trail, setTrail] = useState<[number, number][]>([]);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
 
   const driverChRef = useRef<any>(null);
   const clientChRef = useRef<any>(null);
@@ -246,7 +249,7 @@ export default function DeliveryTrackingPage() {
   if (loading) {
     return (
       <div className="delivery-command-center flex min-h-[400px] items-center justify-center">
-        <Spin size="large" tip="Chargement du centre de pilotage..." />
+        <Spin size="large" description="Chargement du centre de pilotage..." />
       </div>
     );
   }
@@ -272,7 +275,7 @@ export default function DeliveryTrackingPage() {
           type="warning"
           showIcon
           icon={<ExclamationCircleOutlined />}
-          message="Données partielles"
+          title="Données partielles"
           description={pageError}
         />
       ) : null}
@@ -370,31 +373,54 @@ export default function DeliveryTrackingPage() {
           {alerts.length > 0 && (
             <div className="delivery-alert-strip flex flex-wrap gap-2">
               {alerts.slice(0, 5).map((a, i) => (
-                <Alert
+                <div
                   key={i}
-                  type={a.type}
-                  showIcon
-                  icon={<WarningOutlined />}
-                  message={a.msg}
-                  action={
-                    a.driverId ? (
-                      <Button
-                        size="small"
-                        type="link"
-                        onClick={() => setSelectedDriverId(a.driverId!)}
-                      >
-                        Voir
-                      </Button>
-                    ) : undefined
-                  }
-                  className="flex-1 min-w-[200px]"
-                />
+                  className="flex-1 min-w-[200px] cursor-pointer"
+                  onClick={() => a.driverId && setSelectedDriverId(a.driverId)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && a.driverId && setSelectedDriverId(a.driverId)}
+                >
+                  <Alert
+                    type={a.type}
+                    showIcon
+                    icon={<WarningOutlined />}
+                    title={a.msg}
+                    action={
+                      a.driverId ? (
+                        <Button
+                          size="small"
+                          type="link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDriverId(a.driverId!);
+                          }}
+                        >
+                          Voir
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                </div>
               ))}
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
-            <Card title="Livreurs" className="overflow-hidden">
+          <div className={`grid grid-cols-1 gap-4 ${sidebarVisible ? 'lg:grid-cols-[340px_1fr]' : 'lg:grid-cols-1'}`}>
+            {sidebarVisible && (
+            <Card
+              title="Livreurs"
+              className="overflow-hidden"
+              extra={
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<MenuFoldOutlined />}
+                  onClick={() => setSidebarVisible(false)}
+                  title="Masquer la liste"
+                />
+              }
+            >
               <div className="max-h-[480px] overflow-y-auto space-y-1 pr-1">
                 {fleet.map((f) => (
                   <div
@@ -428,11 +454,21 @@ export default function DeliveryTrackingPage() {
                 ))}
               </div>
             </Card>
+            )}
 
             <div className="space-y-3">
               <Card>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <Space wrap>
+                    {!sidebarVisible && (
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<MenuOutlined />}
+                        onClick={() => setSidebarVisible(true)}
+                        title="Afficher la liste des livreurs"
+                      />
+                    )}
                     <Tag color="blue" icon={<EnvironmentOutlined />}>
                       {selectedDriverState ? mapName(selectedDriverState.driver) : '—'}
                     </Tag>
@@ -486,30 +522,79 @@ export default function DeliveryTrackingPage() {
                   )}
                 </div>
 
-                <div className="delivery-map-container" style={{ height: isMapFullscreen ? 'calc(100vh - 220px)' : 480 }}>
-                  {driverLoc?.lat != null ? (
-                    <ClientOnly>
-                      <DeliveryTrackingMap
-                        driverLoc={driverLoc}
-                        clientLoc={clientLoc}
-                        trail={trail}
-                        fitterPos={fitterPos}
-                        selectedDriver={selectedDriverState?.driver}
-                        mapName={mapName}
-                      />
-                    </ClientOnly>
-                  ) : (
-                    <div className="flex h-full items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-900/50">
-                      <div className="text-center p-6">
-                        <EnvironmentOutlined className="text-4xl text-gray-400 mb-2" />
-                        <div className="font-semibold text-gray-500">Aucune position reçue</div>
-                        <div className="text-sm text-gray-400 mt-1">
-                          Le livreur doit envoyer sa position GPS via l&apos;app mobile.
+                {isMapFullscreen ? (
+                  <div
+                    className="fixed inset-0 z-[9999] flex flex-col bg-white dark:bg-gray-900"
+                    style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+                  >
+                    <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                      <Space>
+                        <Tag color="blue" icon={<EnvironmentOutlined />}>
+                          {selectedDriverState ? mapName(selectedDriverState.driver) : '—'}
+                        </Tag>
+                        {selectedOrder && <Tag color="purple">{selectedOrder.displayNum}</Tag>}
+                        {clientLoc && <Tag color="green">Client localisé</Tag>}
+                      </Space>
+                      <Button
+                        icon={<FullscreenExitOutlined />}
+                        onClick={() => setIsMapFullscreen(false)}
+                      >
+                        Quitter le plein écran
+                      </Button>
+                    </div>
+                    <div className="flex-1 min-h-0" style={{ height: 'calc(100vh - 56px)' }}>
+                      {driverLoc?.lat != null ? (
+                        <ClientOnly>
+                          <div className="w-full h-full" style={{ height: 'calc(100vh - 56px)' }}>
+                            <DeliveryTrackingMap
+                              driverLoc={driverLoc}
+                              clientLoc={clientLoc}
+                              trail={trail}
+                              fitterPos={fitterPos}
+                              selectedDriver={selectedDriverState?.driver}
+                              mapName={mapName}
+                            />
+                          </div>
+                        </ClientOnly>
+                      ) : (
+                        <div className="flex h-full items-center justify-center bg-gray-50 dark:bg-gray-900/50">
+                          <div className="text-center p-6">
+                            <EnvironmentOutlined className="text-4xl text-gray-400 mb-2" />
+                            <div className="font-semibold text-gray-500">Aucune position reçue</div>
+                            <div className="text-sm text-gray-400 mt-1">
+                              Le livreur doit envoyer sa position GPS via l&apos;app mobile.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="delivery-map-container" style={{ height: 480 }}>
+                    {driverLoc?.lat != null ? (
+                      <ClientOnly>
+                        <DeliveryTrackingMap
+                          driverLoc={driverLoc}
+                          clientLoc={clientLoc}
+                          trail={trail}
+                          fitterPos={fitterPos}
+                          selectedDriver={selectedDriverState?.driver}
+                          mapName={mapName}
+                        />
+                      </ClientOnly>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                        <div className="text-center p-6">
+                          <EnvironmentOutlined className="text-4xl text-gray-400 mb-2" />
+                          <div className="font-semibold text-gray-500">Aucune position reçue</div>
+                          <div className="text-sm text-gray-400 mt-1">
+                            Le livreur doit envoyer sa position GPS via l&apos;app mobile.
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </Card>
             </div>
           </div>

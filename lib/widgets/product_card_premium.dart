@@ -11,6 +11,7 @@ import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../services/activity_tracking_service.dart';
+import '../utils/auth_guard.dart';
 
 class PremiumProductCard extends StatelessWidget {
   final Product product;
@@ -137,13 +138,12 @@ class PremiumProductCard extends StatelessWidget {
                   ),
                 ),
                 
-                // Badges en haut
+                // Badges top-left (column so they don't overlap favorite)
                 Positioned(
                   top: 12,
                   left: 12,
-                  right: 12,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Badge Featured
                       if (product.isFeatured)
@@ -165,14 +165,14 @@ class PremiumProductCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.star, size: 14, color: Colors.white),
-                              SizedBox(width: 4),
+                              const Icon(Icons.star, size: 14, color: Colors.white),
+                              const SizedBox(width: 4),
                               Text(
-                                'Vedette',
-                                style: TextStyle(
+                                localizations.translate('featured'),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -180,7 +180,10 @@ class PremiumProductCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                        ).animate().fadeIn(duration: 400.ms).scale(delay: 200.ms),
+                        ),
+                      
+                      if (product.isFeatured && hasDiscount)
+                        const SizedBox(height: 6),
                       
                       // Badge Discount
                       if (hasDiscount)
@@ -210,7 +213,7 @@ class PremiumProductCard extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ).animate().fadeIn(duration: 400.ms).scale(delay: 250.ms),
+                        ),
                     ],
                   ),
                 ),
@@ -236,6 +239,7 @@ class PremiumProductCard extends StatelessWidget {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(24),
                         onTap: () {
+                          if (!requireAuth(context)) return;
                           Provider.of<FavoritesProvider>(context, listen: false)
                               .toggleFavorite(product.id, productName: product.name);
                         },
@@ -398,6 +402,7 @@ class PremiumProductCard extends StatelessWidget {
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(12),
                                       onTap: () {
+                                        if (!requireAuth(context)) return;
                                         Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
@@ -430,72 +435,83 @@ class PremiumProductCard extends StatelessWidget {
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Category & Brand
-                        if (product.brand != null)
-                          Text(
-                            product.brand!.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: theme.primaryColor,
-                              letterSpacing: 1,
-                            ),
+                        // Category & Brand + Name + Rating (flexible)
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (product.brand != null)
+                                Text(
+                                  product.brand!.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.primaryColor,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              
+                              const SizedBox(height: 4),
+                              
+                              // Product Name
+                              Text(
+                                product.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: scheme.onSurface,
+                                  height: 1.2,
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 4),
+                              
+                              // Rating (if available)
+                              if (product.rating > 0)
+                                Row(
+                                  children: [
+                                    RatingBarIndicator(
+                                      rating: product.rating.clamp(0.0, 5.0).toDouble(),
+                                      itemBuilder: (context, _) => const Icon(
+                                        Icons.star_rounded,
+                                        color: Colors.amber,
+                                      ),
+                                      itemCount: 5,
+                                      itemSize: 14,
+                                      unratedColor: Colors.amber.withOpacity(0.25),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      product.rating.toStringAsFixed(1),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: scheme.onSurface.withOpacity(0.85),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '(${product.reviewsCount})',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: scheme.onSurface.withOpacity(0.65),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                           ),
+                        ),
                         
                         const SizedBox(height: 4),
-                        
-                        // Product Name
-                        Text(
-                          product.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurface,
-                            height: 1.2,
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 8),
-                        
-                        // Rating (if available)
-                        if (product.rating > 0)
-                          Row(
-                            children: [
-                              RatingBarIndicator(
-                                rating: product.rating.clamp(0.0, 5.0).toDouble(),
-                                itemBuilder: (context, _) => const Icon(
-                                  Icons.star_rounded,
-                                  color: Colors.amber,
-                                ),
-                                itemCount: 5,
-                                itemSize: 14,
-                                unratedColor: Colors.amber.withOpacity(0.25),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                product.rating.toStringAsFixed(1),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: scheme.onSurface.withOpacity(0.85),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '(${product.reviewsCount})',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: scheme.onSurface.withOpacity(0.65),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                          ],
-                        ),
-                        
+
                         // Price Section
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -555,6 +571,7 @@ class PremiumProductCard extends StatelessWidget {
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(12),
                                     onTap: () {
+                                      if (!requireAuth(context)) return;
                                       Provider.of<CartProvider>(context, listen: false).addItem(product, 1);
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(

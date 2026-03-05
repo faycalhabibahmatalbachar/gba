@@ -83,6 +83,14 @@ class AppAnimationRegistry {
     return _specs?[id];
   }
 
+  AppAnimationSpec? getSpecSync(String id) {
+    return _specs?[id];
+  }
+
+  bool get isLoaded => _specs != null;
+
+  Future<void> preload() => _ensureLoaded();
+
   static AppAnimationFormat _parseFormat(Object? raw) {
     final value = raw is String ? raw.trim().toLowerCase() : '';
 

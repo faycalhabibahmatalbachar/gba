@@ -102,7 +102,8 @@ export const StorageService = {
         .from('banners')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: true
+          upsert: true,
+          contentType: file.type,
         });
 
       if (error) throw error;

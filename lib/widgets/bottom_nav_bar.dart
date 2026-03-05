@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../utils/auth_guard.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/cart_provider.dart';
@@ -66,12 +67,15 @@ class _BottomNavBarState extends State<BottomNavBar>
         context.go('/categories');
         break;
       case 2:
+        if (!requireAuth(context)) return;
         context.go('/cart');
         break;
       case 3:
+        if (!requireAuth(context)) return;
         context.go('/favorites');
         break;
       case 4:
+        if (!requireAuth(context)) return;
         context.go('/profile');
         break;
     }

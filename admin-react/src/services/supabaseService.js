@@ -18,35 +18,22 @@ export const AdminProductService = {
   // Créer un nouveau produit
   async create(productData) {
     try {
-      // Préparer les données du produit
+      // Préparer les données du produit — colonnes Supabase uniquement
       const product = {
         sku: productData.sku,
         name: productData.name,
-        description: productData.description,
-        short_description: productData.short_description,
+        description: productData.description || productData.short_description || '',
         category_id: productData.category_id,
         brand: productData.brand,
-        model: productData.model,
         price: parseFloat(productData.price),
         compare_at_price: productData.compare_at_price ? parseFloat(productData.compare_at_price) : null,
-        cost_price: productData.cost_price ? parseFloat(productData.cost_price) : null,
         quantity: parseInt(productData.quantity) || 0,
-        low_stock_threshold: parseInt(productData.low_stock_threshold) || 10,
-        unit: productData.unit || 'pièce',
-        weight: productData.weight ? parseFloat(productData.weight) : null,
-        dimensions: productData.dimensions || {},
         images: productData.images || [],
         main_image: productData.main_image || productData.images?.[0] || null,
         specifications: productData.specifications || {},
         tags: productData.tags || [],
-        barcode: productData.barcode,
         is_featured: productData.is_featured || false,
         is_active: productData.is_active !== false,
-        status: productData.quantity > 0 ? 'available' : 'out_of_stock',
-        meta_title: productData.meta_title,
-        meta_description: productData.meta_description,
-        meta_keywords: productData.meta_keywords || [],
-        // created_by: (await supabase.auth.getUser()).data.user?.id, // Désactivé pour le mode dev
       };
 
       const { data, error } = await supabase
@@ -56,7 +43,7 @@ export const AdminProductService = {
         .single();
 
       if (error) throw error;
-      
+
       // Créer les variantes si fournies
       if (productData.variants && productData.variants.length > 0) {
         const variants = productData.variants.map(v => ({
@@ -87,19 +74,24 @@ export const AdminProductService = {
   // Mettre à jour un produit
   async update(productId, productData) {
     try {
-      // Préparer les données de mise à jour
-      const updates = {
-        ...productData,
-        price: productData.price ? parseFloat(productData.price) : undefined,
-        compare_at_price: productData.compare_at_price ? parseFloat(productData.compare_at_price) : null,
-        cost_price: productData.cost_price ? parseFloat(productData.cost_price) : null,
-        quantity: productData.quantity !== undefined ? parseInt(productData.quantity) : undefined,
-        low_stock_threshold: productData.low_stock_threshold ? parseInt(productData.low_stock_threshold) : undefined,
-        weight: productData.weight ? parseFloat(productData.weight) : null,
-        status: productData.quantity > 0 ? 'available' : 'out_of_stock',
-        // updated_by: (await supabase.auth.getUser()).data.user?.id, // Désactivé pour le mode dev
-        updated_at: new Date().toISOString()
-      };
+      // Préparer les données — colonnes Supabase uniquement
+      const updates = {};
+      const validFields = [
+        'sku', 'name', 'description', 'category_id', 'brand',
+        'price', 'compare_at_price', 'quantity',
+        'images', 'main_image', 'specifications', 'tags',
+        'is_featured', 'is_active',
+      ];
+      for (const key of validFields) {
+        if (productData[key] !== undefined) {
+          updates[key] = productData[key];
+        }
+      }
+      // Parse numbers
+      if (updates.price) updates.price = parseFloat(updates.price);
+      if (updates.compare_at_price) updates.compare_at_price = parseFloat(updates.compare_at_price);
+      if (updates.quantity !== undefined) updates.quantity = parseInt(updates.quantity) || 0;
+      updates.updated_at = new Date().toISOString();
 
       // Nettoyer les champs undefined
       Object.keys(updates).forEach(key => {
@@ -170,7 +162,7 @@ export const AdminProductService = {
     try {
       const { error } = await supabase
         .from('products')
-        .update({ 
+        .update({
           is_active: false,
           updated_at: new Date().toISOString()
         })
@@ -189,7 +181,7 @@ export const AdminProductService = {
     try {
       const { error } = await supabase
         .from('products')
-        .update({ 
+        .update({
           is_active: true,
           updated_at: new Date().toISOString()
         })
@@ -227,7 +219,7 @@ export const AdminProductService = {
 
       const { error } = await supabase
         .from('products')
-        .update({ 
+        .update({
           quantity: newQuantity,
           status: newQuantity > 0 ? 'available' : 'out_of_stock',
           updated_at: new Date().toISOString()
@@ -272,7 +264,7 @@ export const AdminProductService = {
     try {
       const { error } = await supabase
         .from('products')
-        .update({ 
+        .update({
           is_featured: isFeatured,
           updated_at: new Date().toISOString()
         })
@@ -426,9 +418,9 @@ export const AdminCategoryService = {
         .limit(1);
 
       if (products && products.length > 0) {
-        return { 
-          success: false, 
-          error: 'Cette catégorie contient des produits. Veuillez les déplacer avant de supprimer.' 
+        return {
+          success: false,
+          error: 'Cette catégorie contient des produits. Veuillez les déplacer avant de supprimer.'
         };
       }
 

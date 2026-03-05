@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
   };
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response('ok', { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -147,6 +147,39 @@ Deno.serve(async (req) => {
         status: 500,
         headers: corsHeaders,
       });
+    }
+
+    const { data: existingPaymentRows } = await supabaseAdmin
+      .from('payments')
+      .select('id')
+      .eq('order_id', order.id)
+      .eq('provider', 'flutterwave')
+      .limit(1);
+
+    if (!existingPaymentRows || existingPaymentRows.length === 0) {
+      await supabaseAdmin.from('payments').insert({
+        user_id: order.user_id,
+        order_id: order.id,
+        provider: 'flutterwave',
+        status: 'pending',
+        amount: amountXaf,
+        currency: (order.currency ?? 'XAF'),
+        metadata: {
+          tx_ref: txRef,
+          amount_usd: amountUsd,
+        },
+      });
+    } else {
+      await supabaseAdmin
+        .from('payments')
+        .update({
+          status: 'pending',
+          metadata: {
+            tx_ref: txRef,
+            amount_usd: amountUsd,
+          },
+        })
+        .eq('id', existingPaymentRows[0].id);
     }
 
     const { error: updErr1 } = await supabaseAdmin

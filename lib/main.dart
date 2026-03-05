@@ -6,15 +6,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_links/app_links.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'services/notification_service.dart' as ns;
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderScope, ConsumerState, ConsumerStatefulWidget;
 import 'services/activity_tracking_service.dart';
-import 'services/location_background_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'localization/app_localizations.dart';
 import 'config/app_config.dart';
@@ -23,6 +20,8 @@ import 'routes/navigation_keys.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
+import 'providers/cart_provider.dart';
+import 'providers/favorites_provider.dart';
 import 'providers/product_provider.dart';
 import 'providers/banner_provider.dart';
 import 'providers/order_provider.dart';
@@ -30,10 +29,8 @@ import 'providers/messaging_provider.dart';
 import 'providers/categories_provider.dart';
 import 'providers/notification_preferences_provider.dart';
 import 'services/messaging_service.dart';
+import 'services/notification_service.dart';
 import 'utils/i18n_audit.dart';
-import 'animations/app_animation_registry.dart';
-import 'main_driver.dart' as driver_entry;
-import 'widgets/back_button_handler.dart';
 
 const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
   apiKey: String.fromEnvironment(
@@ -62,26 +59,8 @@ const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
   ),
 );
 
-// Top-level background FCM handler — must be registered BEFORE Firebase.initializeApp()
-@pragma('vm:entry-point')
-Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
-  try { await Firebase.initializeApp(); } catch (_) {}
-  await ns.firebaseMessagingBackgroundHandler(message);
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Register background handler before any Firebase call
-  FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
-
-  // Detect flavor: if 'driver', delegate to the dedicated driver app
-  const flavor = String.fromEnvironment('FLUTTER_APP_FLAVOR', defaultValue: '');
-  if (flavor == 'driver') {
-    // Dynamically import won't work, so use a top-level check
-    _runDriverApp();
-    return;
-  }
 
   if (AppConfig.stripePublishableKey.isNotEmpty) {
     Stripe.publishableKey = AppConfig.stripePublishableKey;
@@ -120,22 +99,14 @@ void main() async {
 
   if (firebaseReady) {
     try {
-      await ns.NotificationService().init(navigatorKey: NavigationKeys.rootNavigatorKey);
+      await NotificationService().init(navigatorKey: NavigationKeys.rootNavigatorKey);
     } catch (e) {
       debugPrint('[FCM] Notification init skipped/failed: $e');
     }
   }
   
-  // Only configure the background GPS service at launch (no permission popup, no stream yet).
-  // startService() + permission request happen lazily when user opens order tracking
-  // or when a driver logs in (setUserId triggers startService internally).
-  await LocationBackgroundService.instance.initialize();
-
   // Initialize activity tracking
   await ActivityTrackingService().initSession();
-
-  // Preload animation registry so nav icons render instantly
-  AppAnimationRegistry.instance.preload();
   
   runApp(
     ProviderScope(
@@ -144,6 +115,8 @@ void main() async {
           // Auth provider will be added when fixed
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
           ChangeNotifierProvider(create: (_) => LanguageProvider()),
+          ChangeNotifierProvider(create: (_) => CartProvider()),
+          ChangeNotifierProvider(create: (_) => FavoritesProvider()),
           ChangeNotifierProvider(create: (_) => ProductProvider()),
           ChangeNotifierProvider(create: (_) => BannerProvider()),
           ChangeNotifierProvider(create: (_) => OrderProvider()),
@@ -165,7 +138,7 @@ class AppBootstrap extends ConsumerStatefulWidget {
   ConsumerState<AppBootstrap> createState() => _AppBootstrapState();
 }
 
-class _AppBootstrapState extends ConsumerState<AppBootstrap> {
+class _AppBootstrapState extends ConsumerState<AppBootstrap> with WidgetsBindingObserver {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSub;
   String? _lastHandledLink;
@@ -173,6 +146,7 @@ class _AppBootstrapState extends ConsumerState<AppBootstrap> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     ref.read(authProvider);
     _initDeepLinks();
   }
@@ -210,7 +184,16 @@ class _AppBootstrapState extends ConsumerState<AppBootstrap> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.detached) {
+      ref.read(authProvider.notifier).enforceRememberMePolicy();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _linkSub?.cancel();
     super.dispose();
   }
@@ -219,11 +202,6 @@ class _AppBootstrapState extends ConsumerState<AppBootstrap> {
   Widget build(BuildContext context) {
     return const MyApp();
   }
-}
-
-// ── Driver flavor entry point ─────────────────────────────────────────────────
-void _runDriverApp() {
-  driver_entry.main();
 }
 
 class MyApp extends StatelessWidget {
@@ -246,20 +224,10 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           routerConfig: AppRoutes.router,
           builder: (context, child) {
-            // Détect RTL for Arabic
-            final isArabic = languageProvider.locale.languageCode == 'ar';
-            final textDirection = isArabic ? TextDirection.rtl : TextDirection.ltr;
-
-            return Directionality(
-              textDirection: textDirection,
-              child: BackButtonHandler(
-                scaffoldMessengerKey: NavigationKeys.scaffoldMessengerKey,
-                child: I18nAuditOverlay(
-                  navigatorKey: NavigationKeys.rootNavigatorKey,
-                  router: AppRoutes.router,
-                  child: child ?? const SizedBox.shrink(),
-                ),
-              ),
+            return I18nAuditOverlay(
+              navigatorKey: NavigationKeys.rootNavigatorKey,
+              router: AppRoutes.router,
+              child: child ?? const SizedBox.shrink(),
             );
           },
           locale: languageProvider.locale,
@@ -275,14 +243,6 @@ class MyApp extends StatelessWidget {
             Locale('en', ''), // English
             Locale('ar', ''), // Arabic
           ],
-          localeResolutionCallback: (locale, supportedLocales) {
-            if (locale == null) return const Locale('fr', '');
-            final code = locale.languageCode.toLowerCase();
-            if (code == 'fr') return const Locale('fr', '');
-            if (code == 'en') return const Locale('en', '');
-            if (code == 'ar') return const Locale('ar', '');
-            return const Locale('fr', '');
-          },
         );
       },
     );

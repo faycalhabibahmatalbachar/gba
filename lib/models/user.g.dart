@@ -21,6 +21,8 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       avatarUrl: json['avatar_url'] as String?,
       loyaltyPoints: (json['loyalty_points'] as num?)?.toInt() ?? 0,
       isPremium: json['is_premium'] as bool? ?? false,
+      isSuspended: json['is_suspended'] as bool? ?? false,
+      isBlocked: json['is_blocked'] as bool? ?? false,
       notificationPreferences:
           json['notification_preferences'] as Map<String, dynamic>?,
       memberSince: json['member_since'] == null
@@ -49,6 +51,8 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'avatar_url': instance.avatarUrl,
       'loyalty_points': instance.loyaltyPoints,
       'is_premium': instance.isPremium,
+      'is_suspended': instance.isSuspended,
+      'is_blocked': instance.isBlocked,
       'notification_preferences': instance.notificationPreferences,
       'member_since': instance.memberSince?.toIso8601String(),
       'created_at': instance.createdAt?.toIso8601String(),

@@ -67,14 +67,14 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
   
   if (!order) return null;
 
-  const steps = ['Order Placed', 'Processing', 'Shipped', 'Delivered'];
+  const steps = ['Commande passee', 'En traitement', 'Expediee', 'Livree'];
   const activeStep = order.status === 'delivered' ? 3 : order.status === 'shipped' ? 2 : order.status === 'processing' ? 1 : 0;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <span>Order Details - {order.id}</span>
+          <span>Details commande - {order.id}</span>
           <Chip
             label={order.status}
             color={
@@ -87,9 +87,9 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
       </DialogTitle>
       <DialogContent>
         <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} sx={{ mb: 2 }}>
-          <Tab label="Order Info" />
-          <Tab label="Customer" />
-          <Tab label="Timeline" />
+          <Tab label="Commande" />
+          <Tab label="Client" />
+          <Tab label="Historique" />
         </Tabs>
 
         {tabValue === 0 && (
@@ -110,9 +110,9 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
                   <Table>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Product</TableCell>
-                        <TableCell align="right">Quantity</TableCell>
-                        <TableCell align="right">Price</TableCell>
+                        <TableCell>Produit</TableCell>
+                        <TableCell align="right">Quantite</TableCell>
+                        <TableCell align="right">Prix</TableCell>
                         <TableCell align="right">Total</TableCell>
                       </TableRow>
                     </TableHead>
@@ -121,21 +121,21 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
                         <TableRow key={index}>
                           <TableCell>{item.name}</TableCell>
                           <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">${item.price}</TableCell>
-                          <TableCell align="right">${item.total}</TableCell>
+                          <TableCell align="right">{item.price} FCFA</TableCell>
+                          <TableCell align="right">{item.total} FCFA</TableCell>
                         </TableRow>
                       ))}
                       <TableRow>
-                        <TableCell colSpan={3} align="right"><strong>Subtotal</strong></TableCell>
-                        <TableCell align="right"><strong>${order.subtotal}</strong></TableCell>
+                        <TableCell colSpan={3} align="right"><strong>Sous-total</strong></TableCell>
+                        <TableCell align="right"><strong>{order.subtotal} FCFA</strong></TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell colSpan={3} align="right">Shipping</TableCell>
-                        <TableCell align="right">${order.shipping}</TableCell>
+                        <TableCell colSpan={3} align="right">Livraison</TableCell>
+                        <TableCell align="right">{order.shipping} FCFA</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell colSpan={3} align="right"><strong>Total</strong></TableCell>
-                        <TableCell align="right"><strong>${order.total}</strong></TableCell>
+                        <TableCell align="right"><strong>{order.total} FCFA</strong></TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -154,7 +154,7 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
                     <PersonIcon />
                   </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary="Customer Name" secondary={order.customer} />
+                <ListItemText primary="Nom du client" secondary={order.customer} />
               </ListItem>
               <ListItem>
                 <ListItemAvatar>
@@ -162,7 +162,7 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
                     <EmailIcon />
                   </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary="Email" secondary={order.email || 'customer@example.com'} />
+                <ListItemText primary="Email" secondary={order.email || 'client@exemple.com'} />
               </ListItem>
               <ListItem>
                 <ListItemAvatar>
@@ -170,7 +170,7 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
                     <PhoneIcon />
                   </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary="Phone" secondary={order.phone || '+1 234 567 8900'} />
+                <ListItemText primary="Telephone" secondary={order.phone || 'Non renseigne'} />
               </ListItem>
               <ListItem>
                 <ListItemAvatar>
@@ -179,8 +179,8 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText 
-                  primary="Shipping Address" 
-                  secondary={order.address || '123 Main St, City, State 12345'} 
+                  primary="Adresse de livraison" 
+                  secondary={order.address || 'Non renseignee'} 
                 />
               </ListItem>
               <ListItem>
@@ -189,7 +189,7 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
                     <PaymentIcon />
                   </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary="Payment Method" secondary={order.payment || 'Credit Card'} />
+                <ListItemText primary="Moyen de paiement" secondary={order.payment || 'Carte bancaire'} />
               </ListItem>
             </List>
           </Box>
@@ -200,23 +200,23 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
             <List>
               <ListItem>
                 <ListItemText 
-                  primary="Order Placed"
-                  secondary={new Date(order.date).toLocaleString()}
+                  primary="Commande passee"
+                  secondary={new Date(order.date).toLocaleString('fr-FR')}
                 />
                 <CheckIcon color="success" />
               </ListItem>
               <ListItem>
                 <ListItemText 
-                  primary="Payment Confirmed"
-                  secondary={new Date(order.date).toLocaleString()}
+                  primary="Paiement confirme"
+                  secondary={new Date(order.date).toLocaleString('fr-FR')}
                 />
                 <CheckIcon color="success" />
               </ListItem>
               {order.status !== 'pending' && (
                 <ListItem>
                   <ListItemText 
-                    primary="Order Processing"
-                    secondary="In warehouse"
+                    primary="En traitement"
+                    secondary="En entrepot"
                   />
                   <CheckIcon color="success" />
                 </ListItem>
@@ -224,8 +224,8 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
               {(order.status === 'shipped' || order.status === 'delivered') && (
                 <ListItem>
                   <ListItemText 
-                    primary="Order Shipped"
-                    secondary="On the way"
+                    primary="Commande expediee"
+                    secondary="En route"
                   />
                   <CheckIcon color="success" />
                 </ListItem>
@@ -233,8 +233,8 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
               {order.status === 'delivered' && (
                 <ListItem>
                   <ListItemText 
-                    primary="Order Delivered"
-                    secondary="Completed"
+                    primary="Commande livree"
+                    secondary="Terminee"
                   />
                   <CheckIcon color="success" />
                 </ListItem>
@@ -244,9 +244,9 @@ const OrderDetailDialog = ({ open, onClose, order }) => {
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>Fermer</Button>
         <Button variant="contained" startIcon={<PrintIcon />}>
-          Print Invoice
+          Imprimer la facture
         </Button>
       </DialogActions>
     </Dialog>
@@ -467,7 +467,7 @@ function Orders() {
       width: 120,
       renderCell: (params) => (
         <Typography variant="body2" fontWeight="bold" color="primary">
-          ${params.value}
+          {params.value} FCFA
         </Typography>
       )
     },
@@ -486,7 +486,7 @@ function Orders() {
         const config = statusConfig[params.value];
         return (
           <Chip
-            label={params.value}
+            label={{pending:'En attente',processing:'En traitement',shipped:'Expediee',delivered:'Livree',cancelled:'Annulee'}[params.value] || params.value}
             size="small"
             color={config.color}
             icon={config.icon}
@@ -507,11 +507,11 @@ function Orders() {
               onChange={(e) => handleStatusUpdate(params.row.id, e.target.value)}
               displayEmpty
             >
-              <MenuItem value="pending">Pending</MenuItem>
-              <MenuItem value="processing">Processing</MenuItem>
-              <MenuItem value="shipped">Shipped</MenuItem>
-              <MenuItem value="delivered">Delivered</MenuItem>
-              <MenuItem value="cancelled">Cancelled</MenuItem>
+              <MenuItem value="pending">En attente</MenuItem>
+              <MenuItem value="processing">En traitement</MenuItem>
+              <MenuItem value="shipped">Expediee</MenuItem>
+              <MenuItem value="delivered">Livree</MenuItem>
+              <MenuItem value="cancelled">Annulee</MenuItem>
             </Select>
           </FormControl>
           <Button
@@ -519,7 +519,7 @@ function Orders() {
             variant="outlined"
             onClick={() => handleViewDetails(params.row)}
           >
-            View
+            Voir
           </Button>
         </Box>
       ),
@@ -553,9 +553,9 @@ function Orders() {
     return (
       <Box p={3}>
         <Alert severity="error">
-          Error loading orders: {error}
+          Erreur de chargement des commandes: {error}
         </Alert>
-        <Button onClick={fetchOrders} sx={{ mt: 2 }}>Retry</Button>
+        <Button onClick={fetchOrders} sx={{ mt: 2 }}>Reessayer</Button>
       </Box>
     );
   }
@@ -570,10 +570,10 @@ function Orders() {
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Box>
             <Typography variant="h4" fontWeight="bold" gutterBottom>
-              Orders Management
+              Gestion des commandes
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Track and manage customer orders
+              Suivre et gerer les commandes clients
             </Typography>
           </Box>
           <Box display="flex" gap={2}>
@@ -581,13 +581,13 @@ function Orders() {
               variant="outlined"
               startIcon={<DownloadIcon />}
             >
-              Export
+              Exporter
             </Button>
             <Button
               variant="outlined"
               startIcon={<PrintIcon />}
             >
-              Print All
+              Imprimer
             </Button>
           </Box>
         </Box>
@@ -597,31 +597,31 @@ function Orders() {
         <Grid item xs={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'grey.100' }}>
             <Typography variant="h4" fontWeight="bold">{stats.total}</Typography>
-            <Typography variant="body2" color="text.secondary">Total Orders</Typography>
+            <Typography variant="body2" color="text.secondary">Total commandes</Typography>
           </Paper>
         </Grid>
         <Grid item xs={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light' }}>
             <Typography variant="h4" fontWeight="bold">{stats.pending}</Typography>
-            <Typography variant="body2">Pending</Typography>
+            <Typography variant="body2">En attente</Typography>
           </Paper>
         </Grid>
         <Grid item xs={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light' }}>
             <Typography variant="h4" fontWeight="bold">{stats.processing}</Typography>
-            <Typography variant="body2">Processing</Typography>
+            <Typography variant="body2">En traitement</Typography>
           </Paper>
         </Grid>
         <Grid item xs={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light' }}>
             <Typography variant="h4" fontWeight="bold">{stats.shipped}</Typography>
-            <Typography variant="body2">Shipped</Typography>
+            <Typography variant="body2">Expediees</Typography>
           </Paper>
         </Grid>
         <Grid item xs={6} md={2.4}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light' }}>
             <Typography variant="h4" fontWeight="bold">{stats.delivered}</Typography>
-            <Typography variant="body2">Delivered</Typography>
+            <Typography variant="body2">Livrees</Typography>
           </Paper>
         </Grid>
       </Grid>
@@ -629,7 +629,7 @@ function Orders() {
       <Paper sx={{ p: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={2}>
           <TextField
-            placeholder="Search orders..."
+            placeholder="Rechercher des commandes..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             size="small"
@@ -644,18 +644,18 @@ function Orders() {
           />
           <Box display="flex" gap={2}>
             <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Status</InputLabel>
+              <InputLabel>Statut</InputLabel>
               <Select
                 value={filterStatus}
-                label="Status"
+                label="Statut"
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="processing">Processing</MenuItem>
-                <MenuItem value="shipped">Shipped</MenuItem>
-                <MenuItem value="delivered">Delivered</MenuItem>
-                <MenuItem value="cancelled">Cancelled</MenuItem>
+                <MenuItem value="all">Tous</MenuItem>
+                <MenuItem value="pending">En attente</MenuItem>
+                <MenuItem value="processing">En traitement</MenuItem>
+                <MenuItem value="shipped">Expediee</MenuItem>
+                <MenuItem value="delivered">Livree</MenuItem>
+                <MenuItem value="cancelled">Annulee</MenuItem>
               </Select>
             </FormControl>
           </Box>

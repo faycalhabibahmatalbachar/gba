@@ -28,6 +28,7 @@ import '../services/messaging_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart' as ns;
 import '../services/recommendation_service.dart';
+import '../utils/auth_guard.dart';
 
 class HomeScreenPremium extends ConsumerStatefulWidget {
   const HomeScreenPremium({super.key});
@@ -252,6 +253,12 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
     context.go(route);
   }
 
+  void _navigateFromDrawerProtected(BuildContext context, String route) {
+    Navigator.of(context).pop();
+    if (!requireAuth(context)) return;
+    context.go(route);
+  }
+
   void _showComingSoon(BuildContext context, String label, {bool closeDrawer = false}) {
     if (closeDrawer && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
@@ -285,7 +292,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
         children: [
           // ── Brand header ────────────────────────────────────────────────
           GestureDetector(
-            onTap: () => _navigateFromDrawer(context, '/profile'),
+            onTap: () => _navigateFromDrawerProtected(context, '/profile'),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
@@ -358,17 +365,17 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
                 ListTile(
                   leading: const Icon(Icons.favorite_border),
                   title: Text(localizations.translate('favorites')),
-                  onTap: () => _navigateFromDrawer(context, '/favorites'),
+                  onTap: () => _navigateFromDrawerProtected(context, '/favorites'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.shopping_cart_outlined),
                   title: Text(localizations.translate('cart')),
-                  onTap: () => _navigateFromDrawer(context, '/cart'),
+                  onTap: () => _navigateFromDrawerProtected(context, '/cart'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.receipt_long_outlined),
                   title: Text(localizations.translate('orders')),
-                  onTap: () => _navigateFromDrawer(context, '/orders'),
+                  onTap: () => _navigateFromDrawerProtected(context, '/orders'),
                 ),
                 ExpansionTile(
                   leading: const Icon(Icons.auto_awesome),
@@ -376,23 +383,23 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
                   children: [
                     ListTile(
                       title: Text(localizations.translate('new_special_order')),
-                      onTap: () => _navigateFromDrawer(context, '/special-order'),
+                      onTap: () => _navigateFromDrawerProtected(context, '/special-order'),
                     ),
                     ListTile(
                       title: Text(localizations.translate('my_special_orders')),
-                      onTap: () => _navigateFromDrawer(context, '/special-orders'),
+                      onTap: () => _navigateFromDrawerProtected(context, '/special-orders'),
                     ),
                   ],
                 ),
                 ListTile(
                   leading: const Icon(Icons.message_outlined),
                   title: Text(localizations.translate('messages')),
-                  onTap: () => _navigateFromDrawer(context, '/messages'),
+                  onTap: () => _navigateFromDrawerProtected(context, '/chat'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.settings_outlined),
                   title: Text(localizations.translate('settings')),
-                  onTap: () => _navigateFromDrawer(context, '/settings'),
+                  onTap: () => _navigateFromDrawerProtected(context, '/settings'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.contact_support_outlined),
@@ -441,9 +448,12 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
       vsync: this,
     )..repeat(reverse: true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadUnreadMessages();
+      final isGuest = Supabase.instance.client.auth.currentSession == null;
+      if (!isGuest) {
+        _loadUnreadMessages();
+        _maybeRequestNotificationPermission();
+      }
       _loadRecommendations();
-      _maybeRequestNotificationPermission();
     });
     _scrollController.addListener(() {
       final offset = _scrollController.offset;
@@ -615,7 +625,8 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
                       elevation: 0,
                       onPressed: () {
                         HapticFeedback.lightImpact();
-                        context.push('/messages');
+                        if (!requireAuth(context)) return;
+                        context.push('/chat');
                       },
                       child: Stack(
                         children: [

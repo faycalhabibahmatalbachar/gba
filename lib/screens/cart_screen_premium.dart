@@ -11,6 +11,8 @@ import '../providers/cart_provider.dart';
 import '../models/cart_item.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/adaptive_scaffold.dart';
+import '../animations/app_animations.dart';
+import '../widgets/app_animation.dart';
 
 class CartScreenPremium extends ConsumerStatefulWidget {
   const CartScreenPremium({super.key});
@@ -376,30 +378,14 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.purple.shade300,
-                    Colors.blue.shade400,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.purple.withOpacity(0.3),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: const Icon(
+            AppAnimation(
+              id: AppAnimations.emptyCart,
+              width: 200,
+              height: 200,
+              fallback: Icon(
                 FontAwesomeIcons.cartShopping,
-                size: 48,
-                color: Colors.white,
+                size: 80,
+                color: Colors.purple.shade300,
               ),
             ),
             const SizedBox(height: 24),

@@ -25,28 +25,50 @@ class ActivityTrackingService {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
-  // Initialize session
+  // Initialize session - insert session record immediately
   Future<void> initSession() async {
     _currentSessionId = _generateUuidV4();
     _sessionStartTime = DateTime.now();
+    
+    // Insert session record immediately (without ended_at)
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null) {
+        await _supabase.from('user_sessions').insert({
+          'user_id': userId,
+          'session_id': _currentSessionId,
+          'started_at': _sessionStartTime!.toIso8601String(),
+          // ended_at will be NULL until session ends
+        });
+        debugPrint('📊 Session started: $_currentSessionId');
+      }
+    } catch (e) {
+      debugPrint('Error starting session: $e');
+    }
+    
     await trackActivity('app_opened');
   }
 
-  // End session
+  // End session - update existing session record
   Future<void> endSession() async {
     if (_currentSessionId != null && _sessionStartTime != null) {
       await trackActivity('app_closed');
       
-      // Update session duration
+      // Update existing session record with end time and duration
       try {
-        final duration = DateTime.now().difference(_sessionStartTime!).inSeconds;
-        await _supabase.from('user_sessions').insert({
-          'user_id': _supabase.auth.currentUser?.id,
-          'session_id': _currentSessionId,
-          'started_at': _sessionStartTime!.toIso8601String(),
-          'ended_at': DateTime.now().toIso8601String(),
-          'duration_seconds': duration,
-        });
+        final userId = _supabase.auth.currentUser?.id;
+        if (userId != null) {
+          final duration = DateTime.now().difference(_sessionStartTime!).inSeconds;
+          await _supabase
+              .from('user_sessions')
+              .update({
+                'ended_at': DateTime.now().toIso8601String(),
+                'duration_seconds': duration,
+              })
+              .eq('session_id', _currentSessionId!)
+              .eq('user_id', userId);
+          debugPrint('📊 Session ended: $_currentSessionId (${duration}s)');
+        }
       } catch (e) {
         debugPrint('Error ending session: $e');
       }

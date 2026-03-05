@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
-import { CircularProgress, Box } from '@mui/material';
+
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -16,26 +16,20 @@ import MonitoringCarts from './pages/MonitoringCarts';
 import MonitoringFavorites from './pages/MonitoringFavorites';
 import MonitoringProducts from './pages/MonitoringProducts';
 import Layout from './components/Layout';
-import SimpleAdminChat from './components/messaging/SimpleAdminChat';
+import AdminMessenger from './components/messaging/AdminMessenger';
 import Banners from './pages/Banners';
 import Deliveries from './pages/Deliveries';
 import Drivers from './pages/Drivers';
 import DeliveryTracking from './pages/DeliveryTracking';
-
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
     );
   }
 
@@ -71,7 +65,7 @@ function App() {
         <Route path="monitoring/carts" element={<MonitoringCarts />} />
         <Route path="monitoring/favorites" element={<MonitoringFavorites />} />
         <Route path="monitoring/products" element={<MonitoringProducts />} />
-        <Route path="messages" element={<SimpleAdminChat />} />
+        <Route path="messages" element={<AdminMessenger />} />
         <Route path="deliveries" element={<Deliveries />} />
         <Route path="drivers" element={<Drivers />} />
         <Route path="delivery-tracking" element={<DeliveryTracking />} />

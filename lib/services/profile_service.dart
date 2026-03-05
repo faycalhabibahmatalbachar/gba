@@ -15,6 +15,29 @@ class ProfileService {
   static const String _coverUrlMissingKey = 'profiles_cover_url_missing_v2';
   static const String _coverUrlCacheKeyPrefix = 'cache_profile_cover_url_v1_';
   static const String _reviewsTableMissingKey = 'reviews_table_missing_v2';
+  static const String _statsCacheKeyPrefix = 'cache_profile_stats_v1_';
+  static const String _statsCacheAtKeyPrefix = 'cache_profile_stats_at_v1_';
+  static const int _statsTtlMs = 5 * 60 * 1000; // 5 min TTL
+
+  // ── Layer 1: Static in-memory cache (0ms synchronous, survives navigation) ─────
+  static final Map<String, Map<String, dynamic>> _memStats = {};
+  static final Map<String, DateTime> _memStatsAt = {};
+
+  /// Synchronous read — returns null if never populated for this [userId].
+  /// Call before first build to avoid the "jump from 0" flash.
+  static Map<String, dynamic>? getMemoryCachedStats(String userId) {
+    return _memStats[userId];
+  }
+
+  static void _writeMemoryStats(String userId, Map<String, dynamic> stats) {
+    _memStats[userId] = Map<String, dynamic>.from(stats);
+    _memStatsAt[userId] = DateTime.now();
+  }
+
+  static void clearMemoryCache(String userId) {
+    _memStats.remove(userId);
+    _memStatsAt.remove(userId);
+  }
 
   Future<bool> _isFlagEnabled(String key) async {
     final prefs = await SharedPreferences.getInstance();
@@ -166,7 +189,7 @@ class ProfileService {
       final resized = img.copyResize(
         decodedImage,
         width: decodedImage.width > 500 ? 500 : decodedImage.width,
-        height: decodedImage.height > 500 ? 500 : decodedImage.height,
+        // height intentionally omitted — auto-calculated to preserve aspect ratio
       );
       
       // Compresser en JPEG avec qualité 85%
@@ -398,8 +421,59 @@ class ProfileService {
     }
   }
   
-  // Récupérer les statistiques du profil
-  Future<Map<String, dynamic>> getProfileStats(String userId) async {
+  // ── Stats cache helpers ──────────────────────────────────────────────────────
+
+  // ── Layer 2: SharedPreferences cache (~10ms async) ─────────────────────
+  Future<Map<String, dynamic>?> _getCachedStats(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_statsCacheKeyPrefix$userId');
+      final at = prefs.getInt('$_statsCacheAtKeyPrefix$userId') ?? 0;
+      if (raw == null || raw.isEmpty) return null;
+      if (DateTime.now().millisecondsSinceEpoch - at > _statsTtlMs) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _persistStatsCache(String userId, Map<String, dynamic> stats) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_statsCacheKeyPrefix$userId', jsonEncode(stats));
+      await prefs.setInt('$_statsCacheAtKeyPrefix$userId', DateTime.now().millisecondsSinceEpoch);
+      // Also update in-memory layer immediately
+      _writeMemoryStats(userId, stats);
+    } catch (_) {}
+  }
+
+  /// Invalidate cached stats (call after order placed, review added, etc.)
+  Future<void> invalidateStatsCache(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('$_statsCacheKeyPrefix$userId');
+      await prefs.remove('$_statsCacheAtKeyPrefix$userId');
+      clearMemoryCache(userId);
+    } catch (_) {}
+  }
+
+  // Récupérer les statistiques du profil (Layer1 memory → Layer2 SP → Layer3 Supabase)
+  Future<Map<String, dynamic>> getProfileStats(String userId, {bool forceRefresh = false}) async {
+    // Layer 1: in-memory (0ms) — return immediately if fresh
+    if (!forceRefresh && _memStats.containsKey(userId)) {
+      return Map<String, dynamic>.from(_memStats[userId]!);
+    }
+    // Layer 2: SharedPreferences (~10ms)
+    if (!forceRefresh) {
+      final cached = await _getCachedStats(userId);
+      if (cached != null) {
+        _writeMemoryStats(userId, cached); // warm up memory layer
+        return cached;
+      }
+    }
+
     try {
       int orders = 0;
       try {
@@ -440,18 +514,19 @@ class ProfileService {
         }
       }
 
-      return {
+      final stats = {
         'orders': orders,
         'favorites': favorites,
         'reviews': reviews,
       };
+      await _persistStatsCache(userId, stats);
+      return stats;
     } catch (e) {
-      print('❌ Erreur lors de la récupération des stats: $e');
-      return {
-        'orders': 0,
-        'favorites': 0,
-        'reviews': 0,
-      };
+      print('❌ Erreur stats profil: $e');
+      // Serve stale cache on network error
+      final stale = await _getCachedStats(userId);
+      if (stale != null) return stale;
+      return {'orders': 0, 'favorites': 0, 'reviews': 0};
     }
   }
 }

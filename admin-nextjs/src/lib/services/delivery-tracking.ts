@@ -19,6 +19,7 @@ export type ActiveOrder = {
   id: string;
   order_number?: string | null;
   customer_name?: string | null;
+  user_id?: string | null;
   status?: string | null;
   created_at: string;
   displayName: string;
@@ -38,6 +39,7 @@ export type DriverWithState = {
 
 const STALE_MINUTES = 10;
 const OVERLOAD_THRESHOLD = 5;
+const SLA_HOURS = 2;
 
 export async function fetchAllDriversWithState(): Promise<DriverWithState[]> {
   const { data: drivers, error: driversErr } = await supabase

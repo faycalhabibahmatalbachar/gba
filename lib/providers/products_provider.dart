@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/product.dart';
 import '../services/supabase_service.dart';
+import '../services/cache_service.dart';
 
 // Products Provider with filters
 final productsProvider = StateNotifierProvider<ProductsNotifier, ProductsState>((ref) {
@@ -59,28 +61,69 @@ class ProductsState {
 }
 
 class ProductsNotifier extends StateNotifier<ProductsState> {
+  final _cache = CacheService.instance;
+
   ProductsNotifier() : super(ProductsState()) {
-    loadProducts();
+    _hydrateAndLoad();
+  }
+
+  String _cacheKey({String? categoryId, String? searchQuery}) {
+    final cat = categoryId ?? 'all';
+    final q = (searchQuery != null && searchQuery.isNotEmpty) ? searchQuery : 'none';
+    return 'products_list_${cat}_$q';
+  }
+
+  Future<void> _hydrateAndLoad() async {
+    final key = _cacheKey(
+      categoryId: state.selectedCategoryId,
+      searchQuery: state.searchQuery,
+    );
+    try {
+      final decoded = await _cache.get(key, CacheService.ttlProducts);
+      if (decoded is List && decoded.isNotEmpty) {
+        final cached = decoded
+            .whereType<Map>()
+            .map((e) => Product.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+        if (cached.isNotEmpty) {
+          state = state.copyWith(products: cached, isLoading: false);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ProductsNotifier] cache hydrate error: $e');
+    }
+    await loadProducts(refresh: true);
+  }
+
+  Future<void> _persistToCache(List<Product> products) async {
+    final key = _cacheKey(
+      categoryId: state.selectedCategoryId,
+      searchQuery: state.searchQuery,
+    );
+    try {
+      final payload = products.map((p) => p.toJson()).toList();
+      await _cache.set(key, payload, CacheService.ttlProducts);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ProductsNotifier] cache persist error: $e');
+    }
   }
 
   Future<void> loadProducts({bool refresh = false}) async {
     if (state.isLoading) return;
-    
+
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final products = await SupabaseService.getProducts(
         offset: refresh ? 0 : state.products.length,
         categoryId: state.selectedCategoryId,
         searchQuery: state.searchQuery,
       );
-      
-      // Debug: afficher les produits reçus
-      print('📦 ProductsProvider: ${products.length} produits reçus');
-      for (var p in products.take(3)) {
-        print('  - ${p.name}: mainImage=${p.mainImage}');
+
+      if (kDebugMode) {
+        debugPrint('[ProductsNotifier] ${products.length} produits reçus');
       }
-      
+
       if (refresh) {
         state = state.copyWith(
           products: products,
@@ -94,6 +137,7 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
           hasMore: products.length >= 20,
         );
       }
+      if (refresh) await _persistToCache(state.products);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }

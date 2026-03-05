@@ -217,18 +217,28 @@ class _SuccessView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _GlassCard(
+    return Column(
+      children: [
+        Image.asset(
+          'assets/images/GBA_sans_arriere.png',
+          width: 130,
+          height: 130,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ).animate().fadeIn(duration: 500.ms).scale(begin: const Offset(0.88, 0.88), end: const Offset(1, 1), duration: 600.ms, curve: Curves.easeOutCubic),
+        const SizedBox(height: 20),
+        _GlassCard(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 72,
-            height: 72,
+            width: 80,
+            height: 80,
             decoration: const BoxDecoration(
               gradient: LinearGradient(colors: [Color(0xFF00C853), Color(0xFF69F0AE)]),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.mark_email_read_outlined, color: Colors.white, size: 36),
+            child: const Icon(Icons.mark_email_read_outlined, color: Colors.white, size: 40),
           ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.6, 0.6), end: const Offset(1, 1)),
           const SizedBox(height: 20),
           Text(
@@ -255,7 +265,9 @@ class _SuccessView extends StatelessWidget {
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.96, 0.96), end: const Offset(1, 1));
+    ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.96, 0.96), end: const Offset(1, 1)),
+      ],
+    );
   }
 }
 
@@ -400,9 +412,9 @@ class _MeshPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final a = t * 2 * math.pi;
     void c(Paint p, double x, double y, double r) => canvas.drawCircle(Offset(size.width * x, size.height * y), size.width * r, p);
-    c(Paint()..color = Colors.white.withOpacity(0.12)..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.09), 0.18 + 0.06 * math.sin(a * 0.9), 0.24 + 0.06 * math.cos(a), 0.42);
-    c(Paint()..color = const Color(0xFFFFD54F).withOpacity(0.12)..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.11), 0.88 + 0.05 * math.cos(a), 0.22 + 0.06 * math.sin(a), 0.32);
-    c(Paint()..color = const Color(0xFF69F0AE).withOpacity(0.09)..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.13), 0.62 + 0.06 * math.sin(a), 0.84 + 0.05 * math.cos(a), 0.44);
+    c(Paint()..color = Colors.white.withOpacity(0.10), 0.18 + 0.06 * math.sin(a * 0.9), 0.24 + 0.06 * math.cos(a), 0.42);
+    c(Paint()..color = const Color(0xFFFFD54F).withOpacity(0.10), 0.88 + 0.05 * math.cos(a), 0.22 + 0.06 * math.sin(a), 0.32);
+    c(Paint()..color = const Color(0xFF69F0AE).withOpacity(0.08), 0.62 + 0.06 * math.sin(a), 0.84 + 0.05 * math.cos(a), 0.44);
   }
   @override
   bool shouldRepaint(_MeshPainter old) => old.t != t;

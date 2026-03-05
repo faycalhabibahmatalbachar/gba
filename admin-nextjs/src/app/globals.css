@@ -1,0 +1,232 @@
+@import "tailwindcss";
+
+/*
+  ── Class-based dark mode for Tailwind v4 ────────────────────────────
+  Without this, dark: utilities match @media (prefers-color-scheme: dark)
+  which ignores our manual toggle stored in localStorage.
+  This variant makes dark: target elements inside html.dark instead.
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Light mode tokens ─────────────────────────────────────────────── */
+:root {
+  --background: #fafafa;
+  --foreground: #171717;
+  --card-bg: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.06);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --card-radius: 14px;
+  --page-padding: 24px;
+  --primary: #4f46e5;
+  --primary-hover: #6366f1;
+  --sidebar-bg: #1e1b4b;
+  --header-bg: #ffffff;
+  --header-border: rgba(0, 0, 0, 0.06);
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border-color: #e5e7eb;
+  --hover-bg: rgba(79, 70, 229, 0.04);
+  /* Messaging */
+  --msg-thread-bg: #efeae2;
+  --msg-date-bg: rgba(0, 0, 0, 0.08);
+  --msg-date-fg: #64748b;
+  --msg-bubble-mine: #d9fdd3;
+  --msg-bubble-other: #ffffff;
+  --empty-placeholder: #94a3b8;
+}
+
+/* ── Dark mode tokens (activated by html.dark class) ──────────────── */
+html.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card-bg: #1e293b;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --header-bg: #0f172a;
+  --header-border: rgba(255, 255, 255, 0.07);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --hover-bg: rgba(99, 102, 241, 0.1);
+  /* Messaging */
+  --msg-thread-bg: #1e293b;
+  --msg-date-bg: rgba(255, 255, 255, 0.08);
+  --msg-date-fg: #94a3b8;
+  --msg-bubble-mine: #134e4a;
+  --msg-bubble-other: #334155;
+  --empty-placeholder: #64748b;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ── Admin header fix for dark mode ──────────────────────────────────
+   Ant Design Layout.Header has its own inline bg; we override via CSS var
+*/
+.ant-layout-header {
+  background: var(--header-bg) !important;
+  border-bottom: 1px solid var(--header-border) !important;
+}
+
+/* ── Premium admin content area ─────────────────────────────────────── */
+.admin-content {
+  padding: var(--page-padding);
+  min-height: calc(100vh - 56px);
+}
+
+/* ── Card style override for Ant Design in admin ────────────────────── */
+.admin-content .ant-card {
+  border-radius: var(--card-radius);
+  border-color: var(--card-border);
+  box-shadow: var(--card-shadow);
+  background: var(--card-bg);
+  transition: box-shadow 0.2s ease, background 0.25s ease;
+}
+.admin-content .ant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+html.dark .admin-content .ant-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Dashboard analytics premium ────────────────────────────────────── */
+.dashboard-live-pulse {
+  animation: dashboard-pulse 2s ease-in-out infinite;
+}
+@keyframes dashboard-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.dashboard-card-glass {
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s ease, transform 0.15s ease, background 0.25s ease;
+}
+.dashboard-card-glass:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+html.dark .dashboard-card-glass:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+.dashboard-sparkline {
+  height: 32px;
+  width: 100%;
+}
+.dashboard-funnel-step {
+  transition: transform 0.15s ease;
+}
+.dashboard-table-row-hover:hover {
+  background: var(--hover-bg);
+}
+
+/* ── Dashboard: table row hover ─────────────────────────────────────── */
+.admin-content .dashboard-orders-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+.admin-content .dashboard-orders-table tbody tr:hover {
+  background-color: rgba(79, 70, 229, 0.06);
+}
+html.dark .admin-content .dashboard-orders-table tbody tr:hover {
+  background-color: rgba(99, 102, 241, 0.12);
+}
+
+/* ── Delivery Operations Command Center ─────────────────────────────── */
+.delivery-command-center {
+  --dt-accent: #4f46e5;
+  --dt-accent-hover: #6366f1;
+  --dt-success: #10b981;
+  --dt-warning: #f59e0b;
+  --dt-danger: #ef4444;
+  --dt-muted: #64748b;
+}
+.delivery-kpi-card {
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.delivery-kpi-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+html.dark .delivery-kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.delivery-driver-row {
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.delivery-driver-row:hover {
+  background-color: rgba(79, 70, 229, 0.04);
+}
+.delivery-driver-row.delivery-driver-row--selected {
+  border-left: 3px solid var(--dt-accent);
+  background-color: rgba(79, 70, 229, 0.08);
+}
+.delivery-alert-strip {
+  animation: delivery-alert-in 0.3s ease;
+}
+@keyframes delivery-alert-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.delivery-status-dot {
+  animation: delivery-pulse 2s ease-in-out infinite;
+}
+.delivery-status-dot.delivery-status-dot--offline {
+  animation: none;
+}
+@keyframes delivery-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { opacity: 0.9; }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+.delivery-map-container {
+  transition: height 0.25s ease;
+}
+
+/* ── Placeholders professionnels ───────────────────────────────────── */
+.placeholder-empty {
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+/* ── Online presence badge ──────────────────────────────────────────── */
+.presence-badge-online {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+  animation: delivery-pulse 2s ease-in-out infinite;
+}
+.presence-badge-away {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+.presence-badge-offline {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b7280;
+}

@@ -1,119 +1,81 @@
-# GBA - Plateforme E-commerce
+# Next.js App with shadcn/ui
 
-🛍️ Application e-commerce complète avec Flutter (client mobile/web), React (dashboard admin) et Supabase (backend).
+Production-ready Next.js application with TypeScript, Tailwind CSS, and shadcn/ui components.
 
-## ✨ Fonctionnalités principales
+## Features
 
-### 📱 Application Client (Flutter)
-- 🎨 Interface moderne avec animations fluides
-- 🛒 Panier et favoris
-- 💬 Messagerie en temps réel avec l'admin
-- 🔐 Authentification sécurisée
-- 💰 Prix en FCFA
-- 🌍 Multi-langue (FR/EN)
-- 🌙 Mode sombre
-- 📦 Gestion des commandes
-- ⚡ Réactivité temps réel
+- ✅ **Next.js 14** (App Router)
+- ✅ **TypeScript** (strict mode)
+- ✅ **Tailwind CSS** with custom design tokens
+- ✅ **shadcn/ui** components (accessible, customizable)
+- ✅ **Dark Mode** with system preference detection
+- ✅ **Form Validation** (React Hook Form + Zod)
+- ✅ **Accessibility** (ARIA, keyboard navigation, focus states)
+- ✅ **Performance** optimized (code-splitting, lazy loading)
+- ✅ **Testing** setup (Vitest + Testing Library)
+- ✅ **Linting & Formatting** (ESLint + Prettier)
 
-### 👨‍💼 Dashboard Admin (React) 
-- 📊 Tableau de bord analytics
-- 👥 Gestion des utilisateurs
-- 🚫 Système de blocage/déblocage
-- 💬 Chat avec les clients
-- 📦 Gestion des produits
-- 📈 Statistiques de vente
-- 🔔 Notifications temps réel
-
-### 🔧 Backend (Supabase)
-- 🗄️ Base de données PostgreSQL
-- 🔐 Auth avec RLS (Row Level Security)
-- 📨 Realtime subscriptions
-- 🖼️ Storage pour les images
-- 🔄 Synchronisation temps réel
-
-## 🛠️ Technologies utilisées
-
-- **Frontend Client**: Flutter 3.x, Riverpod, Go Router
-- **Frontend Admin**: React 18, Vite, Material-UI
-- **Backend**: Supabase (PostgreSQL, Auth, Realtime, Storage)
-- **State Management**: Riverpod (Flutter), Context API (React)
-- **Styling**: Material Design 3, CSS Modules
-
-## 📦 Installation
-
-### Prérequis
-- Flutter SDK 3.x
-- Node.js 18+
-- Compte Supabase
-
-### Client Flutter
-```bash
-# Installer les dépendances
-flutter pub get
-
-# Lancer l'application
-flutter run -d chrome  # Pour le web
-flutter run           # Pour mobile
-```
-
-#### Paiement Stripe (mobile)
-
-Le paiement par carte via Stripe utilise `flutter_stripe` (PaymentSheet) et nécessite une clé publishable :
+## Getting Started
 
 ```bash
-flutter run --dart-define=STRIPE_PUBLISHABLE_KEY=pk_test_... --dart-define=SUPABASE_URL=https://xxxx.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJ...
-```
-
-- **Return URL** utilisée: `flutterstripe://redirect`
-- **Android**: l'application doit gérer le deep link `flutterstripe://redirect` (intent-filter déjà ajouté dans `AndroidManifest.xml`).
-- **Web**: PaymentSheet n'est pas supportée (Stripe web est expérimental) — utilisez Flutterwave ou paiement à la livraison.
-
-### Admin React
-```bash
-cd admin-react
+# Install dependencies
 npm install
+
+# Run development server
 npm run dev
-```
 
-### Configuration Supabase
-1. Créer un projet sur [Supabase](https://supabase.com)
-2. Copier les clés API dans les fichiers `.env`
-3. Exécuter les scripts SQL dans le dossier racine
-
-## 🔑 Variables d'environnement
-
-Créer un fichier `.env` dans `admin-react/`:
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
-```
-
-## 🚀 Déploiement
-
-### Flutter Web
-```bash
-flutter build web
-# Déployer le dossier build/web
-```
-
-### Admin React
-```bash
+# Build for production
 npm run build
-# Déployer le dossier dist
+
+# Run tests
+npm test
+
+# Type check
+npm run type-check
+
+# Format code
+npm run format
 ```
 
-## 📝 Licence
+## Project Structure
+
+```
+├── app/                    # Next.js App Router pages
+│   ├── layout.tsx         # Root layout with providers
+│   ├── page.tsx           # Home page
+│   └── globals.css        # Global styles & design tokens
+├── components/
+│   ├── ui/                # shadcn/ui components
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── dialog.tsx
+│   │   ├── form.tsx
+│   │   └── ...
+│   ├── navbar.tsx         # Navigation component
+│   └── ...
+├── lib/
+│   └── utils.ts           # Utility functions
+└── components/providers/
+    └── theme-provider.tsx # Theme provider
+```
+
+## Components
+
+All UI components are built with:
+- **Accessibility** (ARIA labels, keyboard navigation)
+- **TypeScript** (fully typed)
+- **Tailwind CSS** (customizable via CSS variables)
+- **Dark mode** support
+
+## Testing
+
+Tests are written with Vitest and React Testing Library:
+
+```bash
+npm test              # Run tests
+npm run test:ui       # Run tests with UI
+```
+
+## License
 
 MIT
-
-## 👥 Contributeurs
-
-- Faycal Habib Ahmat
-
-## 📞 Contact
-
-Pour toute question: faycalhabibahmat@gmail.com
-
----
-
-⭐ N'hésitez pas à mettre une étoile si ce projet vous a été utile!

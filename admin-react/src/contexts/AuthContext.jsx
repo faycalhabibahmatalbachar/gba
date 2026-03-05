@@ -4,7 +4,7 @@ import { supabase } from '../config/supabase';
 import { useSnackbar } from 'notistack';
 
 // Mode développement pour contourner les problèmes Supabase temporairement
-const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+const DEV_MODE = (import.meta.env.DEV && import.meta.env.VITE_DEV_MODE === 'true');
 const DEV_USERS = [
   { email: 'faycalhabibahmat@gmail.com', password: 'faycalhabibahmat@gmail.com', name: 'Faycal Admin' },
   { email: 'admin@test.com', password: 'admin123', name: 'Test Admin' }
@@ -98,31 +98,36 @@ export const AuthProvider = ({ children }) => {
         }
       } else {
         // Mode production - utiliser Supabase
-        let { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
-        // Si l'utilisateur n'existe pas, le créer automatiquement
-        if (error && error.message.includes('Invalid login credentials')) {
-          console.log('Utilisateur non trouvé, création automatique...');
-          const signUpResult = await signUp(email, password);
-          
-          if (signUpResult.error) {
-            throw signUpResult.error;
-          }
-          
-          // Réessayer la connexion après création
-          const signInResult = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-          
-          data = signInResult.data;
-          error = signInResult.error;
-        }
-
         if (error) throw error;
+
+        // Stamp role:admin dans user_metadata pour que is_admin() RLS retourne true
+        try {
+          await supabase.auth.updateUser({ data: { role: 'admin' } });
+          console.info('[Auth] user_metadata.role → admin OK');
+        } catch (e) { console.warn('[Auth] updateUser meta failed:', e.message); }
+
+        // Synchronise profiles.role = 'admin' en base
+        try {
+          await supabase.rpc('ensure_admin_profile');
+          console.info('[Auth] ensure_admin_profile() → OK');
+        } catch (e) { console.warn('[Auth] ensure_admin_profile failed:', e.message); }
+
+        // Garde-fou: refuser l'accès si l'utilisateur n'est pas admin
+        try {
+          const { data: { user: freshUser }, error: userErr } = await supabase.auth.getUser();
+          if (userErr) throw userErr;
+          const role = freshUser?.user_metadata?.role;
+          if (role !== 'admin') {
+            await supabase.auth.signOut();
+            throw new Error('Accès refusé: compte non admin');
+          }
+        } catch (e) {
+          throw e;
+        }
 
         enqueueSnackbar('Connexion réussie!', { variant: 'success' });
         navigate('/dashboard');

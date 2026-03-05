@@ -9,15 +9,28 @@ class LanguageProvider extends ChangeNotifier {
   
   Locale get locale => _locale;
 
+  /// Détect if current locale is RTL (e.g., Arabic)
+  bool get isRtl => _locale.languageCode == 'ar';
+
   LanguageProvider() {
     _load();
+  }
+
+  String _sanitizeLanguageCode(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return 'fr';
+
+    final normalized = trimmed.replaceAll('-', '_');
+    final base = normalized.split('_').first.toLowerCase();
+    if (base == 'fr' || base == 'en' || base == 'ar') return base;
+    return 'fr';
   }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getString(_prefsKey);
     if (stored != null && stored.isNotEmpty) {
-      _locale = Locale(stored, '');
+      _locale = Locale(_sanitizeLanguageCode(stored), '');
       notifyListeners();
     }
     await _syncToSupabase();
@@ -29,8 +42,9 @@ class LanguageProvider extends ChangeNotifier {
   }
   
   void setLocale(Locale locale) {
-    if (locale.languageCode == _locale.languageCode) return;
-    _locale = locale;
+    final next = Locale(_sanitizeLanguageCode(locale.languageCode), '');
+    if (next.languageCode == _locale.languageCode) return;
+    _locale = next;
     notifyListeners();
     _persist();
     _syncToSupabase();

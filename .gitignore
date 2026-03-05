@@ -1,88 +1,39 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-supabase/.temp/
-tools/supabase-cli/supabase.exe
+*.pem
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-devtools_options.yaml
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# Node.js / React Admin
-admin-react/node_modules/
-admin-react/.env.local
-admin-react/.env
-admin-react/dist/
-admin-react/build/
-admin-react/*.log
-admin-react/vite.config.js.timestamp-*
-
-# React Native Mobile
-gba-mobile/node_modules/
-gba-mobile/.expo/
-gba-mobile/.env
-gba-mobile/.env.local
-gba-mobile/android/.gradle/
-gba-mobile/android/.kotlin/
-gba-mobile/android/app/build/
-gba-mobile/android/build/
-gba-mobile/android/gradle/*.zip
-
-# Environment files
+# local env files
+.env*.local
 .env
-.env.local
-.env.supabasecli.bak
-.env.production
-.env.development
 
-# IDE
-.vscode/
-*.code-workspace
+# vercel
+.vercel
 
-# OS Files
-Thumbs.db
-desktop.ini
+# typescript
+*.tsbuildinfo
+next-env.d.ts
 
-# Gradle files
-*.zip
-gba-mobile/android/gradle/
-*.jar
+# vitest
+.vitest

@@ -1,11 +1,21 @@
+import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart';
-import '../localization/app_localizations.dart';
+
 import '../providers/auth_provider.dart';
+import '../localization/app_localizations.dart';
+import '../widgets/language_picker_button.dart';
+
+const _g1 = Color(0xFF667eea);
+const _g2 = Color(0xFF764ba2);
+const _g3 = Color(0xFFf093fb);
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -14,18 +24,31 @@ class RegisterScreen extends ConsumerStatefulWidget {
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
+  late final AnimationController _bgController;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptedLegal = false;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bgController = AnimationController(
+      duration: const Duration(seconds: 20),
+      vsync: this,
+    )..repeat();
+  }
 
   @override
   void dispose() {
+    _bgController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -33,7 +56,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
+  String _authErrorMessage(AppLocalizations l10n, String raw, String? code) {
+    if (code == 'email_address_invalid') return l10n.translate('auth_error_email_invalid');
+    if (code == 'unexpected_failure') return l10n.translate('auth_error_server_db');
+    if (raw.contains('Database error') || raw.contains('500')) return l10n.translate('auth_error_server_db');
+    return raw;
+  }
+
   Future<void> _register() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     final localizations = AppLocalizations.of(context);
@@ -45,432 +76,472 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-    final fullName = _nameController.text.trim();
+    setState(() => _isSubmitting = true);
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+      final fullName = _nameController.text.trim();
 
-    debugPrint('[Register] submit: email=$email, fullName=$fullName');
+      debugPrint('[Register] submit: email=$email, fullName=$fullName');
 
-    final locale = Localizations.localeOf(context).languageCode;
-    await ref.read(authProvider.notifier).signUp(email, password, fullName, locale: locale);
+      final locale = Localizations.localeOf(context).languageCode;
+      await ref.read(authProvider.notifier).signUp(email, password, fullName, locale: locale);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final authState = ref.read(authProvider);
-    if (authState.needsEmailConfirmation) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(localizations.translate('register_account_created_check_email'))),
-      );
-      context.go('/login');
-      return;
-    }
+      final authState = ref.read(authProvider);
+      if (authState.needsEmailConfirmation) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(localizations.translate('register_account_created_check_email'))),
+        );
+        context.go('/login');
+        return;
+      }
 
-    if (authState.user != null) {
-      context.go('/home');
+      if (authState.user != null) {
+        context.go('/home');
+      } else if (authState.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(authState.error!)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
     final localizations = AppLocalizations.of(context);
 
-    final authState = ref.watch(authProvider);
-    final theme = Theme.of(context);
-
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1976D2),
-              Color(0xFF2196F3),
-              Color(0xFF42A5F5),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
+      body: Stack(
+        children: [
+          _AuthBackground(animation: _bgController),
+          SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2196F3),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2196F3).withOpacity(0.3),
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                        ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 540),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      // Logo
+                      Image.asset(
+                        'assets/images/GBA_sans_arriere.png',
+                        width: 130,
+                        height: 130,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      )
+                          .animate()
+                          .fadeIn(duration: 500.ms)
+                          .scale(begin: const Offset(0.88, 0.88), end: const Offset(1, 1), duration: 600.ms, curve: Curves.easeOutCubic),
+                      const SizedBox(height: 18),
+                      Text(
+                        localizations.translate('create_account'),
+                        style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
+                      ).animate().fadeIn(delay: 200.ms).slideY(begin: -0.1, end: 0),
+                      const SizedBox(height: 4),
+                      Text(
+                        localizations.translate('register_subtitle_join_store'),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(fontSize: 13, color: Colors.white.withOpacity(0.72)),
+                      ).animate().fadeIn(delay: 280.ms),
+                      const SizedBox(height: 24),
+                      if (authState.error != null) ...[
+                        _ErrorBanner(
+                          message: _authErrorMessage(localizations, authState.error!, authState.errorCode),
+                          onClose: () => ref.read(authProvider.notifier).clearError(),
+                        ).animate().fadeIn(duration: 300.ms),
+                        const SizedBox(height: 12),
                       ],
-                    ),
-                    child: const Icon(
-                      Icons.person_add_alt_1_rounded,
-                      size: 50,
-                      color: Colors.white,
-                    ),
-                  ).animate().fadeIn(duration: 600.ms).scale(delay: 200.ms),
-                  const SizedBox(height: 24),
-                  Text(
-                    localizations.translate('create_account'),
-                    style: GoogleFonts.poppins(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF2196F3),
-                    ),
-                  ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2, end: 0),
-                  const SizedBox(height: 8),
-                  Text(
-                    localizations.translate('register_subtitle_join_store'),
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ).animate().fadeIn(delay: 400.ms),
-                  const SizedBox(height: 32),
-                  if (authState.error != null)
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.red.withOpacity(0.25)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error_outline, color: Colors.red),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              authState.error!,
-                              style: const TextStyle(color: Colors.red),
-                            ),
+                      _GlassCard(
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _PremiumField(
+                                controller: _nameController,
+                                label: localizations.translate('full_name'),
+                                icon: Icons.person_outline_rounded,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return localizations.translate('enter_your_name');
+                                  return null;
+                                },
+                                animDelay: 350.ms,
+                              ),
+                              const SizedBox(height: 14),
+                              _PremiumField(
+                                controller: _emailController,
+                                label: localizations.translate('email'),
+                                icon: Icons.email_outlined,
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return localizations.translate('enter_your_email');
+                                  if (!v.trim().contains('@')) return localizations.translate('invalid_email');
+                                  return null;
+                                },
+                                animDelay: 420.ms,
+                              ),
+                              const SizedBox(height: 14),
+                              _PremiumField(
+                                controller: _passwordController,
+                                label: localizations.translate('password'),
+                                icon: Icons.lock_outline_rounded,
+                                obscure: _obscurePassword,
+                                toggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return localizations.translate('enter_your_password');
+                                  if (v.length < 6) return localizations.translate('password_min_length_register');
+                                  return null;
+                                },
+                                animDelay: 490.ms,
+                              ),
+                              const SizedBox(height: 14),
+                              _PremiumField(
+                                controller: _confirmPasswordController,
+                                label: localizations.translate('confirm_password'),
+                                icon: Icons.lock_outline_rounded,
+                                obscure: _obscureConfirmPassword,
+                                toggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return localizations.translate('confirm_your_password');
+                                  if (v != _passwordController.text) return localizations.translate('passwords_do_not_match');
+                                  return null;
+                                },
+                                animDelay: 560.ms,
+                              ),
+                              const SizedBox(height: 16),
+                              _LegalCheckbox(
+                                value: _acceptedLegal,
+                                onChanged: authState.isLoading
+                                    ? null
+                                    : (v) => setState(() => _acceptedLegal = v ?? false),
+                                localizations: localizations,
+                                animDelay: 630.ms,
+                              ),
+                              const SizedBox(height: 8),
+                              _PremiumButton(
+                                label: localizations.translate('register'),
+                                isLoading: authState.isLoading,
+                                onPressed: _register,
+                                animDelay: 700.ms,
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            onPressed: () => ref.read(authProvider.notifier).clearError(),
-                            icon: const Icon(Icons.close, color: Colors.red),
+                        ),
+                      ).animate().fadeIn(delay: 320.ms).slideY(begin: 0.06, end: 0),
+                      const SizedBox(height: 18),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            localizations.translate('already_have_account'),
+                            style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                          ),
+                          GestureDetector(
+                            onTap: () => context.go('/login'),
+                            child: Text(
+                              localizations.translate('login'),
+                              style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Colors.white),
+                            ),
                           ),
                         ],
-                      ),
-                    ).animate().fadeIn(delay: 450.ms),
-                  if (authState.error != null) const SizedBox(height: 16),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: TextFormField(
-                            controller: _nameController,
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              labelText: localizations.translate('full_name'),
-                              prefixIcon: const Icon(
-                                Icons.person_outline,
-                                color: Color(0xFF2196F3),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return localizations.translate('enter_your_name');
-                              }
-                              return null;
-                            },
-                          ),
-                        ).animate().fadeIn(delay: 500.ms).slideX(begin: -0.2, end: 0),
-                        const SizedBox(height: 16),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              labelText: localizations.translate('email'),
-                              prefixIcon: const Icon(
-                                Icons.email_outlined,
-                                color: Color(0xFF2196F3),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return localizations.translate('enter_your_email');
-                              }
-                              if (!value.contains('@')) {
-                                return localizations.translate('invalid_email');
-                              }
-                              return null;
-                            },
-                          ),
-                        ).animate().fadeIn(delay: 600.ms).slideX(begin: 0.2, end: 0),
-                        const SizedBox(height: 16),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              labelText: localizations.translate('password'),
-                              prefixIcon: const Icon(
-                                Icons.lock_outline,
-                                color: Color(0xFF2196F3),
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_rounded
-                                      : Icons.visibility_off_rounded,
-                                  color: Colors.grey,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return localizations.translate('enter_your_password');
-                              }
-                              if (value.length < 6) {
-                                return localizations.translate('password_min_length_register');
-                              }
-                              return null;
-                            },
-                          ),
-                        ).animate().fadeIn(delay: 700.ms).slideX(begin: -0.2, end: 0),
-                        const SizedBox(height: 16),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: TextFormField(
-                            controller: _confirmPasswordController,
-                            obscureText: _obscureConfirmPassword,
-                            textInputAction: TextInputAction.done,
-                            decoration: InputDecoration(
-                              labelText: localizations.translate('confirm_password'),
-                              prefixIcon: const Icon(
-                                Icons.lock_outline,
-                                color: Color(0xFF2196F3),
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscureConfirmPassword
-                                      ? Icons.visibility_rounded
-                                      : Icons.visibility_off_rounded,
-                                  color: Colors.grey,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureConfirmPassword = !_obscureConfirmPassword;
-                                  });
-                                },
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return localizations.translate('confirm_your_password');
-                              }
-                              if (value != _passwordController.text) {
-                                return localizations.translate('passwords_do_not_match');
-                              }
-                              return null;
-                            },
-                            onFieldSubmitted: (_) {
-                              if (!authState.isLoading) {
-                                _register();
-                              }
-                            },
-                          ),
-                        ).animate().fadeIn(delay: 800.ms).slideX(begin: 0.2, end: 0),
-                        const SizedBox(height: 24),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Checkbox(
-                                  value: _acceptedLegal,
-                                  onChanged: authState.isLoading
-                                      ? null
-                                      : (v) {
-                                          setState(() => _acceptedLegal = v ?? false);
-                                        },
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 10),
-                                    child: Wrap(
-                                      children: [
-                                        Text(localizations.translate('accept_legal_prefix')),
-                                        GestureDetector(
-                                          onTap: () => context.push('/legal/terms'),
-                                          child: Text(
-                                            localizations.translate('terms_of_service'),
-                                            style: TextStyle(
-                                              color: theme.colorScheme.primary,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                        Text(localizations.translate('accept_legal_and')),
-                                        GestureDetector(
-                                          onTap: () => context.push('/legal/privacy'),
-                                          child: Text(
-                                            localizations.translate('privacy_policy'),
-                                            style: TextStyle(
-                                              color: theme.colorScheme.primary,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                        const Text('.'),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ).animate().fadeIn(delay: 850.ms),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: authState.isLoading ? null : _register,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 6,
-                            ),
-                            child: authState.isLoading
-                                ? const SizedBox(
-                                    height: 22,
-                                    width: 22,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : Text(
-                                    localizations.translate('register'),
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                          ),
-                        ).animate().fadeIn(delay: 900.ms).scale(begin: const Offset(0.98, 0.98)),
-                        const SizedBox(height: 18),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              localizations.translate('already_have_account'),
-                              style: TextStyle(color: Colors.grey[700]),
-                            ),
-                            TextButton(
-                              onPressed: () => context.go('/login'),
-                              child: Text(
-                                localizations.translate('login'),
-                                style: TextStyle(color: theme.colorScheme.primary),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                      ).animate().fadeIn(delay: 750.ms),
+                      const SizedBox(height: 24),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
+          // Language picker — top-right (keep last so it stays clickable over scroll)
+          Positioned(
+            top: 0,
+            right: 16,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: LanguagePickerButton(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Shared premium components ─────────────────────────────────────────────────
+
+class _GlassCard extends StatelessWidget {
+  const _GlassCard({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.93),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.6)),
+            boxShadow: [BoxShadow(color: _g2.withOpacity(0.12), blurRadius: 30, offset: const Offset(0, 12))],
+          ),
+          child: child,
         ),
       ),
     );
   }
+}
+
+class _PremiumField extends StatelessWidget {
+  const _PremiumField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.keyboardType = TextInputType.text,
+    this.obscure = false,
+    this.toggleObscure,
+    this.validator,
+    this.animDelay = Duration.zero,
+  });
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final TextInputType keyboardType;
+  final bool obscure;
+  final VoidCallback? toggleObscure;
+  final String? Function(String?)? validator;
+  final Duration animDelay;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: _g1, size: 20),
+        suffixIcon: toggleObscure != null
+            ? IconButton(
+                icon: Icon(obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                    color: Colors.grey.shade500, size: 20),
+                onPressed: toggleObscure)
+            : null,
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _g1, width: 1.8)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.red, width: 1.2)),
+        focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.red, width: 1.8)),
+        labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      validator: validator,
+    ).animate().fadeIn(delay: animDelay, duration: 350.ms).slideX(begin: -0.05, end: 0);
+  }
+}
+
+class _PremiumButton extends StatelessWidget {
+  const _PremiumButton({
+    required this.label,
+    required this.isLoading,
+    required this.onPressed,
+    this.animDelay = Duration.zero,
+  });
+  final String label;
+  final bool isLoading;
+  final VoidCallback onPressed;
+  final Duration animDelay;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 54,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: isLoading
+              ? const LinearGradient(colors: [Colors.grey, Colors.grey])
+              : const LinearGradient(colors: [_g1, _g2]),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: _g1.withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: ElevatedButton(
+          onPressed: isLoading ? null : onPressed,
+          style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+          child: isLoading
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : Text(label, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+        ),
+      ),
+    ).animate().fadeIn(delay: animDelay, duration: 350.ms);
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message, required this.onClose});
+  final String message;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.withOpacity(0.3))),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          GestureDetector(onTap: onClose, child: const Icon(Icons.close_rounded, color: Colors.red, size: 18)),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegalCheckbox extends StatelessWidget {
+  const _LegalCheckbox({
+    required this.value,
+    required this.onChanged,
+    required this.localizations,
+    this.animDelay = Duration.zero,
+  });
+  final bool value;
+  final ValueChanged<bool?>? onChanged;
+  final AppLocalizations localizations;
+  final Duration animDelay;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Checkbox(
+          value: value,
+          onChanged: onChanged,
+          activeColor: _g1,
+          checkColor: Colors.white,
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Wrap(
+              children: [
+                Text(
+                  localizations.translate('accept_legal_prefix'),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                ),
+                GestureDetector(
+                  onTap: () => context.push('/legal/terms'),
+                  child: Text(
+                    localizations.translate('terms_of_service'),
+                    style: TextStyle(
+                      color: _g1,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                Text(
+                  localizations.translate('accept_legal_and'),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                ),
+                GestureDetector(
+                  onTap: () => context.push('/legal/privacy'),
+                  child: Text(
+                    localizations.translate('privacy_policy'),
+                    style: TextStyle(
+                      color: _g1,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                Text(
+                  '.',
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ).animate().fadeIn(delay: animDelay, duration: 350.ms);
+  }
+}
+
+class _AuthBackground extends StatelessWidget {
+  const _AuthBackground({required this.animation});
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) => Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: const [_g1, _g2, _g3],
+            stops: const [0.0, 0.52, 1.0],
+            transform: GradientRotation(animation.value * 2 * math.pi),
+          ),
+        ),
+        child: CustomPaint(painter: _MeshPainter(animation.value), child: const SizedBox.expand()),
+      ),
+    );
+  }
+}
+
+class _MeshPainter extends CustomPainter {
+  const _MeshPainter(this.t);
+  final double t;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final a = t * 2 * math.pi;
+    void circle(Paint p, double x, double y, double r) =>
+        canvas.drawCircle(Offset(size.width * x, size.height * y), size.width * r, p);
+    circle(Paint()..color = Colors.white.withOpacity(0.10),
+        0.18 + 0.06 * math.sin(a * 0.9), 0.24 + 0.06 * math.cos(a * 1.1), 0.44 + 0.03 * math.sin(a * 1.2));
+    circle(Paint()..color = const Color(0xFFFFD54F).withOpacity(0.10),
+        0.88 + 0.05 * math.cos(a * 0.8), 0.22 + 0.06 * math.sin(a * 0.7), 0.34 + 0.03 * math.cos(a * 1.3));
+    circle(Paint()..color = const Color(0xFF69F0AE).withOpacity(0.08),
+        0.62 + 0.06 * math.sin(a * 0.8), 0.84 + 0.05 * math.cos(a * 1.0), 0.46 + 0.03 * math.sin(a * 1.1));
+  }
+  @override
+  bool shouldRepaint(_MeshPainter old) => old.t != t;
 }

@@ -1,14 +1,10 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../animations/app_animations.dart';
 import '../localization/app_localizations.dart';
-import '../widgets/app_animation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,8 +14,10 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _backgroundController;
+  String _displayedText = '';
+  int _charIndex = 0;
 
   @override
   void initState() {
@@ -28,13 +26,30 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 18),
       vsync: this,
     )..repeat();
-    // Navigate to home screen after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
+    // Start typewriter after logo fades in
+    Future.delayed(const Duration(milliseconds: 600), _startTypewriter);
+    // Navigate to home screen after 4.5 seconds (enough for typewriter)
+    Future.delayed(const Duration(milliseconds: 4500), () {
       if (mounted) {
-        final session = Supabase.instance.client.auth.currentSession;
-        context.go(session == null ? '/welcome' : '/home');
+        context.go('/home');
       }
-      });
+    });
+  }
+
+  void _startTypewriter() {
+    if (!mounted) return;
+    final localizations = AppLocalizations.of(context);
+    final fullText = localizations.translate('splash_welcome_full');
+    _typeNextChar(fullText);
+  }
+
+  void _typeNextChar(String fullText) {
+    if (!mounted || _charIndex >= fullText.length) return;
+    setState(() {
+      _charIndex++;
+      _displayedText = fullText.substring(0, _charIndex);
+    });
+    Future.delayed(const Duration(milliseconds: 55), () => _typeNextChar(fullText));
   }
 
   @override
@@ -45,7 +60,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -64,23 +78,13 @@ class _SplashScreenState extends State<SplashScreen>
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white.withOpacity(0.18)),
                     ),
-                    child: SizedBox(
-                      width: 110,
-                      height: 110,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const AppAnimation(
-                            id: AppAnimations.navActivePulse,
-                            width: 110,
-                            height: 110,
-                          ),
-                          Icon(
-                            Icons.shopping_bag_rounded,
-                            size: 46,
-                            color: Colors.white.withOpacity(0.95),
-                          ),
-                        ],
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/GBA_sans_arriere.png',
+                        width: 110,
+                        height: 110,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.medium,
                       ),
                     ),
                   )
@@ -92,20 +96,30 @@ class _SplashScreenState extends State<SplashScreen>
                         duration: 450.ms,
                       ),
                   const SizedBox(height: 18),
-                  Text(
-                    localizations.translate('appName'),
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 0.2,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      _displayedText.isEmpty
+                          ? ' '
+                          : _displayedText,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                        height: 1.3,
+                      ),
                     ),
-                  ).animate().fadeIn(delay: 120.ms, duration: 420.ms).slideY(begin: 0.15, end: 0),
+                  ),
                   const SizedBox(height: 22),
-                  const AppAnimation(
-                    id: AppAnimations.loadingSpinner,
-                    width: 64,
-                    height: 64,
-                  ).animate().fadeIn(delay: 220.ms, duration: 420.ms),
+                  const SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -158,18 +172,6 @@ class _SplashMeshPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final p1 = Paint()
-      ..color = Colors.white.withOpacity(0.14)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.08);
-
-    final p2 = Paint()
-      ..color = const Color(0xFFFFD54F).withOpacity(0.14)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.10);
-
-    final p3 = Paint()
-      ..color = const Color(0xFF69F0AE).withOpacity(0.10)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.shortestSide * 0.12);
-
     final a = t * 2 * math.pi;
 
     canvas.drawCircle(
@@ -178,7 +180,7 @@ class _SplashMeshPainter extends CustomPainter {
         size.height * (0.28 + 0.06 * math.cos(a)),
       ),
       size.width * (0.40 + 0.03 * math.sin(a * 1.2)),
-      p1,
+      Paint()..color = Colors.white.withOpacity(0.10),
     );
 
     canvas.drawCircle(
@@ -187,7 +189,7 @@ class _SplashMeshPainter extends CustomPainter {
         size.height * (0.22 + 0.06 * math.sin(a * 0.7)),
       ),
       size.width * (0.34 + 0.03 * math.cos(a * 1.3)),
-      p2,
+      Paint()..color = const Color(0xFFFFD54F).withOpacity(0.10),
     );
 
     canvas.drawCircle(
@@ -196,7 +198,7 @@ class _SplashMeshPainter extends CustomPainter {
         size.height * (0.82 + 0.05 * math.cos(a * 1.1)),
       ),
       size.width * (0.42 + 0.03 * math.sin(a * 1.1)),
-      p3,
+      Paint()..color = const Color(0xFF69F0AE).withOpacity(0.08),
     );
   }
 

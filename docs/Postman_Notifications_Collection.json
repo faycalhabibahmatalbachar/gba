@@ -1,0 +1,116 @@
+{
+  "info": {
+    "name": "GBA - Notifications Push FCM V1",
+    "description": "Tests des notifications push via Supabase Edge Function (FCM HTTP v1 API)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "SUPABASE_URL", "value": "https://uvlrgwdbjegoavjfdrzb.supabase.co" },
+    { "key": "SUPABASE_ANON_KEY", "value": "", "description": "Clé anon public du projet (Dashboard > API > anon public). Obligatoire pour les requêtes 2 à 5." },
+    { "key": "ACCESS_TOKEN", "value": "" },
+    { "key": "USER_ID", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth - Connexion",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "if (res.access_token) {",
+              "  pm.collectionVariables.set('ACCESS_TOKEN', res.access_token);",
+              "  pm.collectionVariables.set('USER_ID', res.user?.id || '');",
+              "  pm.test('Token reçu', () => pm.expect(res.access_token).to.be.a('string'));",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey", "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"freeanimations2@gmail.com\",\n  \"password\": \"freeanimations2@gmail.com\"\n}"
+        },
+        "url": "{{SUPABASE_URL}}/auth/v1/token?grant_type=password"
+      }
+    },
+    {
+      "name": "2. Tokens - Liste des appareils",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body = pm.response.json ? pm.response.json() : {};",
+              "if (pm.response.code === 401 || (body.message && body.message.includes('Invalid API key'))) {",
+              "  console.warn('Renseigner SUPABASE_ANON_KEY dans Variables (Dashboard > API > anon public)');",
+              "  pm.test('API key valide', () => { pm.expect(pm.response.code).to.not.equal(401); });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "apikey", "value": "{{SUPABASE_ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{SUPABASE_URL}}/rest/v1/device_tokens?select=id,user_id,token,platform,last_seen_at"
+      }
+    },
+    {
+      "name": "3. Notification - Envoyer test (mobile cible)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"__passthrough\",\n  \"user_ids\": [\"{{USER_ID}}\"],\n  \"title\": \"Test Postman\",\n  \"body\": \"Notification de test envoyée depuis Postman\",\n  \"data\": {\n    \"route\": \"/home\",\n    \"category\": \"test\"\n  }\n}"
+        },
+        "url": "{{SUPABASE_URL}}/functions/v1/send-push-notification"
+      }
+    },
+    {
+      "name": "4. Notification - Test commande",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"order_status_changed\",\n  \"record\": {\n    \"order_number\": \"TEST-001\",\n    \"status\": \"shipped\",\n    \"user_id\": \"{{USER_ID}}\"\n  }\n}"
+        },
+        "url": "{{SUPABASE_URL}}/functions/v1/send-push-notification"
+      }
+    },
+    {
+      "name": "5. Notification - Test message chat",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{SUPABASE_ANON_KEY}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"__passthrough\",\n  \"user_ids\": [\"{{USER_ID}}\"],\n  \"title\": \"Nouveau message\",\n  \"body\": \"Vous avez reçu un message du support\",\n  \"data\": {\n    \"route\": \"/messages\",\n    \"category\": \"chat\"\n  }\n}"
+        },
+        "url": "{{SUPABASE_URL}}/functions/v1/send-push-notification"
+      }
+    }
+  ]
+}

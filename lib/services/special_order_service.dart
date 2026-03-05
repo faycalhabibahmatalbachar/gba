@@ -1,9 +1,12 @@
 import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'cache_service.dart';
 
 class SpecialOrderService {
   final SupabaseClient _supabase;
+
+  final CacheService _cache = CacheService.instance;
 
   SpecialOrderService({SupabaseClient? supabase})
       : _supabase = supabase ?? Supabase.instance.client;
@@ -126,6 +129,40 @@ class SpecialOrderService {
     }
   }
 
+  String _specialOrdersCacheKey(String userId) => 'special_orders_$userId';
+
+  Future<List<Map<String, dynamic>>> getCachedUserSpecialOrders() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+    try {
+      final decoded = await _cache.get(
+        _specialOrdersCacheKey(userId),
+        CacheService.ttlSpecials,
+      );
+      if (decoded is! List) return [];
+      return decoded
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SpecialOrderService] cache read error: $e');
+      return [];
+    }
+  }
+
+  Future<void> _persistSpecialOrdersCache(
+      String userId, List<Map<String, dynamic>> orders) async {
+    try {
+      await _cache.set(
+        _specialOrdersCacheKey(userId),
+        orders,
+        CacheService.ttlSpecials,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SpecialOrderService] cache write error: $e');
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getUserSpecialOrders() async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return [];
@@ -135,7 +172,9 @@ class SpecialOrderService {
         .select()
         .eq('user_id', userId)
         .order('created_at', ascending: false);
-    return (response as List).cast<Map<String, dynamic>>();
+    final orders = (response as List).cast<Map<String, dynamic>>();
+    await _persistSpecialOrdersCache(userId, orders);
+    return orders;
   }
 
   Future<Map<String, dynamic>?> getSpecialOrderById(String specialOrderId) async {

@@ -11,6 +11,7 @@ import '../../models/product.dart';
 import '../../services/favorites_service.dart';
 import '../../services/review_service.dart';
 import '../../services/activity_tracking_service.dart';
+import '../../utils/auth_guard.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -135,6 +136,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   }
 
   Future<void> _toggleFavorite() async {
+    if (!requireAuth(context)) return;
     try {
       final localizations = AppLocalizations.of(context);
       final rawName = product?['name']?.toString() ?? '';
@@ -338,6 +340,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   }
 
   Future<void> _addToCart() async {
+    if (!requireAuth(context)) return;
     try {
       final localizations = AppLocalizations.of(context);
       if (product == null) {
@@ -587,7 +590,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         ),
                         const Spacer(),
                         TextButton.icon(
-                          onPressed: _openReviewComposer,
+                          onPressed: () {
+                            if (!requireAuth(context)) return;
+                            _openReviewComposer();
+                          },
                           icon: const Icon(Icons.rate_review_outlined, size: 18),
                           label: Text(
                             _myReview == null
@@ -618,24 +624,24 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: (product!['stock_quantity'] ?? 0) > 0
+                            color: (product!['quantity'] ?? 0) > 0
                                 ? Colors.green.shade50
                                 : Colors.red.shade50,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            (product!['stock_quantity'] ?? 0) > 0
+                            (product!['quantity'] ?? 0) > 0
                                 ? localizations.translateParams(
                                     'in_stock_with_count',
                                     {
                                       'count':
-                                          ((product!['stock_quantity'] as num?)?.toInt() ?? 0)
+                                          ((product!['quantity'] as num?)?.toInt() ?? 0)
                                               .toString(),
                                     },
                                   )
                                 : localizations.translate('out_of_stock'),
                             style: TextStyle(
-                              color: (product!['stock_quantity'] ?? 0) > 0
+                              color: (product!['quantity'] ?? 0) > 0
                                   ? Colors.green.shade700
                                   : Colors.red.shade700,
                               fontSize: 12,
@@ -778,7 +784,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.add),
-                                onPressed: quantity < (product!['stock_quantity'] ?? 1)
+                                onPressed: quantity < (product!['quantity'] ?? 1)
                                     ? () => setState(() => quantity++)
                                     : null,
                               ),
@@ -883,7 +889,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         ),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: (product!['stock_quantity'] ?? 0) > 0 ? _addToCart : null,
+            onPressed: (product!['quantity'] ?? 0) > 0 ? _addToCart : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -897,7 +903,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 const Icon(Icons.shopping_cart, color: Colors.white),
                 const SizedBox(width: 8),
                 Text(
-                  (product!['stock_quantity'] ?? 0) > 0
+                  (product!['quantity'] ?? 0) > 0
                       ? localizations.translate('addToCart')
                       : localizations.translate('out_of_stock'),
                   style: const TextStyle(

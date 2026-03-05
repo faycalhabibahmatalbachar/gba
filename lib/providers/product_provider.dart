@@ -76,7 +76,8 @@ class ProductProvider extends ChangeNotifier {
     final now = DateTime.now();
     if (!force && _products.isNotEmpty && _lastLoadedAt != null) {
       final age = now.difference(_lastLoadedAt!);
-      if (age < const Duration(seconds: 30)) {
+      // Skip full reload — delta-sync will handle changes after 5 min
+      if (age < const Duration(minutes: 5)) {
         return;
       }
     }

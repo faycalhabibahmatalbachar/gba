@@ -1,8 +1,9 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/supabase_service.dart';
 import '../routes/navigation_keys.dart';
@@ -48,6 +49,9 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
+  static const _kRememberMe = 'auth_remember_me';
+  static const _kSavedEmail = 'auth_saved_email';
+
   AuthNotifier() : super(AuthState()) {
     _init();
   }
@@ -67,11 +71,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         .toLowerCase();
   }
 
-  String _normalizePhone(String phone) {
-    final trimmed = phone.trim();
-    final digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
-    return digits.isEmpty ? '' : '+$digits';
-  }
 
   Map<String, String?> _splitFullName(String fullName) {
     final normalized = fullName.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -158,9 +157,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> signIn(String email, String password) async {
+  Future<void> signIn(String email, String password, {bool rememberMe = true}) async {
     final normalizedEmail = _normalizeEmail(email);
-    _log('signIn start: email=$normalizedEmail');
+    _log('signIn start: email=$normalizedEmail, rememberMe=$rememberMe');
     state = state.copyWith(isLoading: true, error: null, errorCode: null);
     try {
       final response = await Supabase.instance.client.auth.signInWithPassword(
@@ -172,6 +171,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         _log('signIn success: userId=${response.user!.id}, hasSession=${response.session != null}');
         state = state.copyWith(user: response.user, isLoading: false);
         await _loadProfile();
+        
+        // Handle remember me preference
+        await setRememberMe(rememberMe);
+        if (rememberMe) {
+          await _saveEmail(normalizedEmail);
+        } else {
+          await _clearSavedEmail();
+        }
       } else {
         _log('signIn finished but user is null');
         state = state.copyWith(isLoading: false, error: 'Connexion échouée.');
@@ -265,48 +272,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> requestPhoneOtp({
-    required String phone,
-    String? fullName,
-    String? locale,
-    bool shouldCreateUser = true,
-  }) async {
-    final normalizedPhone = _normalizePhone(phone);
-    _log('requestPhoneOtp start: phone=$normalizedPhone, shouldCreateUser=$shouldCreateUser');
 
-    if (normalizedPhone.isEmpty) {
-      state = state.copyWith(isLoading: false, error: 'Numéro de téléphone invalide.');
-      return;
-    }
-
-    state = state.copyWith(isLoading: true, error: null, errorCode: null);
-    try {
-      await Supabase.instance.client.auth.signInWithOtp(
-        phone: normalizedPhone,
-        shouldCreateUser: shouldCreateUser,
-        data: {
-          if (fullName != null && fullName.trim().isNotEmpty) 'full_name': fullName.trim(),
-          if (locale != null && locale.trim().isNotEmpty) 'locale': locale.trim(),
-        },
-      );
-      state = state.copyWith(isLoading: false);
-      _log('requestPhoneOtp success');
-    } catch (e) {
-      _log('requestPhoneOtp error: $e');
-      String message = e.toString();
-      if (e is AuthApiException) {
-        message = e.message;
-      }
-      state = state.copyWith(isLoading: false, error: message);
-    }
-  }
-
-  Future<void> verifyPhoneOtp({required String phone, required String token}) async {
-    final normalizedPhone = _normalizePhone(phone);
+  Future<void> verifyOtp(String email, String token, OtpType otpType) async {
+    final normalizedEmail = _normalizeEmail(email);
     final normalizedToken = token.trim();
-    _log('verifyPhoneOtp start: phone=$normalizedPhone');
+    _log('verifyOtp start: email=$normalizedEmail, type=$otpType');
 
-    if (normalizedPhone.isEmpty || normalizedToken.isEmpty) {
+    if (normalizedEmail.isEmpty || normalizedToken.isEmpty) {
       state = state.copyWith(isLoading: false, error: 'Code OTP invalide.');
       return;
     }
@@ -314,8 +286,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null, errorCode: null);
     try {
       final response = await Supabase.instance.client.auth.verifyOTP(
-        type: OtpType.sms,
-        phone: normalizedPhone,
+        type: otpType,
+        email: normalizedEmail,
         token: normalizedToken,
       );
 
@@ -326,9 +298,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       state = state.copyWith(user: response.user, isLoading: false);
       await _loadProfile();
-      _log('verifyPhoneOtp success: userId=${response.user!.id}');
+      _log('verifyOtp success: userId=${response.user!.id}');
     } catch (e) {
-      _log('verifyPhoneOtp error: $e');
+      _log('verifyOtp error: $e');
       String message = e.toString();
       if (e is AuthApiException) {
         message = e.message;
@@ -341,8 +313,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _log('signOut start');
     state = state.copyWith(isLoading: true);
     try {
+      final userId = state.user?.id;
       await Supabase.instance.client.auth.signOut();
       _log('signOut success');
+      
+      // Clear saved email if remember me is off
+      final prefs = await SharedPreferences.getInstance();
+      final remember = prefs.getBool(_kRememberMe) ?? true;
+      if (!remember) {
+        await _clearSavedEmail();
+      }
+      
       state = AuthState();
     } catch (e) {
       _log('signOut error: $e');
@@ -354,18 +335,56 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(error: null, errorCode: null);
   }
 
-  Future<void> resendEmailConfirmation(String email) async {
+  Future<void> resendEmailConfirmation(String email, [OtpType? otpType]) async {
     final normalizedEmail = _normalizeEmail(email);
-    _log('resendEmailConfirmation start: email=$normalizedEmail');
+    final type = otpType ?? OtpType.signup;
+    _log('resendEmailConfirmation start: email=$normalizedEmail, type=$type');
     try {
       await Supabase.instance.client.auth.resend(
-        type: OtpType.signup,
+        type: type,
         email: normalizedEmail,
       );
       _log('resendEmailConfirmation success');
     } catch (e) {
       _log('resendEmailConfirmation error: $e');
       rethrow;
+    }
+  }
+
+  // Remember me methods
+  Future<bool> getRememberMe() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_kRememberMe) ?? true;
+  }
+
+  Future<void> setRememberMe(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kRememberMe, value);
+    _log('setRememberMe: $value');
+  }
+
+  Future<String?> getSavedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kSavedEmail);
+  }
+
+  Future<void> _saveEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kSavedEmail, email);
+    _log('_saveEmail: $email');
+  }
+
+  Future<void> _clearSavedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kSavedEmail);
+    _log('_clearSavedEmail');
+  }
+
+  Future<void> enforceRememberMePolicy() async {
+    final remember = await getRememberMe();
+    if (!remember && state.user != null) {
+      _log('enforceRememberMePolicy: remember me is off, signing out');
+      await signOut();
     }
   }
 }

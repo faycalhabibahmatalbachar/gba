@@ -422,7 +422,7 @@ const RealTimeMonitoring = ({ type }) => {
         <div className="col-md-3">
           <div className="stat-box">
             <FaDollarSign size={24} className="text-success mb-2" />
-            <h3>{stats.totalValue}€</h3>
+            <h3>{stats.totalValue} FCFA</h3>
             <p>Valeur Totale</p>
           </div>
         </div>
@@ -436,7 +436,7 @@ const RealTimeMonitoring = ({ type }) => {
         <div className="col-md-3">
           <div className="stat-box">
             <FaChartLine size={24} className="text-warning mb-2" />
-            <h3>{stats.averageCartValue}€</h3>
+            <h3>{stats.averageCartValue} FCFA</h3>
             <p>Panier Moyen</p>
           </div>
         </div>
@@ -461,7 +461,7 @@ const RealTimeMonitoring = ({ type }) => {
                   <td>{item.profiles?.email}</td>
                   <td>{item.products?.name}</td>
                   <td>{item.quantity}</td>
-                  <td>{(item.quantity * item.products?.price).toFixed(2)}€</td>
+                  <td>{(item.quantity * item.products?.price).toFixed(2)} FCFA</td>
                   <td>{format(new Date(item.created_at), 'dd/MM HH:mm')}</td>
                 </tr>
               ))}
@@ -485,14 +485,14 @@ const RealTimeMonitoring = ({ type }) => {
         <div className="col-md-3">
           <div className="stat-box">
             <FaDollarSign size={24} className="text-primary mb-2" />
-            <h3>{stats.todayRevenue}€</h3>
+            <h3>{stats.todayRevenue} FCFA</h3>
             <p>Revenus Aujourd'hui</p>
           </div>
         </div>
         <div className="col-md-3">
           <div className="stat-box">
             <FaChartLine size={24} className="text-info mb-2" />
-            <h3>{stats.averageOrderValue}€</h3>
+            <h3>{stats.averageOrderValue} FCFA</h3>
             <p>Commande Moyenne</p>
           </div>
         </div>
@@ -523,7 +523,7 @@ const RealTimeMonitoring = ({ type }) => {
                 <tr key={order.id}>
                   <td>{order.id.slice(0, 8)}</td>
                   <td>{order.profiles?.first_name} {order.profiles?.last_name}</td>
-                  <td>{order.total_amount}€</td>
+                  <td>{order.total_amount} FCFA</td>
                   <td>
                     <span className={`badge bg-${order.status === 'completed' ? 'success' : 'warning'}`}>
                       {order.status}

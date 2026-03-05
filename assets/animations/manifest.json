@@ -20,6 +20,12 @@
       "loop": true,
       "autoplay": true
     },
+    "addToFavorites": {
+      "format": "lottie",
+      "path": "lottie/Add to favorites.json",
+      "loop": true,
+      "autoplay": true
+    },
     "emptyCart": {
       "format": "lottie",
       "path": "lottie/cart/empty_cart_v1.json",

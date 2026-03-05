@@ -50,7 +50,6 @@ export default function ProductForm({ open, onClose, product, categories, onSave
     main_image: '',
     specifications: {},
     tags: [],
-    barcode: '',
     is_featured: false,
     is_active: true,
     meta_title: '',
@@ -98,7 +97,6 @@ export default function ProductForm({ open, onClose, product, categories, onSave
       main_image: '',
       specifications: {},
       tags: [],
-      barcode: '',
       is_featured: false,
       is_active: true,
       meta_title: '',
@@ -320,9 +318,10 @@ export default function ProductForm({ open, onClose, product, categories, onSave
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Code-barres"
-                value={formData.barcode}
-                onChange={(e) => handleChange('barcode', e.target.value)}
+                label="Modèle"
+                value={formData.model}
+                onChange={(e) => handleChange('model', e.target.value)}
+                placeholder="Ex: A2889"
               />
             </Grid>
             <Grid item xs={12}>

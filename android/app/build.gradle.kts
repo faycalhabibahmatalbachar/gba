@@ -32,6 +32,21 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "app"
+
+    productFlavors {
+        create("client") {
+            dimension = "app"
+            resValue("string", "app_name", "GBA Store")
+        }
+
+        create("driver") {
+            dimension = "app"
+            applicationIdSuffix = ".driver"
+            resValue("string", "app_name", "GBA Livreur")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
@@ -44,6 +59,11 @@ android {
 				"proguard-rules.pro",
 			)
         }
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 

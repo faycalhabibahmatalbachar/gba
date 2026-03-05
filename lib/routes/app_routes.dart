@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/animated_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,10 +6,6 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/reset_password_screen.dart';
 import '../screens/auth/change_password_screen.dart';
-import '../screens/auth/welcome_screen.dart';
-import '../screens/auth/auth_method_selection_screen.dart';
-import '../screens/auth/phone_auth_screen.dart';
-import '../screens/auth/otp_verification_screen.dart';
 import '../screens/splash_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/home_screen_premium.dart';
@@ -24,7 +20,7 @@ import '../screens/profile_screen_ultra.dart';
 import '../screens/settings_screen_premium.dart';
 import '../screens/promotions_screen_premium.dart';
 import '../screens/chat/chat_screen.dart';
-import '../screens/chat/conversations_list_screen.dart';
+import '../screens/contact_screen.dart';
 import '../screens/chat/admin_chat_screen.dart';
 import '../screens/checkout/checkout_cancel_screen.dart';
 import '../screens/checkout/checkout_success_screen.dart';
@@ -122,21 +118,30 @@ class AppRoutes {
       final supabase = Supabase.instance.client;
       final session = supabase.auth.currentSession;
       final isLoggedIn = session != null;
-      final isSplashRoute = state.matchedLocation == '/splash';
-      final isResetPasswordRoute = state.matchedLocation == '/reset-password';
-      final isAuthRoute = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/splash' ||
-          state.matchedLocation == '/welcome' ||
-          state.matchedLocation == '/auth-method' ||
-          state.matchedLocation == '/phone-auth' ||
-          state.matchedLocation == '/otp' ||
-          state.matchedLocation == '/register' ||
-          state.matchedLocation == '/forgot-password' ||
-          state.matchedLocation == '/reset-password' ||
-          state.matchedLocation == '/legal/terms' ||
-          state.matchedLocation == '/legal/privacy';
-      final isOnboardingRoute = state.matchedLocation == '/onboarding';
-      final isBlockedRoute = state.matchedLocation == '/blocked';
+      final loc = state.matchedLocation;
+      final isSplashRoute = loc == '/splash';
+      final isResetPasswordRoute = loc == '/reset-password';
+      final isAuthRoute = loc == '/login' ||
+          loc == '/splash' ||
+          loc == '/register' ||
+          loc == '/forgot-password' ||
+          loc == '/reset-password' ||
+          loc == '/otp-verification' ||
+          loc == '/legal/terms' ||
+          loc == '/legal/privacy';
+      final isOnboardingRoute = loc == '/onboarding';
+      final isBlockedRoute = loc == '/blocked';
+
+      // Routes accessible without authentication (guest browsing)
+      final isPublicRoute = isAuthRoute ||
+          loc == '/home' ||
+          loc == '/categories' ||
+          loc == '/promotions' ||
+          loc == '/contact' ||
+          loc.startsWith('/product/') ||
+          loc.startsWith('/legal/') ||
+          isSplashRoute ||
+          isBlockedRoute;
 
       if (isSplashRoute) {
         return null;
@@ -162,9 +167,9 @@ class AppRoutes {
         }
       }
       
-      // If not logged in and trying to access protected routes
-      if (!isLoggedIn && !isAuthRoute && !isBlockedRoute) {
-        return '/welcome';
+      // If not logged in and trying to access protected routes → redirect to home
+      if (!isLoggedIn && !isPublicRoute) {
+        return '/home';
       }
 
       // If logged in but onboarding not completed, force onboarding
@@ -204,63 +209,7 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/',
-        redirect: (context, state) {
-          final session = Supabase.instance.client.auth.currentSession;
-          return session == null ? '/welcome' : '/home';
-        },
-      ),
-      GoRoute(
-        path: '/welcome',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          child: const WelcomeScreen(),
-          transitionDuration: const Duration(milliseconds: 500),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 1.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-              )),
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
-                ),
-                child: child,
-              ),
-            );
-          },
-        ),
-      ),
-      GoRoute(
-        path: '/auth-method',
-        builder: (context, state) {
-          final mode = state.uri.queryParameters['mode']?.trim().toLowerCase();
-          final effectiveMode = (mode == 'register' || mode == 'login') ? mode! : 'login';
-          return AuthMethodSelectionScreen(mode: effectiveMode);
-        },
-      ),
-      GoRoute(
-        path: '/phone-auth',
-        builder: (context, state) {
-          final mode = state.uri.queryParameters['mode']?.trim().toLowerCase();
-          final effectiveMode = (mode == 'register' || mode == 'login') ? mode! : 'login';
-          return PhoneAuthScreen(mode: effectiveMode);
-        },
-      ),
-      GoRoute(
-        path: '/otp',
-        builder: (context, state) {
-          final phone = state.uri.queryParameters['phone'] ?? '';
-          final mode = state.uri.queryParameters['mode']?.trim().toLowerCase();
-          final effectiveMode = (mode == 'register' || mode == 'login') ? mode! : 'login';
-          if (phone.trim().isEmpty) {
-            return const PhoneAuthScreen(mode: 'login');
-          }
-          return OtpVerificationScreen(phone: phone, mode: effectiveMode);
-        },
+        redirect: (context, state) => '/home',
       ),
       GoRoute(
         path: '/login',
@@ -573,31 +522,6 @@ class AppRoutes {
         ),
       ),
       GoRoute(
-        path: '/messages',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          child: const ConversationsListScreen(),
-          transitionDuration: const Duration(milliseconds: 600),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, -1.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutQuart,
-              )),
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: const Interval(0.3, 1.0),
-                ),
-                child: child,
-              ),
-            );
-          },
-        ),
-      ),
-      GoRoute(
         path: '/chat/:conversationId',
         pageBuilder: (context, state) {
           final conversationId = state.pathParameters['conversationId'];
@@ -674,6 +598,10 @@ class AppRoutes {
             );
           },
         ),
+      ),
+      GoRoute(
+        path: '/contact',
+        builder: (context, state) => const ContactScreen(),
       ),
       GoRoute(
         path: '/blocked',

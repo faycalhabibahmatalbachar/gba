@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.flutterwave-webhook]
 verify_jwt = false
 
+[functions.send-push-notification]
+verify_jwt = false
+
 [auth.email.template.confirmation]
 subject = "Confirm your signup"
 content_path = "./supabase/templates/confirmation.html"
