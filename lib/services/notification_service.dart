@@ -173,6 +173,7 @@ class NotificationService {
     '/favorites',
     '/orders',
     '/chat',
+    '/messages',
     '/promotions',
     '/product/',
     '/settings',

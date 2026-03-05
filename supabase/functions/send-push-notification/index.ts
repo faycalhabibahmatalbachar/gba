@@ -44,6 +44,8 @@ const t: Record<string, Record<Lang, string>> = {
   driver_new_order_body:    { fr: 'Commande #{num} vous a été assignée', en: 'Order #{num} has been assigned to you', ar: 'تم تعيين الطلب #{num} لك' },
   banner_title:             { fr: 'Nouvelle promotion !',               en: 'New promotion!',                   ar: 'عرض جديد!' },
   banner_body:              { fr: 'Découvrez notre nouvelle offre',     en: 'Check out our new offer',          ar: 'اكتشف عرضنا الجديد' },
+  special_order_title:      { fr: 'Mise à jour commande spéciale',      en: 'Special order update',             ar: 'تحديث الطلب الخاص' },
+  special_order_body:       { fr: 'Votre commande spéciale #{num} est {status}', en: 'Your special order #{num} is {status}', ar: 'طلبك الخاص #{num} أصبح {status}' },
   fallback_title:           { fr: 'Notification',                       en: 'Notification',                     ar: 'إشعار' },
   client:                   { fr: 'Client',                             en: 'Customer',                         ar: 'عميل' },
 };
@@ -133,18 +135,12 @@ async function sendFcmV1(
       notification: { title, body },
       data,
       android: {
-        // FCM v1: MessagePriority enum must be uppercase 'NORMAL' or 'HIGH'
         priority: 'HIGH' as const,
         ttl: '86400s',
         notification: {
           sound: 'default',
           click_action: 'FLUTTER_NOTIFICATION_CLICK',
           channel_id: 'high_importance_channel',
-          // FCM v1: NotificationPriority enum (NOT the same as MessagePriority)
-          // Valid values: PRIORITY_UNSPECIFIED, PRIORITY_MIN, PRIORITY_LOW,
-          //               PRIORITY_DEFAULT, PRIORITY_HIGH, PRIORITY_MAX
-          // NOTE: 'priority' is NOT a valid field here — it caused INVALID_ARGUMENT errors
-          notification_priority: 'PRIORITY_HIGH' as const,
         },
       },
       apns: {
@@ -655,6 +651,16 @@ Deno.serve(async (req) => {
         });
       }
 
+      case 'special_order_status_changed': {
+        templateKey = 'special_order';
+        const statusKey = `status_${record?.status}`;
+        templateParams = { num: record?.id?.toString()?.substring(0, 8) ?? '' };
+        data = { route: '/orders', category: 'order', template: 'special_order_update', status: record?.status ?? '' };
+        if (record?.user_id) targetUserIds = [record.user_id];
+        console.log(`[PUSH] special_order_status_changed → user=${record?.user_id} status=${record?.status}`);
+        break;
+      }
+
       case 'banner_created': {
         templateKey = 'banner';
         data = { route: '/home', category: 'promo', template: 'new_banner' };
@@ -783,6 +789,14 @@ Deno.serve(async (req) => {
         case 'driver_assigned':
           title = tr('driver_assigned_title', lang);
           body = tr('driver_assigned_body', lang, { num: p.num });
+          break;
+        case 'special_order':
+          title = tr('special_order_title', lang);
+          {
+            const soStatusKey = `status_${record?.status}`;
+            const soStatusLabel = t[soStatusKey]?.[lang] ?? record?.status ?? '';
+            body = tr('special_order_body', lang, { num: p.num, status: soStatusLabel });
+          }
           break;
         case 'banner':
           title = tr('banner_title', lang);
