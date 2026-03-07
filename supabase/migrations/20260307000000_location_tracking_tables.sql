@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS public.user_locations (
   altitude DOUBLE PRECISION,
   speed DOUBLE PRECISION,
   heading DOUBLE PRECISION,
-  recorded_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Table: user_current_location (real-time current position)
@@ -24,13 +24,14 @@ CREATE TABLE IF NOT EXISTS public.user_current_location (
   accuracy DOUBLE PRECISION,
   speed DOUBLE PRECISION,
   heading DOUBLE PRECISION,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_user_locations_user_id ON public.user_locations(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_locations_recorded_at ON public.user_locations(recorded_at DESC);
-CREATE INDEX IF NOT EXISTS idx_user_locations_user_time ON public.user_locations(user_id, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_locations_created_at ON public.user_locations(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_locations_user_time ON public.user_locations(user_id, created_at DESC);
 
 -- Enable Row Level Security
 ALTER TABLE public.user_locations ENABLE ROW LEVEL SECURITY;
@@ -133,7 +134,6 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  -- Use created_at column which always exists
   DELETE FROM public.user_locations
   WHERE created_at < NOW() - INTERVAL '30 days';
 END;

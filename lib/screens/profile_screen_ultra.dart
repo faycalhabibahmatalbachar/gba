@@ -872,18 +872,27 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF667eea).withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          FontAwesomeIcons.userLock,
-                          color: Color(0xFF667eea),
-                          size: 36,
-                        ),
+                      Lottie.asset(
+                        'assets/animations/lottie/login.json',
+                        width: 200,
+                        height: 200,
+                        fit: BoxFit.contain,
+                        repeat: true,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF667eea).withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              FontAwesomeIcons.userLock,
+                              color: Color(0xFF667eea),
+                              size: 36,
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                       Text(
@@ -906,19 +915,6 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                       Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => context.go('/home'),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(localizations.translate('cancel')),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
                             child: ElevatedButton(
                               onPressed: () => context.go('/login'),
                               style: ElevatedButton.styleFrom(
@@ -932,12 +928,20 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                               child: Text(localizations.translate('login')),
                             ),
                           ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => context.go('/register'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(localizations.translate('register')),
+                            ),
+                          ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () => context.go('/register'),
-                        child: Text(localizations.translate('register')),
                       ),
                     ],
                   ),

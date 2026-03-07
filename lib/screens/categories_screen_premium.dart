@@ -23,8 +23,6 @@ class CategoriesScreenPremium extends StatefulWidget {
 class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  Map<String, int> _productCounts = {};
-  bool _countsLoaded = false;
 
   @override
   void initState() {
@@ -32,32 +30,12 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
     });
-    _loadProductCounts();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadProductCounts() async {
-    try {
-      final response = await Supabase.instance.client
-          .from('products')
-          .select('category_id');
-      final rows = response as List;
-      final counts = <String, int>{};
-      for (final row in rows) {
-        final catId = row['category_id']?.toString();
-        if (catId != null) {
-          counts[catId] = (counts[catId] ?? 0) + 1;
-        }
-      }
-      if (mounted) setState(() { _productCounts = counts; _countsLoaded = true; });
-    } catch (_) {
-      if (mounted) setState(() => _countsLoaded = true);
-    }
   }
 
   String _fixImageUrl(String url) {
@@ -154,7 +132,6 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
                   color: _kAccent,
                   onRefresh: () async {
                     await prov.loadCategories(force: true);
-                    _loadProductCounts();
                   },
                   child: categories.isEmpty
                       ? ListView(
@@ -179,7 +156,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
                                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                                 sliver: SliverGrid(
                                   delegate: SliverChildBuilderDelegate(
-                                    (ctx, i) => _buildCategoryCard(filtered[i], i, l, isDark),
+                                    (ctx, i) => _buildCategoryCard(filtered[i], i, l, isDark, prov),
                                     childCount: filtered.length,
                                   ),
                                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -228,11 +205,10 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
     ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1, end: 0, curve: Curves.easeOut);
   }
 
-  Widget _buildCategoryCard(dynamic category, int index, AppLocalizations l, bool isDark) {
+  Widget _buildCategoryCard(dynamic category, int index, AppLocalizations l, bool isDark, CategoriesProvider prov) {
     final name = (category['name'] ?? l.translate('category')).toString();
     final imageUrl = category['image_url']?.toString();
     final catId = category['id']?.toString() ?? '';
-    final count = _productCounts[catId] ?? 0;
     final gradient = _cardGradients[index % _cardGradients.length];
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
@@ -362,33 +338,6 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: _countsLoaded
-                          ? Text(
-                              l.translateParams('products_count', {'count': count.toString()}),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            )
-                          : SizedBox(
-                              width: 40,
-                              height: 12,
-                              child: LinearProgressIndicator(
-                                minHeight: 2,
-                                color: Colors.white54,
-                                backgroundColor: Colors.white24,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
                     ),
                   ],
                 ),
