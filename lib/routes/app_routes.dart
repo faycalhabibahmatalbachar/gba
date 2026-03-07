@@ -8,6 +8,7 @@ import '../screens/auth/reset_password_screen.dart';
 import '../screens/auth/change_password_screen.dart';
 import '../screens/splash_screen.dart';
 import '../screens/register_screen.dart';
+import '../screens/main_navigation_screen.dart';
 import '../screens/home_screen_premium.dart';
 import '../screens/product/product_detail_screen.dart';
 import '../screens/product/product_search_screen.dart';
@@ -237,23 +238,15 @@ class AppRoutes {
       GoRoute(
         path: '/home',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const HomeScreenPremium(),
+          child: const MainNavigationScreen(initialIndex: 0),
+          transitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: CurvedAnimation(
                 parent: animation,
-                curve: Curves.easeInOutCubic,
+                curve: Curves.easeInOut,
               ),
-              child: ScaleTransition(
-                scale: Tween<double>(
-                  begin: 0.95,
-                  end: 1.0,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutBack,
-                )),
-                child: child,
-              ),
+              child: child,
             );
           },
         ),
@@ -412,24 +405,15 @@ class AppRoutes {
       GoRoute(
         path: '/categories',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const CategoriesScreenPremium(),
-          transitionDuration: const Duration(milliseconds: 600),
+          child: const MainNavigationScreen(initialIndex: 1),
+          transitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
+            return FadeTransition(
+              opacity: CurvedAnimation(
                 parent: animation,
-                curve: Curves.easeOutQuart,
-              )),
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: const Interval(0.0, 0.5),
-                ),
-                child: child,
+                curve: Curves.easeInOut,
               ),
+              child: child,
             );
           },
         ),
@@ -437,24 +421,15 @@ class AppRoutes {
       GoRoute(
         path: '/cart',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const CartScreenPremium(),
-          transitionDuration: const Duration(milliseconds: 500),
+          child: const MainNavigationScreen(initialIndex: 2),
+          transitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 1.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
+            return FadeTransition(
+              opacity: CurvedAnimation(
                 parent: animation,
-                curve: Curves.easeOutCubic,
-              )),
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeIn,
-                ),
-                child: child,
+                curve: Curves.easeInOut,
               ),
+              child: child,
             );
           },
         ),
@@ -462,24 +437,15 @@ class AppRoutes {
       GoRoute(
         path: '/profile',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const ProfileScreenUltra(),
-          transitionDuration: const Duration(milliseconds: 400),
+          child: const MainNavigationScreen(initialIndex: 4),
+          transitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: CurvedAnimation(
                 parent: animation,
                 curve: Curves.easeInOut,
               ),
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.0, 0.05),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                )),
-                child: child,
-              ),
+              child: child,
             );
           },
         ),
@@ -537,24 +503,15 @@ class AppRoutes {
       GoRoute(
         path: '/favorites',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const FavoritesScreenPremium(),
-          transitionDuration: const Duration(milliseconds: 500),
+          child: const MainNavigationScreen(initialIndex: 3),
+          transitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(-1.0, 0.0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
+            return FadeTransition(
+              opacity: CurvedAnimation(
                 parent: animation,
-                curve: Curves.easeOutCubic,
-              )),
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeIn,
-                ),
-                child: child,
+                curve: Curves.easeInOut,
               ),
+              child: child,
             );
           },
         ),
