@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
@@ -51,6 +54,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   
   // Subscription pour éviter l'erreur setState après dispose
   var _messageSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _realtimeSub;
   
   @override
   void initState() {
@@ -391,9 +395,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       // Charger les messages
       _messages = await messagingService.loadMessages(_conversation!.id);
       
-      // Marquer comme lus
+      // Marquer comme lus — messages des autres (admin/driver)
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       final toRead = _messages
-          .where((m) => !m.isRead && m.senderType != 'customer')
+          .where((m) => !m.isRead && m.senderId != currentUserId)
           .map((m) => m.id)
           .toList();
       await messagingService.markMessagesAsRead(toRead);
@@ -407,17 +412,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       // Scroll vers le bas
       _scrollToBottom();
       
-      // Écouter les nouveaux messages (avec subscription pour cleanup)
-      _messageSubscription = messagingService.newMessageStream.listen((message) {
-        if (message.conversationId == _conversation!.id) {
-          // Vérifier si le widget est toujours monté avant setState
-          if (mounted) {
-            setState(() {
-              _messages.add(message);
-            });
-            _scrollToBottom();
-          }
-        }
+      // Écouter les nouveaux messages via Supabase Realtime directement
+      // (plus fiable que MessagingService.newMessageStream)
+      _realtimeSub = Supabase.instance.client
+          .from('chat_messages')
+          .stream(primaryKey: ['id'])
+          .eq('conversation_id', _conversation!.id)
+          .listen((data) {
+        if (!mounted) return;
+        final updated = data
+            .map((row) => Message.fromJson(row))
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        setState(() => _messages = updated);
+        _scrollToBottom();
       });
     } catch (e) {
       print('❌ Erreur chargement conversation: $e');
@@ -1145,8 +1153,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    // Annuler la subscription pour éviter setState après dispose
+    // Annuler les subscriptions pour éviter setState après dispose
     _messageSubscription?.cancel();
+    _realtimeSub?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();

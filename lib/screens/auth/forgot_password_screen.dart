@@ -52,7 +52,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       final baseUrl = AppConfig.siteUrl.trim();
       final normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
       final redirectTo = kIsWeb
-          ? '$normalizedBaseUrl/#/reset-password'
+          ? '$normalizedBaseUrl/reset-password'
           : 'com.gba.ecommerce_client://login-callback';
       await Supabase.instance.client.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
       if (!mounted) return;
@@ -316,6 +316,7 @@ class _PremiumField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller, keyboardType: keyboardType, obscureText: obscure,
+      style: const TextStyle(color: Color(0xFF2D3436), fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: _g1, size: 20),

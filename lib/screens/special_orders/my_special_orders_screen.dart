@@ -216,16 +216,18 @@ class _MySpecialOrdersScreenState extends State<MySpecialOrdersScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.all(14),
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: Theme.of(context).colorScheme.surface,
                                         borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: Colors.grey.withOpacity(0.15)),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.05),
-                                            blurRadius: 12,
-                                            offset: const Offset(0, 6),
-                                          ),
-                                        ],
+                                        border: Border.all(color: Theme.of(context).dividerColor),
+                                        boxShadow: Theme.of(context).brightness == Brightness.dark
+                                            ? []
+                                            : [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.05),
+                                                  blurRadius: 12,
+                                                  offset: const Offset(0, 6),
+                                                ),
+                                              ],
                                       ),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,7 +267,7 @@ class _MySpecialOrdersScreenState extends State<MySpecialOrdersScreen> {
                                               'special_order_quantity_delivery',
                                               {'qty': qty, 'shipping': shipping},
                                             ),
-                                            style: TextStyle(color: Colors.grey.shade700),
+                                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                           ),
                                           const SizedBox(height: 8),
                                           if (quoteTotal != null)
@@ -291,7 +293,7 @@ class _MySpecialOrdersScreenState extends State<MySpecialOrdersScreen> {
                                                       '${_formatDate(etaMin)}${etaMax != null ? ' - ${_formatDate(etaMax)}' : ''}',
                                                 },
                                               ),
-                                              style: TextStyle(color: Colors.grey.shade700),
+                                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                             ),
                                           ],
                                           if (quoteStatus != null && quoteStatus != status) ...[
@@ -301,7 +303,7 @@ class _MySpecialOrdersScreenState extends State<MySpecialOrdersScreen> {
                                                 'special_order_quote_status_with_status',
                                                 {'status': _statusLabel(quoteStatus)},
                                               ),
-                                              style: TextStyle(color: Colors.grey.shade700),
+                                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                             ),
                                           ],
                                         ],

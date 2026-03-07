@@ -10,7 +10,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import ConversationThread from '@/components/messaging/ConversationThread';
 
 export default function MessagesPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
 
@@ -63,6 +63,9 @@ export default function MessagesPage() {
 
   // Quick replies
   const [quickReplies, setQuickReplies] = useState<{ id: string; title: string; content: string }[]>([]);
+
+  // Sender profiles for messages (id -> { name, role })
+  const [senderProfiles, setSenderProfiles] = useState<Record<string, { name: string; role: string }>>({});
   const [quickReplyOpen, setQuickReplyOpen] = useState(false);
 
   const statusOptions = [
@@ -217,6 +220,21 @@ export default function MessagesPage() {
       setMsgs(ordered);
       setHasMoreMsgs((data || []).length >= MSG_PAGE_SIZE);
 
+      // Fetch sender profiles for non-admin messages
+      const senderIds = [...new Set((data || []).map((m: any) => m.sender_id).filter(Boolean))] as string[];
+      if (senderIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, role')
+          .in('id', senderIds);
+        const map: Record<string, { name: string; role: string }> = {};
+        (profs || []).forEach((p: any) => {
+          const name = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email || '?';
+          map[p.id] = { name, role: p.role || 'client' };
+        });
+        setSenderProfiles((prev) => ({ ...prev, ...map }));
+      }
+
       if (adminIdRef.current) {
         const ids = (data || []).filter((m: any) => !m.is_read && m.sender_id !== adminIdRef.current).map((m: any) => m.id);
         if (ids.length) {
@@ -257,7 +275,7 @@ export default function MessagesPage() {
 
   const deleteMessages = useCallback(async (ids: string[]) => {
     if (!ids.length) return;
-    Modal.confirm({
+    modal.confirm({
       title: 'Supprimer les messages',
       content: `Supprimer ${ids.length} message(s) pour tout le monde ?`,
       okText: 'Supprimer',
@@ -492,12 +510,7 @@ export default function MessagesPage() {
       if (error) throw error;
       setMsgs((p) => p.map((m) => (m.id === tmpId ? (data as any) : m)));
       await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', selected.id);
-
-      try {
-        await supabase.functions.invoke('send-push-notification', {
-          body: { type: 'chat_message', record: data },
-        });
-      } catch {}
+      // Push notification is handled by SQL trigger trg_chat_message_created
     } catch (e: any) {
       message.error(e?.message || 'Erreur envoi');
       setMsgs((p) => p.filter((m) => m.id !== tmpId));
@@ -533,11 +546,7 @@ export default function MessagesPage() {
           .single();
         if (error) throw error;
         await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', selected.id);
-        try {
-          await supabase.functions.invoke('send-push-notification', {
-            body: { type: 'chat_message', record: data },
-          });
-        } catch {}
+        // Push notification is handled by SQL trigger trg_chat_message_created
       } catch (e: any) {
         message.error(e?.message || 'Upload échoué');
       } finally {
@@ -628,6 +637,9 @@ export default function MessagesPage() {
       const mine = !!adminIdRef.current && m.sender_id === adminIdRef.current;
       const img = isImageUrl(m.message);
       const isSelected = selectedMsgIds.has(m.id);
+      const sender = !mine ? senderProfiles[m.sender_id] : null;
+      const senderLabel = sender ? sender.name : null;
+      const senderRole = sender?.role;
 
       const handleDownload = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -669,6 +681,15 @@ export default function MessagesPage() {
               boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
             }}
           >
+            {!mine && senderLabel && (
+              <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ color: senderRole === 'driver' ? '#1677ff' : '#389e0d' }}>
+                  {senderRole === 'driver' ? '🚗' : '👤'} {senderLabel}
+                </span>
+                {senderRole === 'driver' && <span style={{ fontSize: 9, background: '#e6f4ff', color: '#1677ff', padding: '0 4px', borderRadius: 4 }}>Livreur</span>}
+                {senderRole === 'client' && <span style={{ fontSize: 9, background: '#f6ffed', color: '#389e0d', padding: '0 4px', borderRadius: 4 }}>Client</span>}
+              </div>
+            )}
             {img ? (
               <div style={{ width: wide ? 520 : 320, maxWidth: '100%', borderRadius: 10, overflow: 'hidden' }}>
                 <Image
@@ -704,7 +725,7 @@ export default function MessagesPage() {
         </div>
       );
     },
-    [selectedMsgIds, editMode, toggleMsgSelection, deleteMessages],
+    [selectedMsgIds, editMode, toggleMsgSelection, deleteMessages, senderProfiles],
   );
 
   // Initialize audio element for notifications (load on first use to avoid ERR_CACHE in some browsers)

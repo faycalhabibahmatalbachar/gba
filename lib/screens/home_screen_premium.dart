@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,14 +29,14 @@ import '../services/notification_service.dart' as ns;
 import '../services/recommendation_service.dart';
 import '../utils/auth_guard.dart';
 
-class HomeScreenPremium extends ConsumerStatefulWidget {
+class HomeScreenPremium extends StatefulWidget {
   const HomeScreenPremium({super.key});
 
   @override
-  ConsumerState<HomeScreenPremium> createState() => _HomeScreenPremiumState();
+  State<HomeScreenPremium> createState() => _HomeScreenPremiumState();
 }
 
-class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with TickerProviderStateMixin {
+class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProviderStateMixin {
   static const bool _debugImageLogs = false;
   String? selectedCategoryId;
   int _currentIndex = 0;
@@ -48,6 +47,8 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
   bool _showBackToTop = false;
   bool _bannerCollapsed = false;
   int _unreadMessages = 0;
+  DateTime? _lastBackPressTime;
+  MessagingService? _messagingService;
 
   final RecommendationService _recommendationService = RecommendationService();
   List<Product> _recommendedProducts = [];
@@ -450,7 +451,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final isGuest = Supabase.instance.client.auth.currentSession == null;
       if (!isGuest) {
-        _loadUnreadMessages();
+        _initMessagingListener();
         _maybeRequestNotificationPermission();
       }
       _loadRecommendations();
@@ -526,21 +527,29 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
     }
   }
 
-  void _loadUnreadMessages() async {
+  void _onMessagingChanged() {
+    if (!mounted) return;
+    final count = _messagingService?.unreadCount ?? 0;
+    if (count != _unreadMessages) {
+      setState(() => _unreadMessages = count);
+    }
+  }
+
+  void _initMessagingListener() {
     if (!mounted) return;
     try {
-      final messagingService = classic_provider.Provider.of<MessagingService>(context, listen: false);
-      if (!mounted) return;
-      setState(() {
-        _unreadMessages = messagingService.unreadCount;
-      });
+      _messagingService = classic_provider.Provider.of<MessagingService>(context, listen: false);
+      _messagingService!.addListener(_onMessagingChanged);
+      // Read initial value
+      setState(() => _unreadMessages = _messagingService!.unreadCount);
     } catch (e) {
-      debugPrint('Erreur chargement messages: $e');
+      debugPrint('Erreur init messaging listener: $e');
     }
   }
   
   @override
   void dispose() {
+    _messagingService?.removeListener(_onMessagingChanged);
     _fabAnimationController.dispose();
     _searchAnimationController.dispose();
     _messageButtonController.dispose();
@@ -560,10 +569,37 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
     final bannerTitle = (activeBanner?.title ?? '').trim();
     final bannerSubtitle = (activeBanner?.subtitle ?? '').trim();
     final bannerTargetRoute = activeBanner?.targetRoute?.trim();
-    final cartCount = ref.watch(cartProvider).itemCount;
+    final cartCount = classic_provider.Provider.of<CartProvider>(context).itemCount;
     
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return AdaptiveScaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // If scrolled down, scroll to top first
+        if (_scrollController.hasClients && _scrollController.offset > 0) {
+          _scrollController.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+          return;
+        }
+        // Double-tap-to-exit
+        final now = DateTime.now();
+        if (_lastBackPressTime != null && now.difference(_lastBackPressTime!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPressTime = now;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(localizations.translate('press_back_again_to_exit')),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+          ),
+        );
+      },
+      child: AdaptiveScaffold(
       currentIndex: 0,
       backgroundColor: isDark ? const Color(0xFF1a1a2e) : const Color(0xFFF5F7FA),
       extendBody: true,
@@ -1258,6 +1294,7 @@ class _HomeScreenPremiumState extends ConsumerState<HomeScreenPremium> with Tick
           ),
         ],
       ),
+    ),
     );
   }
   

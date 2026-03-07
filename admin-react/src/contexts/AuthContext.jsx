@@ -33,11 +33,25 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     } else {
       // Mode production - utiliser Supabase
-      supabase.auth.getSession().then(({ data: { session } }) => {
+      // Handle PKCE code exchange (e.g. from reset password email link)
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+
+      const initSession = async () => {
+        if (code) {
+          try {
+            await supabase.auth.exchangeCodeForSession(code);
+            console.log('[Auth] PKCE code exchanged successfully');
+          } catch (e) {
+            console.warn('[Auth] PKCE code exchange failed:', e.message);
+          }
+        }
+        const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-      });
+      };
+      initSession();
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);

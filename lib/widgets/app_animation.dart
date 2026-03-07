@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
@@ -45,6 +46,11 @@ class AppAnimation extends StatelessWidget {
 
         switch (spec.format) {
           case AppAnimationFormat.lottie:
+            // Lottie TrimPath causes Stack Overflow on Flutter Web CanvasKit.
+            // Use the fallback widget on web to avoid the crash.
+            if (kIsWeb) {
+              return fallback ?? const SizedBox.shrink();
+            }
             return Lottie.asset(
               spec.assetPath,
               width: width,

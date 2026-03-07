@@ -210,7 +210,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
             },
             icon: const Icon(FontAwesomeIcons.arrowLeft),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -233,7 +233,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                     {'count': _orders.length.toString()},
                   ),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -327,7 +327,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -364,7 +364,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                           Text(
                             _formatDate(order['created_at']),
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -414,7 +414,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                         {'count': items.length.toString()},
                       ),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.grey,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -452,7 +452,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                             margin: const EdgeInsets.only(right: 8),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
-                              color: Colors.grey.shade200,
+                              color: theme.brightness == Brightness.dark
+                                  ? theme.colorScheme.surfaceContainerHighest
+                                  : Colors.grey.shade200,
                             ),
                             child: item['product_image'] != null
                                 ? ClipRRect(
@@ -462,13 +464,13 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => Icon(
                                         FontAwesomeIcons.boxOpen,
-                                        color: Colors.grey.shade400,
+                                        color: theme.colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   )
                                 : Icon(
                                     FontAwesomeIcons.boxOpen,
-                                    color: Colors.grey.shade400,
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
                           );
                         },
@@ -559,9 +561,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         ),
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -570,7 +572,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
               width: 50,
               height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: theme.colorScheme.onSurfaceVariant,
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -645,7 +647,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                         child: Text(
                           localizations.translate('no_items'),
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey.shade600,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -654,7 +656,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: theme.brightness == Brightness.dark
+                            ? theme.colorScheme.surfaceContainerHighest
+                            : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -664,7 +668,9 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                             height: 50,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
-                              color: Colors.white,
+                              color: theme.brightness == Brightness.dark
+                                  ? theme.colorScheme.surfaceContainerHighest
+                                  : Colors.white,
                             ),
                             child: (item is Map && item['product_image'] != null)
                                 ? ClipRRect(
@@ -674,14 +680,14 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => Icon(
                                         FontAwesomeIcons.boxOpen,
-                                        color: Colors.grey.shade400,
+                                        color: theme.colorScheme.onSurfaceVariant,
                                         size: 20,
                                       ),
                                     ),
                                   )
                                 : Icon(
                                     FontAwesomeIcons.boxOpen,
-                                    color: Colors.grey.shade400,
+                                    color: theme.colorScheme.onSurfaceVariant,
                                     size: 20,
                                   ),
                           ),
@@ -703,7 +709,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                                     return '$qtyLabel x $unitLabel FCFA';
                                   })(),
                                   style: TextStyle(
-                                    color: Colors.grey.shade600,
+                                    color: theme.colorScheme.onSurfaceVariant,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -797,7 +803,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: isTotal ? FontWeight.bold : null,
               fontSize: isTotal ? 16 : 14,
             ),

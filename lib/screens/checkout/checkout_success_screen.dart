@@ -51,14 +51,14 @@ class _CheckoutSuccessScreenState extends State<CheckoutSuccessScreen> {
                   Text(
                     'Merci ! Votre commande a été payée et sera traitée.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                   ),
                   if (widget.orderId != null && widget.orderId!.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     Text(
                       'Commande: ${widget.orderId}',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade700),
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ],
                   const SizedBox(height: 18),

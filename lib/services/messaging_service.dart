@@ -183,6 +183,10 @@ class MessagingService extends ChangeNotifier {
       }
       
       _log('${_conversations.length} conversations chargées', level: 'SUCCESS');
+
+      // Compute unread counts from chat_messages
+      await _refreshUnreadCounts(userId);
+
       await _persistConversationsToPrefs(userId);
       notifyListeners();
     } catch (e, stackTrace) {
@@ -193,6 +197,33 @@ class MessagingService extends ChangeNotifier {
       }
       _log('Stack trace: $stackTrace', level: 'ERROR');
       rethrow;
+    }
+  }
+
+  /// Fetch unread message counts per conversation from DB and update models.
+  Future<void> _refreshUnreadCounts(String userId) async {
+    if (_conversations.isEmpty) return;
+    try {
+      final convIds = _conversations.map((c) => c.id).toList();
+      final List<Map<String, dynamic>> unreadRows = await _supabase
+          .from('chat_messages')
+          .select('conversation_id')
+          .inFilter('conversation_id', convIds)
+          .eq('is_read', false)
+          .neq('sender_id', userId);
+
+      final countMap = <String, int>{};
+      for (final row in unreadRows) {
+        final cid = row['conversation_id']?.toString() ?? '';
+        countMap[cid] = (countMap[cid] ?? 0) + 1;
+      }
+
+      _conversations = _conversations.map((c) {
+        final count = countMap[c.id] ?? 0;
+        return c.unreadCount != count ? c.copyWith(unreadCount: count) : c;
+      }).toList();
+    } catch (e) {
+      _log('Erreur calcul unread counts: $e', level: 'ERROR');
     }
   }
 
@@ -305,16 +336,11 @@ class MessagingService extends ChangeNotifier {
         _log('Messages trouvés dans le cache (peut être complété incrémentalement)');
       }
 
-      final existing = _messagesCache[conversationId] ?? <Message>[];
-      final DateTime? lastCreatedAt = existing.isEmpty
-          ? null
-          : existing.map((m) => m.createdAt).reduce((a, b) => a.isAfter(b) ? a : b);
-
       _log('Requête des messages depuis Supabase');
       _log('Colonnes demandées: id, conversation_id, sender_id, message, is_read, created_at');
       
-      // Requête simplifiée pour éviter les erreurs
-      var query = _supabase
+      // Full fetch (not incremental) so we detect deletions
+      final response = await _supabase
           .from('chat_messages')
           .select('''
             id,
@@ -324,19 +350,14 @@ class MessagingService extends ChangeNotifier {
             is_read,
             created_at
           ''')
-          .eq('conversation_id', conversationId);
-
-      if (lastCreatedAt != null) {
-        query = query.gt('created_at', lastCreatedAt.toIso8601String());
-      }
-
-      final response = await query.order('created_at', ascending: true);
+          .eq('conversation_id', conversationId)
+          .order('created_at', ascending: true);
 
       _log('Réponse reçue: ${response.runtimeType}');
       
       if (response == null) {
         _log('Réponse nulle reçue', level: 'WARNING');
-        return existing;
+        return _messagesCache[conversationId] ?? <Message>[];
       }
       
       final messages = (response as List)
@@ -346,15 +367,8 @@ class MessagingService extends ChangeNotifier {
           })
           .toList();
       
-      // Mettre en cache (merge)
-      final byId = <String, Message>{
-        for (final m in existing) m.id: m,
-      };
-      for (final m in messages) {
-        byId[m.id] = m;
-      }
-      final merged = byId.values.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      _messagesCache[conversationId] = merged;
+      // Replace cache entirely so deletions are reflected
+      _messagesCache[conversationId] = messages;
 
       if (userId != null) {
         await _persistMessagesToPrefs(userId, conversationId);
@@ -469,6 +483,26 @@ class MessagingService extends ChangeNotifier {
           .inFilter('id', messageIds);
       
       _log('Messages marqués comme lus', level: 'SUCCESS');
+
+      // Reset unread count on the conversation that owns these messages
+      // Find conversation IDs from the cached messages
+      final affectedConvIds = <String>{};
+      for (final entry in _messagesCache.entries) {
+        for (final m in entry.value) {
+          if (messageIds.contains(m.id)) {
+            affectedConvIds.add(entry.key);
+          }
+        }
+      }
+      if (affectedConvIds.isNotEmpty) {
+        _conversations = _conversations.map((c) {
+          if (affectedConvIds.contains(c.id)) {
+            return c.copyWith(unreadCount: 0);
+          }
+          return c;
+        }).toList();
+        notifyListeners();
+      }
     } catch (e) {
       _log('Erreur marquage messages: $e', level: 'ERROR');
     }
@@ -493,32 +527,59 @@ class MessagingService extends ChangeNotifier {
           .stream(primaryKey: ['id'])
           .listen((List<Map<String, dynamic>> data) {
         _log('Événement Realtime reçu: ${data.length} messages');
-        
+
+        // Group incoming messages by conversation
+        final incomingByConv = <String, Map<String, Message>>{};
         for (final messageData in data) {
           try {
             final message = Message.fromJson(messageData);
-            
-            // Mettre à jour le cache
-            final conversationId = message.conversationId;
-            if (_messagesCache.containsKey(conversationId)) {
-              final existingIndex = _messagesCache[conversationId]!
-                  .indexWhere((m) => m.id == message.id);
-              
-              if (existingIndex == -1) {
-                _messagesCache[conversationId]!.add(message);
-                _messagesCache[conversationId]!
-                    .sort((a, b) => a.createdAt.compareTo(b.createdAt));
-                _newMessageController.add(message);
-                _log('Nouveau message ajouté: ${message.id}', level: 'SUCCESS');
-
-                final uid = _supabase.auth.currentUser?.id;
-                if (uid != null) {
-                  _persistMessagesToPrefs(uid, conversationId);
-                }
-              }
-            }
+            final cid = message.conversationId;
+            incomingByConv.putIfAbsent(cid, () => {});
+            incomingByConv[cid]![message.id] = message;
           } catch (e) {
             _log('Erreur parsing message realtime: $e', level: 'ERROR');
+          }
+        }
+
+        final uid = _supabase.auth.currentUser?.id;
+
+        // Process each cached conversation: add new, remove deleted
+        for (final convId in _messagesCache.keys.toList()) {
+          final incoming = incomingByConv[convId];
+          if (incoming == null) continue; // no stream data for this conv
+
+          final cached = _messagesCache[convId]!;
+
+          // Remove messages deleted externally
+          final before = cached.length;
+          cached.removeWhere((m) => !incoming.containsKey(m.id));
+          if (cached.length < before) {
+            _log('${before - cached.length} messages supprimés (sync)', level: 'INFO');
+          }
+
+          // Add new messages
+          for (final msg in incoming.values) {
+            if (cached.indexWhere((m) => m.id == msg.id) == -1) {
+              cached.add(msg);
+              _newMessageController.add(msg);
+              _log('Nouveau message ajouté: ${msg.id}', level: 'SUCCESS');
+
+              // Increment unread count if message is from someone else
+              if (uid != null && msg.senderId != uid && !msg.isRead) {
+                _conversations = _conversations.map((c) {
+                  if (c.id == convId) {
+                    return c.copyWith(unreadCount: c.unreadCount + 1);
+                  }
+                  return c;
+                }).toList();
+              }
+            }
+          }
+
+          cached.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+          if (uid != null) {
+            _persistMessagesToPrefs(uid, convId);
           }
         }
         

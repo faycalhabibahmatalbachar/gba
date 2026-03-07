@@ -30,7 +30,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   // Stats
   int _todayDeliveries = 0;
   double _todayEarnings = 0;
-  final double _rating = 4.8;
+  int _totalDeliveries = 0;
+  double _totalEarnings = 0;
+  double _rating = 0;
+
+  // Driver profile
+  String _driverName = '';
+  String? _driverAvatarUrl;
+  String? _driverPhone;
 
   static const _purple = Color(0xFF667eea);
   static const _violet = Color(0xFF764ba2);
@@ -43,6 +50,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+    _loadDriverProfile();
     _loadOrders();
     _subscribeToOrders();
     // Start GPS tracking
@@ -59,6 +67,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
     DriverLocationService.instance.dispose();
     DriverNotificationService.instance.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDriverProfile() async {
+    try {
+      final driver = _supabase.auth.currentUser;
+      if (driver == null) return;
+
+      final data = await _supabase
+          .from('profiles')
+          .select('first_name, last_name, avatar_url, phone')
+          .eq('id', driver.id)
+          .maybeSingle();
+
+      if (data != null && mounted) {
+        final first = (data['first_name'] ?? '').toString().trim();
+        final last = (data['last_name'] ?? '').toString().trim();
+        setState(() {
+          _driverName = [first, last].where((s) => s.isNotEmpty).join(' ');
+          _driverAvatarUrl = data['avatar_url']?.toString();
+          _driverPhone = data['phone']?.toString();
+        });
+      }
+    } catch (e) {
+      debugPrint('[DriverHome] Erreur chargement profil: $e');
+    }
   }
 
   Future<void> _loadOrders() async {
@@ -79,15 +112,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
 
       final all = List<Map<String, dynamic>>.from(response);
 
-      // Compute today stats
+      // Compute stats
       final today = DateTime.now();
-      final todayOrders = all.where((o) {
+      final deliveredAll = all.where((o) => o['status'] == 'delivered').toList();
+      final todayOrders = deliveredAll.where((o) {
         final created = DateTime.tryParse(o['created_at'] ?? '');
         return created != null &&
             created.year == today.year &&
             created.month == today.month &&
-            created.day == today.day &&
-            o['status'] == 'delivered';
+            created.day == today.day;
       }).toList();
 
       setState(() {
@@ -95,6 +128,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         _isLoading = false;
         _todayDeliveries = todayOrders.length;
         _todayEarnings = todayOrders.fold(
+            0.0, (sum, o) => sum + ((o['total_amount'] as num?)?.toDouble() ?? 0));
+        _totalDeliveries = deliveredAll.length;
+        _totalEarnings = deliveredAll.fold(
             0.0, (sum, o) => sum + ((o['total_amount'] as num?)?.toDouble() ?? 0));
       });
     } catch (e) {
@@ -133,7 +169,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   Widget build(BuildContext context) {
     final user = _supabase.auth.currentUser;
     final email = user?.email ?? '';
-    final handle = email.contains('@') ? email.split('@').first : 'Livreur';
+    final emailHandle = email.contains('@') ? email.split('@').first : 'Livreur';
+    final handle = _driverName.isNotEmpty ? _driverName : emailHandle;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -175,8 +212,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                                       color: Colors.white.withValues(alpha: 0.5),
                                       width: 2),
                                 ),
-                                child: const Icon(Icons.delivery_dining,
-                                    color: Colors.white, size: 26),
+                                child: _driverAvatarUrl != null && _driverAvatarUrl!.isNotEmpty
+                                    ? ClipOval(
+                                        child: Image.network(
+                                          _driverAvatarUrl!,
+                                          width: 48,
+                                          height: 48,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => _buildAvatarFallback(),
+                                        ),
+                                      )
+                                    : _buildAvatarFallback(),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -259,26 +305,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                             ],
                           ),
                           const SizedBox(height: 20),
-                          // Stats row
+                          // Stats row — real data
                           Row(
                             children: [
                               _StatChip(
-                                icon: Icons.check_circle_outline,
+                                icon: Icons.today,
                                 value: _todayDeliveries.toString(),
-                                label: 'Livraisons',
+                                label: "Aujourd'hui",
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
+                              _StatChip(
+                                icon: Icons.check_circle_outline,
+                                value: _totalDeliveries.toString(),
+                                label: 'Total',
+                              ),
+                              const SizedBox(width: 10),
                               _StatChip(
                                 icon: Icons.payments_outlined,
-                                value:
-                                    '${_todayEarnings.toStringAsFixed(0)} FCFA',
-                                label: 'Gains',
-                              ),
-                              const SizedBox(width: 12),
-                              _StatChip(
-                                icon: Icons.star_outline,
-                                value: _rating.toStringAsFixed(1),
-                                label: 'Note',
+                                value: '${_totalEarnings.toStringAsFixed(0)}',
+                                label: 'FCFA',
                               ),
                             ],
                           ),
@@ -374,6 +419,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildAvatarFallback() {
+    if (_driverName.isNotEmpty) {
+      final initials = _driverName.split(' ').map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').take(2).join();
+      return Center(
+        child: Text(
+          initials,
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+      );
+    }
+    return const Icon(Icons.delivery_dining, color: Colors.white, size: 26);
   }
 
   String _greeting() {

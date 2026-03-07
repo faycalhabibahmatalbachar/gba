@@ -158,8 +158,54 @@ class DriverApp extends StatelessWidget {
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 
-class _DriverRoot extends StatelessWidget {
+class _DriverRoot extends StatefulWidget {
   const _DriverRoot();
+
+  @override
+  State<_DriverRoot> createState() => _DriverRootState();
+}
+
+class _DriverRootState extends State<_DriverRoot> {
+  bool _checkingRole = false;
+  bool _roleVerified = false;
+  String? _roleError;
+
+  Future<void> _verifyDriverRole(String userId) async {
+    if (_checkingRole) return;
+    setState(() {
+      _checkingRole = true;
+      _roleError = null;
+    });
+    try {
+      final response = await Supabase.instance.client
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+      final role = response?['role']?.toString().toLowerCase();
+      if (role == 'driver') {
+        if (mounted) setState(() { _roleVerified = true; _checkingRole = false; });
+      } else {
+        // Not a driver — sign out
+        await Supabase.instance.client.auth.signOut();
+        if (mounted) {
+          setState(() {
+            _roleVerified = false;
+            _checkingRole = false;
+            _roleError = 'Ce compte n\'est pas un compte livreur. Contactez l\'administrateur.';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[DriverRoot] role check error: $e');
+      if (mounted) {
+        setState(() {
+          _checkingRole = false;
+          _roleError = 'Erreur de vérification du rôle: $e';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,8 +215,47 @@ class _DriverRoot extends StatelessWidget {
         final session = snap.data?.session ??
             Supabase.instance.client.auth.currentSession;
         if (session == null) {
+          // Reset role state on logout
+          if (_roleVerified) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() { _roleVerified = false; _checkingRole = false; });
+            });
+          }
           LocationBackgroundService.instance.clearDriverId();
-          return const _DriverLoginScreen();
+          return _DriverLoginScreen(roleError: _roleError);
+        }
+
+        // Verify driver role before granting access
+        if (!_roleVerified && !_checkingRole) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _verifyDriverRole(session.user.id);
+          });
+          return Scaffold(
+            body: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                ),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text('Vérification du compte...', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!_roleVerified) {
+          LocationBackgroundService.instance.clearDriverId();
+          return _DriverLoginScreen(roleError: _roleError);
         }
 
         // Associate driverId so background tracking writes into driver_locations.
@@ -185,7 +270,8 @@ class _DriverRoot extends StatelessWidget {
 // ─── Lightweight driver login ─────────────────────────────────────────────────
 
 class _DriverLoginScreen extends StatefulWidget {
-  const _DriverLoginScreen();
+  final String? roleError;
+  const _DriverLoginScreen({this.roleError});
 
   @override
   State<_DriverLoginScreen> createState() => _DriverLoginScreenState();
@@ -198,6 +284,22 @@ class _DriverLoginScreenState extends State<_DriverLoginScreen> {
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.roleError != null) {
+      _error = widget.roleError;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _DriverLoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.roleError != oldWidget.roleError && widget.roleError != null) {
+      setState(() => _error = widget.roleError);
+    }
+  }
 
   static const _purple = Color(0xFF667eea);
   static const _violet = Color(0xFF764ba2);

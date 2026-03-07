@@ -1,18 +1,18 @@
 # Supabase Auth — Production (prod uniquement)
 
-Toutes les redirections auth utilisent l’URL de prod : **https://gba-vc4s.vercel.app** (aucun localhost).
+Toutes les redirections auth utilisent l’URL de prod : **https://globalbusinessamdaradir.vercel.app** (aucun localhost).
 
 ## 1. Redirect URLs (Supabase Dashboard → Authentication → URL Configuration)
 
 À ajouter dans **Redirect URLs** :
 
 ```
-https://gba-vc4s.vercel.app/#/reset-password
-https://gba-vc4s.vercel.app/#/otp
-https://gba-vc4s.vercel.app/**
+https://globalbusinessamdaradir.vercel.app/#/reset-password
+https://globalbusinessamdaradir.vercel.app/#/otp
+https://globalbusinessamdaradir.vercel.app/**
 ```
 
-**Site URL** : `https://gba-vc4s.vercel.app`
+**Site URL** : `https://globalbusinessamdaradir.vercel.app`
 
 ## 2. Email Templates
 
@@ -55,5 +55,5 @@ Pour une action sensible, rediriger l’utilisateur vers `/otp?email=...&type=em
 
 ## 4. Config app (prod)
 
-- `AppConfig.authRedirectBaseUrl` = `https://gba-vc4s.vercel.app` (utilisé pour reset password et tout redirect auth).
+- `AppConfig.authRedirectBaseUrl` = `https://globalbusinessamdaradir.vercel.app` (utilisé pour reset password et tout redirect auth).
 - Aucune URL de dev (localhost) n’est utilisée pour les redirections auth.

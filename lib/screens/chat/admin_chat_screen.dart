@@ -137,6 +137,24 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
             }
           },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'chat_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: _conversationId,
+          ),
+          callback: (payload) {
+            final deletedId = payload.oldRecord['id'];
+            if (deletedId != null) {
+              setState(() {
+                _messages.removeWhere((m) => m['id'] == deletedId);
+              });
+            }
+          },
+        )
         .subscribe();
   }
 
@@ -235,11 +253,10 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     return Scaffold(
       appBar: AppBar(
         elevation: 2,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         title: Row(
           children: [
-            // Icône Admin
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -258,17 +275,17 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
               children: [
                 Text(
                   localizations.translate('support_admin'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   localizations.translate('admin_support_available'),
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -281,10 +298,15 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.orange.shade50,
-              Colors.white,
-            ],
+            colors: Theme.of(context).brightness == Brightness.dark
+                ? [
+                    Theme.of(context).scaffoldBackgroundColor,
+                    Theme.of(context).scaffoldBackgroundColor,
+                  ]
+                : [
+                    Colors.orange.shade50,
+                    Colors.white,
+                  ],
           ),
         ),
         child: Column(
@@ -371,7 +393,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                                               ? Theme.of(context).primaryColor
                                               : isAdmin
                                                   ? Colors.orange.shade100
-                                                  : Colors.grey[200],
+                                                  : Theme.of(context).brightness == Brightness.dark
+                                                      ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                                      : Theme.of(context).colorScheme.surfaceVariant,
                                           borderRadius: BorderRadius.only(
                                             topLeft: const Radius.circular(18),
                                             topRight: const Radius.circular(18),
@@ -387,7 +411,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                                               style: TextStyle(
                                                 color: isMe
                                                     ? Colors.white
-                                                    : Colors.black87,
+                                                    : Theme.of(context).colorScheme.onSurface,
                                                 fontSize: 15,
                                               ),
                                             ),
@@ -431,7 +455,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
             // Zone de saisie
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
@@ -456,7 +480,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: Colors.grey[100],
+                        fillColor: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.surfaceContainerHighest
+                            : Colors.grey[100],
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 10,

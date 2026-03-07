@@ -31,6 +31,10 @@ class _DriverOrderDetailScreenState extends State<DriverOrderDetailScreen>
   Map<String, dynamic>? _clientProfile;
   bool _loadingProfile = true;
 
+  // Special order
+  Map<String, dynamic>? _specialOrder;
+  bool _isSpecialOrder = false;
+
   // Client live location
   LatLng? _clientPos;
   StreamSubscription? _clientLocSub;
@@ -58,6 +62,7 @@ class _DriverOrderDetailScreenState extends State<DriverOrderDetailScreen>
     _slideController.forward();
     _loadClientProfile();
     _subscribeClientLocation();
+    _checkSpecialOrder();
   }
 
   @override
@@ -109,6 +114,25 @@ class _DriverOrderDetailScreenState extends State<DriverOrderDetailScreen>
     });
   }
 
+  // ── Special order check ─────────────────────────────────────────────────
+
+  Future<void> _checkSpecialOrder() async {
+    final isSpecial = _order['is_special'] == true || _order['order_type'] == 'special';
+    final specialOrderId = _order['special_order_id']?.toString();
+    if (!isSpecial && specialOrderId == null) return;
+    setState(() => _isSpecialOrder = true);
+    if (specialOrderId != null) {
+      try {
+        final data = await _supabase
+            .from('special_orders')
+            .select('*')
+            .eq('id', specialOrderId)
+            .maybeSingle();
+        if (data != null && mounted) setState(() => _specialOrder = data);
+      } catch (_) {}
+    }
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   String get _clientName {
@@ -132,6 +156,17 @@ class _DriverOrderDetailScreenState extends State<DriverOrderDetailScreen>
     if (phone == null) return;
     final uri = Uri(scheme: 'tel', path: phone);
     if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  void _showFullScreenImage(BuildContext ctx, String imageUrl, String title) {
+    Navigator.of(ctx).push(
+      MaterialPageRoute(
+        builder: (_) => _FullScreenImagePage(
+          imageUrl: imageUrl,
+          title: title,
+        ),
+      ),
+    );
   }
 
   int _currentStepIndex() {
@@ -288,6 +323,68 @@ class _DriverOrderDetailScreenState extends State<DriverOrderDetailScreen>
                     ),
                     const SizedBox(height: 20),
 
+                    // ── Special order info ────────────────────
+                    if (_isSpecialOrder) ...[                      
+                      const _SectionTitle(
+                          icon: Icons.star_rounded,
+                          label: 'Commande spéciale'),
+                      _InfoCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(colors: [_orange, Color(0xFFFF8F00)]),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Icon(Icons.star_rounded, color: Colors.white, size: 14),
+                                    SizedBox(width: 4),
+                                    Text('Spéciale', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                                  ]),
+                                ),
+                              ]),
+                              if (_specialOrder != null) ...[
+                                const SizedBox(height: 12),
+                                if (_specialOrder!['description'] != null)
+                                  Text(
+                                    _specialOrder!['description'].toString(),
+                                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.5),
+                                  ),
+                                if (_specialOrder!['notes'] != null) ...[
+                                  const SizedBox(height: 8),
+                                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Icon(Icons.note_outlined, size: 14, color: Colors.grey.shade500),
+                                    const SizedBox(width: 6),
+                                    Expanded(child: Text(
+                                      _specialOrder!['notes'].toString(),
+                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                    )),
+                                  ]),
+                                ],
+                                if (_specialOrder!['status'] != null) ...[
+                                  const SizedBox(height: 8),
+                                  Row(children: [
+                                    Text('Statut: ', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                                    Text(_specialOrder!['status'].toString(), style: const TextStyle(fontSize: 12, color: _purple, fontWeight: FontWeight.w700)),
+                                  ]),
+                                ],
+                              ] else
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text('Commande avec demande spéciale du client', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
                     // ── Order items ───────────────────────────
                     _SectionTitle(
                         icon: Icons.shopping_bag_outlined,
@@ -298,44 +395,68 @@ class _DriverOrderDetailScreenState extends State<DriverOrderDetailScreen>
                           ...items.asMap().entries.map((e) {
                             final i = e.value;
                             final isLast = e.key == items.length - 1;
+                            final imgUrl = (i['product_image'] ?? i['image_url'] ?? '').toString();
+                            final qty = (i['quantity'] as num?)?.toInt() ?? 1;
+                            final unitPrice = (i['unit_price'] as num?)?.toDouble() ?? (i['price'] as num?)?.toDouble() ?? 0;
+                            final lineTotal = (i['total_price'] as num?)?.toDouble() ?? (unitPrice * qty);
                             return Column(
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Row(
                                     children: [
-                                      Container(
-                                        width: 40,
-                                        height: 40,
-                                        decoration: BoxDecoration(
-                                          color: _purple.withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            '×${i['quantity'] ?? 1}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              color: _purple,
-                                            ),
-                                          ),
+                                      // Product image or quantity badge
+                                      GestureDetector(
+                                        onTap: imgUrl.isNotEmpty && imgUrl.startsWith('http')
+                                            ? () => _showFullScreenImage(context, imgUrl, i['product_name'] ?? i['name'] ?? 'Article')
+                                            : null,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: imgUrl.isNotEmpty && imgUrl.startsWith('http')
+                                              ? CachedNetworkImage(
+                                                  imageUrl: imgUrl,
+                                                  width: 48,
+                                                  height: 48,
+                                                  fit: BoxFit.cover,
+                                                  errorWidget: (_, __, ___) => Container(
+                                                    width: 48, height: 48,
+                                                    decoration: BoxDecoration(
+                                                      color: _purple.withValues(alpha: 0.1),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                    child: Center(child: Text('×$qty', style: const TextStyle(fontWeight: FontWeight.w800, color: _purple))),
+                                                  ),
+                                                )
+                                              : Container(
+                                                  width: 48, height: 48,
+                                                  decoration: BoxDecoration(
+                                                    color: _purple.withValues(alpha: 0.1),
+                                                    borderRadius: BorderRadius.circular(12),
+                                                  ),
+                                                  child: Center(child: Text('×$qty', style: const TextStyle(fontWeight: FontWeight.w800, color: _purple))),
+                                                ),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
-                                        child: Text(
-                                          i['product_name'] ??
-                                              i['name'] ??
-                                              'Article',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              i['product_name'] ?? i['name'] ?? 'Article',
+                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                              maxLines: 2, overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              '${unitPrice.toStringAsFixed(0)} FCFA × $qty',
+                                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       Text(
-                                        '${((i['price'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)} FCFA',
+                                        '${lineTotal.toStringAsFixed(0)} FCFA',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           color: _purple,
@@ -859,6 +980,63 @@ class _QuickActionBtn extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w700)),
           ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fullscreen image viewer with zoom and download for driver order images.
+class _FullScreenImagePage extends StatelessWidget {
+  final String imageUrl;
+  final String title;
+  const _FullScreenImagePage({required this.imageUrl, required this.title});
+
+  static const _purple = Color(0xFF667eea);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(title, style: const TextStyle(fontSize: 14)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download_rounded),
+            tooltip: 'Télécharger',
+            onPressed: () async {
+              final uri = Uri.tryParse(imageUrl);
+              if (uri != null) {
+                try {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Impossible d\'ouvrir: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              }
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.contain,
+            placeholder: (_, __) => const Center(
+              child: CircularProgressIndicator(color: _purple),
+            ),
+            errorWidget: (_, __, ___) => const Center(
+              child: Icon(Icons.broken_image, color: Colors.white54, size: 64),
+            ),
+          ),
         ),
       ),
     );

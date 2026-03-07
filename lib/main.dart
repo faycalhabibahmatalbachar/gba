@@ -31,6 +31,8 @@ import 'providers/notification_preferences_provider.dart';
 import 'services/messaging_service.dart';
 import 'services/notification_service.dart';
 import 'utils/i18n_audit.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'main_driver.dart' as driver_app;
 
 const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
   apiKey: String.fromEnvironment(
@@ -61,6 +63,13 @@ const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // If built with --flavor driver, delegate to driver entry point immediately
+  final packageInfo = await PackageInfo.fromPlatform();
+  if (packageInfo.packageName.endsWith('.driver')) {
+    await driver_app.main();
+    return;
+  }
 
   if (AppConfig.stripePublishableKey.isNotEmpty) {
     Stripe.publishableKey = AppConfig.stripePublishableKey;

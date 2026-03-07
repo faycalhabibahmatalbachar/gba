@@ -200,14 +200,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                 margin: const EdgeInsets.symmetric(horizontal: 4),
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? Colors.blue : Colors.grey.shade200,
+                                  color: isSelected
+                                      ? Colors.blue
+                                      : Theme.of(context).brightness == Brightness.dark
+                                          ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                          : Colors.grey.shade200,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Center(
                                   child: Text(
                                     category['name'] ?? '',
                                     style: TextStyle(
-                                      color: isSelected ? Colors.white : Colors.black87,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Theme.of(context).colorScheme.onSurface,
                                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                     ),
                                   ),

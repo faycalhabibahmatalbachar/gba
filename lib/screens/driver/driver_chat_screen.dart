@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Chat screen for drivers to communicate with customers about their orders.
@@ -166,6 +168,71 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
     }
   }
 
+  Future<void> _pickAndSendImage() async {
+    final driverId = _supabase.auth.currentUser?.id;
+    if (driverId == null || _conversationId == null) return;
+
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 80,
+    );
+    if (image == null) return;
+
+    setState(() => _isSending = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final name = image.name.trim().isEmpty ? 'image.jpg' : image.name.trim();
+      final dot = name.lastIndexOf('.');
+      final ext = (dot >= 0 && dot < name.length - 1)
+          ? name.substring(dot + 1).toLowerCase()
+          : 'jpg';
+      final safeExt = ext.length <= 5 ? ext : 'jpg';
+
+      final objectPath =
+          '$driverId/$_conversationId/${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      await _supabase.storage.from('chat').uploadBinary(
+            objectPath,
+            bytes,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          );
+      final imageUrl = _supabase.storage.from('chat').getPublicUrl(objectPath);
+
+      if (imageUrl.isEmpty) {
+        debugPrint('[DriverChat] image upload returned empty URL');
+        return;
+      }
+
+      await _supabase.from('chat_messages').insert({
+        'conversation_id': _conversationId,
+        'sender_id': driverId,
+        'message': imageUrl,
+        'image_url': imageUrl,
+        'is_read': false,
+      });
+
+      await _supabase.from('chat_conversations').update({
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', _conversationId!);
+
+      HapticFeedback.lightImpact();
+    } catch (e) {
+      debugPrint('[DriverChat] image send error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur envoi image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollCtrl.hasClients) {
@@ -247,6 +314,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
                             final isMe = msg['sender_id'] == driverId;
                             return _MessageBubble(
                               text: msg['message'] ?? msg['content'] ?? '',
+                              imageUrl: msg['image_url']?.toString(),
                               isMe: isMe,
                               time: DateTime.tryParse(
                                       msg['created_at'] ?? '') ??
@@ -322,6 +390,20 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
       ),
       child: Row(
         children: [
+          // Attach image button
+          GestureDetector(
+            onTap: _isSending ? null : _pickAndSendImage,
+            child: Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: _purple.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.attach_file_rounded, color: _purple, size: 20),
+            ),
+          ),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -381,17 +463,41 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
 
 class _MessageBubble extends StatelessWidget {
   final String text;
+  final String? imageUrl;
   final bool isMe;
   final DateTime time;
 
   const _MessageBubble({
     required this.text,
+    this.imageUrl,
     required this.isMe,
     required this.time,
   });
 
+  bool get _isImage {
+    if (imageUrl != null && imageUrl!.isNotEmpty) return true;
+    final t = text.trim();
+    return t.startsWith('http') &&
+        (t.contains('/storage/v1/object/public/chat/') ||
+            t.endsWith('.jpg') ||
+            t.endsWith('.jpeg') ||
+            t.endsWith('.png') ||
+            t.endsWith('.webp'));
+  }
+
+  String get _imgSrc =>
+      (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl! : text.trim();
+
   @override
   Widget build(BuildContext context) {
+    final isImg = _isImage;
+    final radius = BorderRadius.only(
+      topLeft: const Radius.circular(18),
+      topRight: const Radius.circular(18),
+      bottomLeft: Radius.circular(isMe ? 18 : 4),
+      bottomRight: Radius.circular(isMe ? 4 : 18),
+    );
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -399,19 +505,16 @@ class _MessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: isImg
+            ? const EdgeInsets.all(4)
+            : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           gradient: isMe
               ? const LinearGradient(
                   colors: [Color(0xFF667eea), Color(0xFF764ba2)])
               : null,
           color: isMe ? null : Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(18),
-            topRight: const Radius.circular(18),
-            bottomLeft: Radius.circular(isMe ? 18 : 4),
-            bottomRight: Radius.circular(isMe ? 4 : 18),
-          ),
+          borderRadius: radius,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -424,22 +527,58 @@ class _MessageBubble extends StatelessWidget {
           crossAxisAlignment:
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Text(
-              text,
-              style: TextStyle(
-                color: isMe ? Colors.white : const Color(0xFF2D3436),
-                fontSize: 14,
-                height: 1.4,
+            if (isImg)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: CachedNetworkImage(
+                  imageUrl: _imgSrc,
+                  width: 220,
+                  height: 220,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    width: 220,
+                    height: 220,
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 220,
+                    height: 220,
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: Icon(Icons.broken_image_outlined, size: 32),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Text(
+                text,
+                style: TextStyle(
+                  color: isMe ? Colors.white : const Color(0xFF2D3436),
+                  fontSize: 14,
+                  height: 1.4,
+                ),
               ),
-            ),
             const SizedBox(height: 4),
-            Text(
-              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-              style: TextStyle(
-                color: isMe
-                    ? Colors.white.withValues(alpha: 0.7)
-                    : Colors.grey.shade400,
-                fontSize: 10,
+            Padding(
+              padding: isImg
+                  ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2)
+                  : EdgeInsets.zero,
+              child: Text(
+                '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(
+                  color: isMe
+                      ? Colors.white.withValues(alpha: 0.7)
+                      : Colors.grey.shade400,
+                  fontSize: 10,
+                ),
               ),
             ),
           ],

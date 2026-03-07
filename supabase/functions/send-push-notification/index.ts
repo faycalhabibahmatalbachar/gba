@@ -46,6 +46,8 @@ const t: Record<string, Record<Lang, string>> = {
   banner_body:              { fr: 'Découvrez notre nouvelle offre',     en: 'Check out our new offer',          ar: 'اكتشف عرضنا الجديد' },
   special_order_title:      { fr: 'Mise à jour commande spéciale',      en: 'Special order update',             ar: 'تحديث الطلب الخاص' },
   special_order_body:       { fr: 'Votre commande spéciale #{num} est {status}', en: 'Your special order #{num} is {status}', ar: 'طلبك الخاص #{num} أصبح {status}' },
+  special_order_created_title: { fr: 'Nouvelle commande spéciale !',       en: 'New special order!',               ar: 'طلب خاص جديد!' },
+  special_order_created_body:  { fr: 'Commande spéciale de {name} ({qty}x)', en: 'Special order from {name} ({qty}x)', ar: 'طلب خاص من {name} ({qty}x)' },
   fallback_title:           { fr: 'Notification',                       en: 'Notification',                     ar: 'إشعار' },
   client:                   { fr: 'Client',                             en: 'Customer',                         ar: 'عميل' },
 };
@@ -126,14 +128,22 @@ async function sendFcmV1(
   title: string,
   body: string,
   data: Record<string, string>,
+  imageUrl?: string,
 ): Promise<{ success: boolean; error?: string; errorCode?: string }> {
   const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+
+  // Include image_url in data so Flutter local notification handler can use it
+  const enrichedData = { ...data };
+  if (imageUrl) enrichedData.image_url = imageUrl;
+
+  const notification: Record<string, string> = { title, body };
+  if (imageUrl) notification.image = imageUrl;
 
   const message = {
     message: {
       token,
-      notification: { title, body },
-      data,
+      notification,
+      data: enrichedData,
       android: {
         priority: 'HIGH' as const,
         ttl: '86400s',
@@ -141,6 +151,7 @@ async function sendFcmV1(
           sound: 'default',
           click_action: 'FLUTTER_NOTIFICATION_CLICK',
           channel_id: 'high_importance_channel',
+          ...(imageUrl ? { image: imageUrl } : {}),
         },
       },
       apns: {
@@ -153,11 +164,17 @@ async function sendFcmV1(
             'mutable-content': 1,
           },
         },
-        fcm_options: { analytics_label: 'gba_push' },
+        fcm_options: {
+          analytics_label: 'gba_push',
+          ...(imageUrl ? { image: imageUrl } : {}),
+        },
       },
       webpush: {
         headers: { Urgency: 'high' },
-        notification: { icon: '/icons/icon-192x192.png' },
+        notification: {
+          icon: '/icons/icon-192x192.png',
+          ...(imageUrl ? { image: imageUrl } : {}),
+        },
       },
     },
   };
@@ -440,11 +457,13 @@ Deno.serve(async (req) => {
     let data: Record<string, string> = {};
     let templateParams: Record<string, string> = {};
     let senderName = '';
+    let imageUrl: string | undefined;
 
     switch (type) {
       case 'product_added': {
         templateKey = 'new_product';
         templateParams = { name: record?.name ?? '' };
+        imageUrl = record?.image_url || record?.main_image || undefined;
         data = { route: '/home', category: 'product', template: 'new_product' };
         // Notify all non-admin users
         const { data: adminIds } = await supabase.from('profiles').select('id').eq('role', 'admin');
@@ -465,6 +484,7 @@ Deno.serve(async (req) => {
           num: record?.order_number ?? record?.id ?? '',
           amount: String(record?.total_amount ?? 0),
         };
+        imageUrl = record?.image_url || undefined;
         data = { route: '/orders', category: 'order', template: 'new_order' };
         // Notify all admin users dynamically
         const { data: adminProfiles } = await supabase
@@ -481,6 +501,7 @@ Deno.serve(async (req) => {
         templateParams = {
           num: record?.order_number ?? record?.id ?? '',
         };
+        imageUrl = record?.image_url || undefined;
         data = { route: '/orders', category: 'order', template: 'order_update', status: record?.status ?? '' };
         if (record?.user_id) targetUserIds = [record.user_id];
         console.log(`[PUSH] order_status_changed → user=${record?.user_id} status=${record?.status}`);
@@ -494,7 +515,7 @@ Deno.serve(async (req) => {
           break;
         }
 
-        // Resolve sender role to decide direction (admin→user or user→admins)
+        // Resolve sender role to decide direction
         const { data: senderProfile } = await supabase
           .from('profiles')
           .select('role, first_name, last_name')
@@ -502,27 +523,59 @@ Deno.serve(async (req) => {
           .single();
         const senderRole = senderProfile?.role ?? 'user';
 
+        // Get the conversation to know the customer (user_id)
+        const { data: conv } = await supabase
+          .from('chat_conversations')
+          .select('user_id')
+          .eq('id', record?.conversation_id)
+          .single();
+        const convUserId = conv?.user_id;
+
         if (senderRole === 'admin') {
-          // Admin sent → notify the conversation's user
-          const { data: conv } = await supabase
-            .from('chat_conversations')
-            .select('user_id')
-            .eq('id', record?.conversation_id)
-            .single();
-          if (conv?.user_id) targetUserIds = [conv.user_id];
+          // Admin sent → notify the conversation's user + assigned driver
+          if (convUserId) targetUserIds.push(convUserId);
           templateKey = 'chat_support';
+        } else if (senderRole === 'driver') {
+          // Driver sent → notify the customer + all admins
+          if (convUserId) targetUserIds.push(convUserId);
+          const { data: adminProfiles } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('role', 'admin');
+          for (const p of (adminProfiles ?? [])) targetUserIds.push((p as any).id as string);
+          senderName = senderProfile
+            ? `${senderProfile.first_name ?? ''} ${senderProfile.last_name ?? ''}`.trim() || ''
+            : '';
+          templateKey = 'chat_from';
         } else {
-          // User/driver sent → notify all admins
+          // User/client sent → notify all admins + assigned driver(s) for this customer
           const { data: adminProfiles } = await supabase
             .from('profiles')
             .select('id')
             .eq('role', 'admin');
           targetUserIds = (adminProfiles ?? []).map((p: any) => p.id as string);
+
+          // Also notify drivers assigned to this customer's orders
+          if (convUserId) {
+            const { data: driverOrders } = await supabase
+              .from('orders')
+              .select('driver_id')
+              .eq('user_id', convUserId)
+              .not('driver_id', 'is', null)
+              .in('status', ['confirmed', 'processing', 'preparing', 'ready', 'shipped', 'out_for_delivery', 'in_transit']);
+            const driverIds = [...new Set((driverOrders ?? []).map((o: any) => o.driver_id as string).filter(Boolean))];
+            for (const did of driverIds) targetUserIds.push(did);
+          }
+
           senderName = senderProfile
             ? `${senderProfile.first_name ?? ''} ${senderProfile.last_name ?? ''}`.trim() || ''
             : '';
           templateKey = 'chat_from';
         }
+
+        // Never notify the sender themselves
+        targetUserIds = targetUserIds.filter((id) => id !== senderId);
+
         data = { route: '/messages', category: 'chat', template: 'new_message', conversation_id: String(record?.conversation_id ?? '') };
         console.log(`[PUSH] chat_message → sender=${senderId} role=${senderRole}, targets=${targetUserIds.length}`);
         break;
@@ -552,6 +605,7 @@ Deno.serve(async (req) => {
         if (record?.user_id) targetUserIds = [record.user_id];
         templateKey = 'delivery_pickup';
         templateParams = { num: record?.order_number ?? record?.id ?? '' };
+        imageUrl = record?.image_url || undefined;
         data = { route: '/orders', category: 'delivery', template: 'delivery_picked_up' };
         console.log(`[PUSH] delivery_picked_up → user=${record?.user_id}`);
         break;
@@ -564,6 +618,7 @@ Deno.serve(async (req) => {
         for (const p of (adminProfiles ?? [])) targetUserIds.push((p as any).id as string);
         templateKey = 'delivery_done';
         templateParams = { num: record?.order_number ?? record?.id ?? '' };
+        imageUrl = record?.image_url || undefined;
         data = { route: '/orders', category: 'delivery', template: 'delivery_completed' };
         console.log(`[PUSH] delivery_completed → targets=${targetUserIds.length}`);
         break;
@@ -572,6 +627,7 @@ Deno.serve(async (req) => {
       case 'driver_assigned': {
         const orderNum = record?.order_number ?? record?.id ?? '';
         templateParams = { num: orderNum };
+        imageUrl = record?.image_url || undefined;
         data = { route: '/orders', category: 'delivery', template: 'driver_assigned' };
 
         // Notify client: "A driver has been assigned"
@@ -588,7 +644,7 @@ Deno.serve(async (req) => {
 
           for (const { token } of (clientTokens ?? [])) {
             if (!token) continue;
-            const result = await sendFcmV1(accessToken, projectId, token, clientTitle, clientBody, data);
+            const result = await sendFcmV1(accessToken, projectId, token, clientTitle, clientBody, data, imageUrl);
             await logNotification(supabase, {
               user_id: record.user_id,
               device_token: token,
@@ -624,7 +680,7 @@ Deno.serve(async (req) => {
 
           for (const { token } of (driverTokens ?? [])) {
             if (!token) continue;
-            const result = await sendFcmV1(accessToken, projectId, token, driverTitle, driverBody, data);
+            const result = await sendFcmV1(accessToken, projectId, token, driverTitle, driverBody, data, imageUrl);
             await logNotification(supabase, {
               user_id: record.driver_id,
               device_token: token,
@@ -651,10 +707,28 @@ Deno.serve(async (req) => {
         });
       }
 
+      case 'special_order_created': {
+        templateKey = 'special_order_created';
+        const productName = record?.product_name ?? '';
+        const qty = String(record?.quantity ?? 1);
+        templateParams = { name: productName, qty };
+        imageUrl = record?.image_url || undefined;
+        data = { route: '/orders', category: 'order', template: 'special_order_created' };
+        // Notify all admin users
+        const { data: adminProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin');
+        targetUserIds = (adminProfiles ?? []).map((p: any) => p.id as string);
+        console.log(`[PUSH] special_order_created → notify ${targetUserIds.length} admin(s)`);
+        break;
+      }
+
       case 'special_order_status_changed': {
         templateKey = 'special_order';
         const statusKey = `status_${record?.status}`;
         templateParams = { num: record?.id?.toString()?.substring(0, 8) ?? '' };
+        imageUrl = record?.image_url || undefined;
         data = { route: '/orders', category: 'order', template: 'special_order_update', status: record?.status ?? '' };
         if (record?.user_id) targetUserIds = [record.user_id];
         console.log(`[PUSH] special_order_status_changed → user=${record?.user_id} status=${record?.status}`);
@@ -663,6 +737,7 @@ Deno.serve(async (req) => {
 
       case 'banner_created': {
         templateKey = 'banner';
+        imageUrl = record?.image_url || undefined;
         data = { route: '/home', category: 'promo', template: 'new_banner' };
         // Notify all non-admin users
         const { data: adminIds } = await supabase.from('profiles').select('id').eq('role', 'admin');
@@ -824,7 +899,7 @@ Deno.serve(async (req) => {
       const results = await Promise.allSettled(
         batch.map(({ token, lang }) => {
           const { title, body } = buildTitleBody(lang);
-          return sendFcmV1(accessToken, projectId, token, title, body, data);
+          return sendFcmV1(accessToken, projectId, token, title, body, data, imageUrl);
         }),
       );
 

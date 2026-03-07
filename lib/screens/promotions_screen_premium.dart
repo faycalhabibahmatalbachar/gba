@@ -62,7 +62,7 @@ class _PromotionsScreenPremiumState extends State<PromotionsScreenPremium> {
     final filtered = _filtered(products);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: RefreshIndicator(
         onRefresh: () async {
           await productProvider.loadProducts(force: true);
@@ -295,7 +295,9 @@ class _TabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected ? const Color(0xFF667eea) : Colors.white,
+      color: isSelected
+          ? const Color(0xFF667eea)
+          : Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: () {
@@ -308,7 +310,7 @@ class _TabChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF2D3748),
+              color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),

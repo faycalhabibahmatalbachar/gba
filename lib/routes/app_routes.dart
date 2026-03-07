@@ -10,7 +10,8 @@ import '../screens/splash_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/home_screen_premium.dart';
 import '../screens/product/product_detail_screen.dart';
-// import '../screens/product/product_search_screen.dart'; // Fichier n'existe pas encore
+import '../screens/product/product_search_screen.dart';
+import '../screens/products_by_category_screen.dart';
 import '../screens/checkout/ultra_checkout_screen.dart';
 import '../screens/orders/my_orders_screen.dart';
 import '../screens/favorites_screen_premium.dart';
@@ -139,6 +140,8 @@ class AppRoutes {
           loc == '/promotions' ||
           loc == '/contact' ||
           loc.startsWith('/product/') ||
+          loc.startsWith('/category/') ||
+          loc == '/search' ||
           loc.startsWith('/legal/') ||
           isSplashRoute ||
           isBlockedRoute;
@@ -338,7 +341,48 @@ class AppRoutes {
       ),
       GoRoute(
         path: '/search',
-        redirect: (context, state) => '/categories',
+        pageBuilder: (context, state) {
+          final q = state.uri.queryParameters['q'];
+          return CustomTransitionPage(
+            child: ProductSearchScreen(initialQuery: q),
+            transitionDuration: const Duration(milliseconds: 400),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.05),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                  child: child,
+                ),
+              );
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/category/:id',
+        pageBuilder: (context, state) {
+          final categoryId = state.pathParameters['id'] ?? '';
+          final categoryName = state.uri.queryParameters['name'] ?? '';
+          return CustomTransitionPage(
+            child: ProductsByCategoryScreen(
+              categoryId: categoryId,
+              categoryName: Uri.decodeComponent(categoryName),
+            ),
+            transitionDuration: const Duration(milliseconds: 500),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+          );
+        },
       ),
       GoRoute(
         path: '/promotions',

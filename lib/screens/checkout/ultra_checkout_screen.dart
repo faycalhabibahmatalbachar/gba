@@ -560,7 +560,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
             },
             icon: const Icon(FontAwesomeIcons.arrowLeft),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -582,15 +582,17 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        boxShadow: Theme.of(context).brightness == Brightness.dark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,7 +635,9 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
           borderRadius: BorderRadius.circular(12),
         ),
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.surfaceContainerHighest
+            : Colors.grey.shade50,
       ),
     );
   }
@@ -649,7 +653,9 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
             height: 50,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              color: Colors.grey.shade200,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.surfaceContainerHighest
+                  : Colors.grey.shade200,
               image: item.product?.mainImage != null && item.product!.mainImage!.isNotEmpty
                   ? DecorationImage(
                       image: NetworkImage(item.product!.mainImage!),
@@ -659,7 +665,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                   : null,
             ),
             child: item.product?.mainImage == null || item.product!.mainImage!.isEmpty
-                ? Icon(FontAwesomeIcons.boxOpen, color: Colors.grey.shade400, size: 20)
+                ? Icon(FontAwesomeIcons.boxOpen, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20)
                 : null,
           ),
           const SizedBox(width: 12),
@@ -673,7 +679,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                 ),
                 Text(
                   '${item.quantity} x ${unitFcfa.toStringAsFixed(0)} FCFA',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
                 ),
               ],
             ),
@@ -720,14 +726,16 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
+        color: theme.colorScheme.surface,
+        boxShadow: theme.brightness == Brightness.dark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
+                ),
+              ],
       ),
       child: ElevatedButton(
         onPressed: _isProcessing ? null : _submitOrder,
@@ -777,9 +785,9 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
             const SizedBox(height: 10),
             Text(
               'N° $orderNumber',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 30),

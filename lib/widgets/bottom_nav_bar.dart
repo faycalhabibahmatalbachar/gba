@@ -1,289 +1,138 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../utils/auth_guard.dart';
-import 'package:badges/badges.dart' as badges;
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/cart_provider.dart';
 import '../localization/app_localizations.dart';
-import '../animations/app_animations.dart';
-import 'app_animation.dart';
+
+const _kAccent = Color(0xFF667eea);
+const _kAccent2 = Color(0xFF764ba2);
+const _kNavHeight = 68.0;
+const _kIconSize = 24.0;
+const _kIconSizeInactive = 22.0;
 
 class BottomNavBar extends StatefulWidget {
   final int currentIndex;
-  
-  const BottomNavBar({
-    super.key,
-    required this.currentIndex,
-  });
+
+  const BottomNavBar({super.key, required this.currentIndex});
 
   @override
   State<BottomNavBar> createState() => _BottomNavBarState();
 }
 
-class _BottomNavBarState extends State<BottomNavBar> {
-  int? _tappedIndex;
-  
+class _BottomNavBarState extends State<BottomNavBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _indicatorCtrl;
+  late Animation<double> _indicatorPos;
+  int _prevIndex = 0;
+
+  static const _routes = ['/home', '/categories', '/cart', '/favorites', '/profile'];
+  static const _authRequired = {2, 3, 4};
+
+  @override
+  void initState() {
+    super.initState();
+    _prevIndex = widget.currentIndex;
+    _indicatorCtrl = AnimationController(
+      duration: const Duration(milliseconds: 320),
+      vsync: this,
+    );
+    _indicatorPos = AlwaysStoppedAnimation(widget.currentIndex.toDouble());
+  }
+
+  @override
+  void didUpdateWidget(covariant BottomNavBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentIndex != widget.currentIndex) {
+      _animateTo(widget.currentIndex);
+    }
+  }
+
+  void _animateTo(int target) {
+    _indicatorPos = Tween<double>(
+      begin: _prevIndex.toDouble(),
+      end: target.toDouble(),
+    ).animate(CurvedAnimation(parent: _indicatorCtrl, curve: Curves.easeOutCubic));
+    _indicatorCtrl.forward(from: 0);
+    _prevIndex = target;
+  }
+
   @override
   void dispose() {
+    _indicatorCtrl.dispose();
     super.dispose();
   }
-  
-  void _onItemTapped(int index) {
+
+  void _onTap(int index) {
+    if (index == widget.currentIndex) return;
     HapticFeedback.lightImpact();
-    setState(() => _tappedIndex = index);
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (mounted) setState(() => _tappedIndex = null);
-    });
-    
-    switch (index) {
-      case 0:
-        context.go('/home');
-        break;
-      case 1:
-        context.go('/categories');
-        break;
-      case 2:
-        if (!requireAuth(context)) return;
-        context.go('/cart');
-        break;
-      case 3:
-        if (!requireAuth(context)) return;
-        context.go('/favorites');
-        break;
-      case 4:
-        if (!requireAuth(context)) return;
-        context.go('/profile');
-        break;
-    }
+    if (_authRequired.contains(index) && !requireAuth(context)) return;
+    context.go(_routes[index]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final cartProvider = Provider.of<CartProvider>(context);
-    final cartItemCount = cartProvider.itemCount;
-    final localizations = AppLocalizations.of(context);
-    
+    final cart = Provider.of<CartProvider>(context);
+    final l = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? const Color(0xFF1a1a2e) : Colors.white;
+
+    final items = <_NavItemData>[
+      _NavItemData(Icons.home_rounded, Icons.home_outlined, l.translate('home')),
+      _NavItemData(Icons.grid_view_rounded, Icons.grid_view_outlined, l.translate('categories')),
+      _NavItemData(Icons.shopping_bag_rounded, Icons.shopping_bag_outlined, l.translate('cart'), badge: cart.itemCount),
+      _NavItemData(Icons.favorite_rounded, Icons.favorite_border_rounded, l.translate('favorites')),
+      _NavItemData(Icons.person_rounded, Icons.person_outline_rounded, l.translate('profile')),
+    ];
+
+    final bg = isDark ? const Color(0xFF141420) : Colors.white;
+    final border = isDark ? Colors.white.withOpacity(0.06) : Colors.grey.withOpacity(0.12);
+    final inactiveColor = isDark ? Colors.grey.shade500 : Colors.grey.shade500;
 
     return Container(
       decoration: BoxDecoration(
-        color: surfaceColor.withOpacity(0.95),
+        color: bg,
+        border: Border(top: BorderSide(color: border, width: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667eea).withOpacity(isDark ? 0.05 : 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
-      child: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  surfaceColor.withOpacity(0.9),
-                  surfaceColor.withOpacity(0.95),
-                ],
-              ),
-              border: Border(
-                top: BorderSide(
-                  color: const Color(0xFF667eea).withOpacity(isDark ? 0.05 : 0.1),
-                  width: 0.5,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: _kNavHeight,
+          child: AnimatedBuilder(
+            animation: _indicatorCtrl,
+            builder: (context, _) {
+              return CustomPaint(
+                painter: _IndicatorPainter(
+                  position: _indicatorPos.value,
+                  itemCount: items.length,
+                  color: _kAccent,
+                  isDark: isDark,
                 ),
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: SizedBox(
-                height: 65,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildNavItem(
-                      index: 0,
-                      icon: FontAwesomeIcons.house,
-                      activeIcon: FontAwesomeIcons.house,
-                      label: localizations.translate('home'),
-                      isActive: widget.currentIndex == 0,
-                    ),
-                    _buildNavItem(
-                      index: 1,
-                      icon: FontAwesomeIcons.grip,
-                      activeIcon: FontAwesomeIcons.grip,
-                      label: localizations.translate('categories'),
-                      isActive: widget.currentIndex == 1,
-                    ),
-                    _buildNavItem(
-                      index: 2,
-                      icon: FontAwesomeIcons.cartShopping,
-                      activeIcon: FontAwesomeIcons.bagShopping,
-                      label: localizations.translate('cart'),
-                      isActive: widget.currentIndex == 2,
-                      hasBadge: true,
-                      badgeCount: cartItemCount,
-                    ),
-                    _buildNavItem(
-                      index: 3,
-                      icon: FontAwesomeIcons.heart,
-                      activeIcon: FontAwesomeIcons.solidHeart,
-                      label: localizations.translate('favorites'),
-                      isActive: widget.currentIndex == 3,
-                    ),
-                    _buildNavItem(
-                      index: 4,
-                      icon: FontAwesomeIcons.user,
-                      activeIcon: FontAwesomeIcons.solidUser,
-                      label: localizations.translate('profile'),
-                      isActive: widget.currentIndex == 4,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required bool isActive,
-    bool hasBadge = false,
-    int badgeCount = 0,
-  }) {
-    final iconWidget = hasBadge
-        ? badges.Badge(
-            position: badges.BadgePosition.topEnd(top: -8, end: -8),
-            showBadge: badgeCount > 0,
-            badgeAnimation: const badges.BadgeAnimation.scale(
-              animationDuration: Duration(milliseconds: 300),
-            ),
-            badgeContent: Text(
-              badgeCount.toString(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            badgeStyle: badges.BadgeStyle(
-              badgeColor: const Color(0xFFFF6B6B),
-              elevation: 0,
-              badgeGradient: const badges.BadgeGradient.linear(
-                colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-              ),
-            ),
-            child: FaIcon(
-              isActive ? activeIcon : icon,
-              size: isActive ? 22 : 20,
-              color: isActive ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
-            ),
-          )
-        : FaIcon(
-            isActive ? activeIcon : icon,
-            size: isActive ? 22 : 20,
-            color: isActive ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
-          );
-
-    final isTapped = _tappedIndex == index;
-
-    return Expanded(
-      child: AnimatedScale(
-        scale: isTapped ? 0.90 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeInOut,
-        child: InkWell(
-          onTap: () => _onItemTapped(index),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutBack,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isActive ? 16 : 12,
-                    vertical: isActive ? 7 : 5,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: isActive
-                        ? const LinearGradient(
-                            colors: [
-                              Color(0xFF667eea),
-                              Color(0xFF764ba2),
-                            ],
-                          )
-                        : null,
-                    borderRadius: BorderRadius.circular(isActive ? 20 : 15),
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF667eea).withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.center,
-                    children: [
-                      if (isActive)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: Center(
-                              child: OverflowBox(
-                                maxWidth: 56,
-                                maxHeight: 56,
-                                child: AppAnimation(
-                                  key: ValueKey(
-                                    '${AppAnimations.navActivePulse}-$index-${widget.currentIndex}',
-                                  ),
-                                  id: AppAnimations.navActivePulse,
-                                  width: 56,
-                                  height: 56,
-                                  fit: BoxFit.contain,
-                                  fallback: const SizedBox.shrink(),
-                                ),
-                              ),
-                            ),
-                          ),
+                  children: List.generate(items.length, (i) {
+                    final isActive = widget.currentIndex == i;
+                    final item = items[i];
+                    return Expanded(
+                      child: RepaintBoundary(
+                        child: _NavItem(
+                          data: item,
+                          isActive: isActive,
+                          inactiveColor: inactiveColor,
+                          onTap: () => _onTap(i),
                         ),
-                      iconWidget,
-                    ],
-                  ),
+                      ),
+                    );
+                  }),
                 ),
-                const SizedBox(height: 3),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 300),
-                  style: TextStyle(
-                    fontSize: isActive ? 11 : 10,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                    color: isActive
-                        ? const Color(0xFF667eea)
-                        : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
-                  ),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(label, maxLines: 1),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -291,5 +140,184 @@ class _BottomNavBarState extends State<BottomNavBar> {
   }
 }
 
-// Provider pour gérer l'index de navigation actuel
-// Navigation index handled by widget state
+class _NavItemData {
+  final IconData activeIcon;
+  final IconData inactiveIcon;
+  final String label;
+  final int badge;
+  const _NavItemData(this.activeIcon, this.inactiveIcon, this.label, {this.badge = 0});
+}
+
+class _NavItem extends StatefulWidget {
+  final _NavItemData data;
+  final bool isActive;
+  final Color inactiveColor;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.data,
+    required this.isActive,
+    required this.inactiveColor,
+    required this.onTap,
+  });
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin {
+  late final AnimationController _tapCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _tapCtrl = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 200),
+      vsync: this,
+      lowerBound: 0.0,
+      upperBound: 1.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tapCtrl.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails _) {
+    _tapCtrl.forward();
+  }
+
+  void _handleTapUp(TapUpDetails _) {
+    _tapCtrl.reverse();
+    widget.onTap();
+  }
+
+  void _handleTapCancel() {
+    _tapCtrl.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.isActive;
+    final iconColor = active ? _kAccent : widget.inactiveColor;
+    final labelColor = active ? _kAccent : widget.inactiveColor;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: _handleTapDown,
+      onTapUp: _handleTapUp,
+      onTapCancel: _handleTapCancel,
+      child: AnimatedBuilder(
+        animation: _tapCtrl,
+        builder: (context, child) {
+          final scale = 1.0 - (_tapCtrl.value * 0.08);
+          return Transform.scale(scale: scale, child: child);
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                  child: Icon(
+                    active ? widget.data.activeIcon : widget.data.inactiveIcon,
+                    key: ValueKey(active),
+                    size: active ? _kIconSize : _kIconSizeInactive,
+                    color: iconColor,
+                  ),
+                ),
+                if (widget.data.badge > 0)
+                  Positioned(
+                    right: -8,
+                    top: -6,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                      child: Container(
+                        key: ValueKey(widget.data.badge),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        constraints: const BoxConstraints(minWidth: 18, minHeight: 16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)]),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(color: const Color(0xFFFF6B6B).withOpacity(0.4), blurRadius: 6, offset: const Offset(0, 2)),
+                          ],
+                        ),
+                        child: Text(
+                          widget.data.badge > 99 ? '99+' : '${widget.data.badge}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700, height: 1.2),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 250),
+              style: TextStyle(
+                fontSize: active ? 11 : 10,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: labelColor,
+                letterSpacing: active ? 0.3 : 0,
+              ),
+              child: Text(widget.data.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IndicatorPainter extends CustomPainter {
+  final double position;
+  final int itemCount;
+  final Color color;
+  final bool isDark;
+
+  _IndicatorPainter({
+    required this.position,
+    required this.itemCount,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (itemCount == 0) return;
+    final itemWidth = size.width / itemCount;
+    final cx = itemWidth * position + itemWidth / 2;
+
+    // Top indicator line
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        colors: [_kAccent, _kAccent2],
+      ).createShader(Rect.fromCenter(center: Offset(cx, 0), width: 32, height: 3));
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, 1.5), width: 32, height: 3),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(rrect, paint);
+
+    // Subtle glow below indicator
+    final glowPaint = Paint()
+      ..color = color.withOpacity(isDark ? 0.08 : 0.05)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    canvas.drawCircle(Offset(cx, 16), 20, glowPaint);
+  }
+
+  @override
+  bool shouldRepaint(_IndicatorPainter old) =>
+      old.position != position || old.itemCount != itemCount || old.isDark != isDark;
+}

@@ -30,7 +30,6 @@ class _DriverMapScreenState extends State<DriverMapScreen>
 
   MbTilesTileProvider? _mbTilesProvider;
   bool _mapReady = false;
-  String? _mapErr;
   bool _useOnlineTiles = false;
 
   // Driver state
@@ -60,6 +59,7 @@ class _DriverMapScreenState extends State<DriverMapScreen>
   bool _isUpdatingStatus = false;
   String _currentStatus = 'confirmed';
   bool _arrivedAtClient = false;
+  bool _isFullScreen = false;
   static const double _arrivalRadiusMeters = 80.0;
 
   // Animations
@@ -105,16 +105,15 @@ class _DriverMapScreenState extends State<DriverMapScreen>
       setState(() {
         _mbTilesProvider = prov;
         _mapReady = true;
-        _mapErr = null;
         _useOnlineTiles = false;
       });
     } catch (e) {
       if (!mounted) return;
+      debugPrint('[DriverMap] offline tiles unavailable, using online: $e');
       setState(() {
         _mbTilesProvider = null;
         _mapReady = true;
         _useOnlineTiles = true;
-        _mapErr = 'Carte offline indisponible (map.mbtiles manquant)';
       });
     }
   }
@@ -352,7 +351,7 @@ class _DriverMapScreenState extends State<DriverMapScreen>
                   Marker(
                     point: _clientPos!,
                     width: 52, height: 72,
-                    child: _ClientMarker(speed: _clientSpeed, name: _clientName),
+                    child: _ClientMarker(speed: _clientSpeed, name: _clientName, pulse: _pulseCtrl),
                   ),
                 if (_driverPos != null)
                   Marker(
@@ -393,42 +392,6 @@ class _DriverMapScreenState extends State<DriverMapScreen>
               ]),
             ],
           ),
-
-          if (_mapErr != null)
-            Positioned(
-              left: 12,
-              right: 12,
-              top: MediaQuery.of(context).padding.top + 12,
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      IgnorePointer(
-                        ignoring: true,
-                        child: const Icon(Icons.map_outlined),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: IgnorePointer(
-                          ignoring: true,
-                          child: Text(
-                            _mapErr ?? 'Chargement de la carte offline…',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _initOfflineTiles,
-                        child: const Text('Réessayer'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
 
           // ── Top bar ──────────────────────────────────────────────────
           SafeArea(
@@ -482,11 +445,20 @@ class _DriverMapScreenState extends State<DriverMapScreen>
                     color: _autoFollow ? _green : Colors.white, size: 22,
                   ),
                 ),
+                const SizedBox(width: 8),
+                _GlassButton(
+                  onTap: () => setState(() => _isFullScreen = !_isFullScreen),
+                  child: Icon(
+                    _isFullScreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                    color: Colors.white, size: 22,
+                  ),
+                ),
               ]),
             ),
           ),
 
           // ── Speed + ETA HUD (top-right) ───────────────────────────
+          if (!_isFullScreen)
           Positioned(
             top: 100,
             right: 14,
@@ -574,7 +546,7 @@ class _DriverMapScreenState extends State<DriverMapScreen>
           ),
 
           // ── Direct distance HUD (top-left) ─────────────────────────
-          if (_directDistanceM > 0)
+          if (_directDistanceM > 0 && !_isFullScreen)
             Positioned(
               top: 100,
               left: 14,
@@ -606,10 +578,11 @@ class _DriverMapScreenState extends State<DriverMapScreen>
             ),
 
           // ── Bottom order panel ────────────────────────────────────
-          Positioned(
-            left: 0, right: 0, bottom: 0,
-            child: _buildBottomPanel(),
-          ),
+          if (!_isFullScreen)
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: _buildBottomPanel(),
+            ),
         ]),
       ),
     );
@@ -684,14 +657,14 @@ class _DriverMapScreenState extends State<DriverMapScreen>
         if (_currentStatus != 'delivered') ...[
           const SizedBox(height: 14),
           if (_arrivedAtClient)
-            Expanded(child: _ActionBtn(
+            _ActionBtn(
               label: '✅  Confirmer la livraison',
               colors: [_green, Colors.green.shade600],
               loading: _isUpdatingStatus,
               onTap: () => _updateStatus('delivered'),
-            ))
+            )
           else
-            Expanded(child: Container(
+            Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
@@ -707,15 +680,15 @@ class _DriverMapScreenState extends State<DriverMapScreen>
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ]),
-            )),
+            ),
         ],
         if (_currentStatus == 'delivered')
-          Expanded(child: Container(
+          Container(
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(color: _green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16),
               border: Border.all(color: _green.withValues(alpha: 0.3))),
             child: const Center(child: Text('🎉 Livraison terminée', style: TextStyle(color: _green, fontWeight: FontWeight.w800))),
-          )),
+          ),
       ]),
     );
   }
@@ -914,7 +887,8 @@ class _MotionTrailPainter extends CustomPainter {
 class _ClientMarker extends StatelessWidget {
   final double speed;
   final String name;
-  const _ClientMarker({required this.speed, required this.name});
+  final AnimationController pulse;
+  const _ClientMarker({required this.speed, required this.name, required this.pulse});
 
   @override
   Widget build(BuildContext context) {
@@ -922,32 +896,49 @@ class _ClientMarker extends StatelessWidget {
     final color = isMoving ? const Color(0xFFFF6B35) : const Color(0xFF00C851);
     final icon = isMoving ? Icons.directions_walk_rounded : Icons.person_pin_circle_rounded;
 
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      // Name label
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 6)],
-        ),
-        child: Text(
-          name.split(' ').first,
-          style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800),
-          maxLines: 1, overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      const SizedBox(height: 2),
-      Container(
-        width: 44, height: 44,
-        decoration: BoxDecoration(
-          color: color, shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 10, offset: const Offset(0, 3))],
-        ),
-        child: Icon(icon, color: Colors.white, size: 22),
-      ),
-      CustomPaint(size: const Size(12, 8), painter: _TrianglePainter(color)),
-    ]);
+    return AnimatedBuilder(
+      animation: pulse,
+      builder: (_, __) {
+        final t = pulse.value;
+        return Column(mainAxisSize: MainAxisSize.min, children: [
+          // Name label
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 6)],
+            ),
+            child: Text(
+              name.split(' ').first,
+              style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800),
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Stack(alignment: Alignment.center, children: [
+            // Blinking pulse ring
+            Container(
+              width: 44 + 16 * math.sin(t * math.pi),
+              height: 44 + 16 * math.sin(t * math.pi),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: 0.15 * (1 - t)),
+              ),
+            ),
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: color, shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 10, offset: const Offset(0, 3))],
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+          ]),
+          CustomPaint(size: const Size(12, 8), painter: _TrianglePainter(color)),
+        ]);
+      },
+    );
   }
 }
 

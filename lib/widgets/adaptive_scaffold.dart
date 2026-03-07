@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import 'bottom_nav_bar.dart';
@@ -60,7 +59,7 @@ class AdaptiveScaffold extends StatelessWidget {
         final localizations = AppLocalizations.of(context);
 
         if (!isWide) {
-          return Scaffold(
+          final scaffold = Scaffold(
             backgroundColor: backgroundColor,
             extendBodyBehindAppBar: extendBodyBehindAppBar,
             extendBody: extendBody,
@@ -71,6 +70,24 @@ class AdaptiveScaffold extends StatelessWidget {
             floatingActionButtonLocation: floatingActionButtonLocation,
             bottomNavigationBar: BottomNavBar(currentIndex: currentIndex),
           );
+
+          // On non-home tabs, intercept back button → go to home
+          if (currentIndex != 0) {
+            return PopScope(
+              canPop: false,
+              onPopInvokedWithResult: (didPop, _) {
+                if (didPop) return;
+                if (GoRouter.of(context).canPop()) {
+                  GoRouter.of(context).pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+              child: scaffold,
+            );
+          }
+
+          return scaffold;
         }
 
         return Scaffold(
@@ -104,8 +121,8 @@ class AdaptiveScaffold extends StatelessWidget {
                 ),
                 destinations: [
                   NavigationRailDestination(
-                    icon: const FaIcon(FontAwesomeIcons.house, size: 18),
-                    selectedIcon: const FaIcon(FontAwesomeIcons.house, size: 18),
+                    icon: const Icon(Icons.home_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.home_rounded, size: 22),
                     label: Text(
                       localizations.translate('home'),
                       maxLines: 1,
@@ -113,8 +130,8 @@ class AdaptiveScaffold extends StatelessWidget {
                     ),
                   ),
                   NavigationRailDestination(
-                    icon: const FaIcon(FontAwesomeIcons.grip, size: 18),
-                    selectedIcon: const FaIcon(FontAwesomeIcons.grip, size: 18),
+                    icon: const Icon(Icons.grid_view_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.grid_view_rounded, size: 22),
                     label: Text(
                       localizations.translate('categories'),
                       maxLines: 1,
@@ -122,8 +139,8 @@ class AdaptiveScaffold extends StatelessWidget {
                     ),
                   ),
                   NavigationRailDestination(
-                    icon: const FaIcon(FontAwesomeIcons.cartShopping, size: 18),
-                    selectedIcon: const FaIcon(FontAwesomeIcons.bagShopping, size: 18),
+                    icon: const Icon(Icons.shopping_bag_outlined, size: 22),
+                    selectedIcon: const Icon(Icons.shopping_bag_rounded, size: 22),
                     label: Text(
                       localizations.translate('cart'),
                       maxLines: 1,
@@ -131,8 +148,8 @@ class AdaptiveScaffold extends StatelessWidget {
                     ),
                   ),
                   NavigationRailDestination(
-                    icon: const FaIcon(FontAwesomeIcons.heart, size: 18),
-                    selectedIcon: const FaIcon(FontAwesomeIcons.solidHeart, size: 18),
+                    icon: const Icon(Icons.favorite_border_rounded, size: 22),
+                    selectedIcon: const Icon(Icons.favorite_rounded, size: 22),
                     label: Text(
                       localizations.translate('favorites'),
                       maxLines: 1,
@@ -140,8 +157,8 @@ class AdaptiveScaffold extends StatelessWidget {
                     ),
                   ),
                   NavigationRailDestination(
-                    icon: const FaIcon(FontAwesomeIcons.user, size: 18),
-                    selectedIcon: const FaIcon(FontAwesomeIcons.solidUser, size: 18),
+                    icon: const Icon(Icons.person_outline_rounded, size: 22),
+                    selectedIcon: const Icon(Icons.person_rounded, size: 22),
                     label: Text(
                       localizations.translate('profile'),
                       maxLines: 1,

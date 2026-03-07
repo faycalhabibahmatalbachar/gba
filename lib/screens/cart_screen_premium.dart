@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as classic_provider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -14,14 +14,14 @@ import '../widgets/adaptive_scaffold.dart';
 import '../animations/app_animations.dart';
 import '../widgets/app_animation.dart';
 
-class CartScreenPremium extends ConsumerStatefulWidget {
+class CartScreenPremium extends StatefulWidget {
   const CartScreenPremium({super.key});
 
   @override
-  ConsumerState<CartScreenPremium> createState() => _CartScreenPremiumState();
+  State<CartScreenPremium> createState() => _CartScreenPremiumState();
 }
 
-class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
+class _CartScreenPremiumState extends State<CartScreenPremium>
     with TickerProviderStateMixin {
   static const bool _debugImageLogs = false;
   late AnimationController _fadeController;
@@ -85,7 +85,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
 
     // Always reload cart when screen mounts
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(cartProvider).loadCart();
+      classic_provider.Provider.of<CartProvider>(context, listen: false).loadCart();
     });
   }
 
@@ -115,7 +115,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final cartState = ref.watch(cartProvider);
+    final cartState = classic_provider.Provider.of<CartProvider>(context);
 
     final appBar = _buildAppBar(context, localizations);
 
@@ -280,7 +280,7 @@ class _CartScreenPremiumState extends ConsumerState<CartScreenPremium>
         padding: const EdgeInsets.only(left: 16),
         child: Builder(
           builder: (context) {
-            final count = ref.watch(cartProvider).itemCount;
+            final count = classic_provider.Provider.of<CartProvider>(context).itemCount;
             return Row(
               children: [
                 Icon(

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -329,31 +332,46 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
   }
 
   Widget _card({required Widget child}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.withOpacity(0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        border: Border.all(color: theme.dividerColor),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
       ),
       child: child,
     );
   }
 
-  InputDecoration _fieldDecoration(String label, {String? hint}) {
+  InputDecoration _fieldDecoration(String label, {String? hint, IconData? icon}) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
+      prefixIcon: icon != null
+          ? Padding(
+              padding: const EdgeInsets.only(left: 14, right: 10),
+              child: Icon(icon, size: 16),
+            )
+          : null,
+      prefixIconConstraints: icon != null
+          ? const BoxConstraints(minWidth: 0, minHeight: 0)
+          : null,
       filled: true,
-      fillColor: Colors.grey.withOpacity(0.06),
+      fillColor: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).colorScheme.surfaceContainerHighest
+          : Colors.grey.withOpacity(0.06),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
@@ -361,28 +379,55 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme, AppLocalizations localizations) {
-    final progress = (_currentStep + 1) / _totalSteps;
-    final stepLabel = localizations.translateParams(
-      'special_order_step_indicator',
-      {
-        'current': (_currentStep + 1).toString(),
-        'total': _totalSteps.toString(),
-      },
-    );
+  static const List<IconData> _stepIcons = [
+    FontAwesomeIcons.penToSquare,
+    FontAwesomeIcons.camera,
+    FontAwesomeIcons.truckFast,
+    FontAwesomeIcons.clipboardCheck,
+  ];
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+  static const List<String> _stepKeys = [
+    'special_order_step_details',
+    'special_order_step_images',
+    'special_order_step_delivery',
+    'special_order_step_summary',
+  ];
+
+  Widget _buildHeader(ThemeData theme, AppLocalizations localizations) {
+    final isDark = theme.brightness == Brightness.dark;
+    const brandGradient = [Color(0xFF667eea), Color(0xFF764ba2)];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: brandGradient,
+        ),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: const Color(0xFF667eea).withOpacity(0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               IconButton(
                 onPressed: _isSubmitting ? null : _goBack,
-                icon: const Icon(Icons.arrow_back),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.white,
+                  backgroundColor: Colors.white.withOpacity(0.18),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -390,88 +435,225 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localizations.translate('specialOrder'),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      stepLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  localizations.translate('specialOrder'),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 10,
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
-            ),
+          const SizedBox(height: 18),
+          Row(
+            children: List.generate(_totalSteps * 2 - 1, (i) {
+              if (i.isOdd) {
+                final beforeIndex = i ~/ 2;
+                final done = beforeIndex < _currentStep;
+                return Expanded(
+                  child: Container(
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      color: done
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.25),
+                    ),
+                  ),
+                );
+              }
+              final stepIndex = i ~/ 2;
+              final isDone = stepIndex < _currentStep;
+              final isCurrent = stepIndex == _currentStep;
+              return _buildStepDot(
+                stepIndex: stepIndex,
+                isDone: isDone,
+                isCurrent: isCurrent,
+                localizations: localizations,
+              );
+            }),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildStepDot({
+    required int stepIndex,
+    required bool isDone,
+    required bool isCurrent,
+    required AppLocalizations localizations,
+  }) {
+    final icon = _stepIcons[stepIndex];
+    final label = localizations.translate(_stepKeys[stepIndex]);
+
+    return Column(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          width: isCurrent ? 46 : 38,
+          height: isCurrent ? 46 : 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDone
+                ? Colors.white
+                : isCurrent
+                    ? Colors.white.withOpacity(0.25)
+                    : Colors.white.withOpacity(0.10),
+            border: isCurrent
+                ? Border.all(color: Colors.white, width: 2.5)
+                : null,
+            boxShadow: isCurrent
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.35),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    )
+                  ]
+                : null,
+          ),
+          child: Icon(
+            icon,
+            size: isCurrent ? 18 : 15,
+            color: isDone
+                ? const Color(0xFF667eea)
+                : Colors.white.withOpacity(isCurrent ? 1.0 : 0.5),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+            color: Colors.white.withOpacity(isCurrent ? 1.0 : 0.55),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBottomControls(AppLocalizations localizations) {
     final isLast = _currentStep >= _totalSteps - 1;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey.withOpacity(0.12)),
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
         ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
       ),
       child: Row(
         children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _goNext,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+          if (_currentStep > 0)
+            IconButton(
+              onPressed: _isSubmitting ? null : _goBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+              style: IconButton.styleFrom(
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                minimumSize: const Size(48, 48),
+              ),
+            )
+          else
+            OutlinedButton(
+              onPressed: _isSubmitting ? null : _goBack,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      isLast
-                          ? localizations.translate('confirmOrder')
-                          : localizations.translate('save_and_continue'),
-                    ),
+              child: Text(localizations.translate('cancel')),
             ),
-          ),
-          const SizedBox(width: 10),
-          OutlinedButton(
-            onPressed: _isSubmitting ? null : _goBack,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                ),
+                boxShadow: _isSubmitting
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: const Color(0xFF667eea).withOpacity(0.4),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
               ),
-            ),
-            child: Text(
-              _currentStep == 0 ? localizations.translate('cancel') : localizations.translate('back'),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _isSubmitting
+                      ? null
+                      : () {
+                          HapticFeedback.mediumImpact();
+                          _goNext();
+                        },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    child: Center(
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  isLast
+                                      ? localizations.translate('confirmOrder')
+                                      : localizations.translate('save_and_continue'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                if (!isLast) ...[
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward_rounded,
+                                      color: Colors.white, size: 18),
+                                ],
+                                if (isLast) ...[
+                                  const SizedBox(width: 8),
+                                  const Icon(FontAwesomeIcons.check,
+                                      color: Colors.white, size: 15),
+                                ],
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -496,7 +678,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _productNameController,
-              decoration: _fieldDecoration(localizations.translate('productName')),
+              decoration: _fieldDecoration(localizations.translate('productName'), icon: FontAwesomeIcons.box),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return localizations.translate('special_order_product_name_required');
@@ -507,7 +689,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _quantityController,
-              decoration: _fieldDecoration(localizations.translate('quantity'), hint: 'Ex: 2'),
+              decoration: _fieldDecoration(localizations.translate('quantity'), hint: 'Ex: 2', icon: FontAwesomeIcons.hashtag),
               keyboardType: TextInputType.number,
               validator: (value) {
                 final q = int.tryParse(value?.trim() ?? '');
@@ -520,7 +702,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _descriptionController,
-              decoration: _fieldDecoration(localizations.translate('description'), hint: 'Marque, taille, couleur…'),
+              decoration: _fieldDecoration(localizations.translate('description'), hint: 'Marque, taille, couleur…', icon: FontAwesomeIcons.alignLeft),
               maxLines: 4,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -560,7 +742,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
           const SizedBox(height: 10),
           Text(
             localizations.translate('special_order_images_hint'),
-            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 14),
           if (_selectedImages.isEmpty)
@@ -568,13 +750,15 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.06),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.surfaceContainerHighest
+                    : Colors.grey.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Text(
                 localizations.translate('uploadImage'),
-                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700),
               ),
             )
           else
@@ -652,9 +836,11 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
             ),
             Container(
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.06),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.surfaceContainerHighest
+                    : Colors.grey.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.withOpacity(0.12)),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Column(
                 children: [
@@ -751,9 +937,11 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.06),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.surfaceContainerHighest
+                  : Colors.grey.withOpacity(0.06),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.withOpacity(0.12)),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Text(
               localizations.translate('special_order_confirm_hint'),
@@ -852,7 +1040,12 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
 
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return PopScope(
+      canPop: _currentStep == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goBack();
+      },
+      child: Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -900,6 +1093,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -930,7 +1124,7 @@ class _SummaryRow extends StatelessWidget {
           width: 92,
           child: Text(
             label,
-            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w800),
           ),
         ),
         const SizedBox(width: 10),

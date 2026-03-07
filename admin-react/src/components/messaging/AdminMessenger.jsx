@@ -217,9 +217,7 @@ export default function AdminMessenger() {
       if (error) throw error;
       setMsgs(p => p.map(m => m.id === tmp ? data : m));
       await supabase.from('chat_conversations').update({ updated_at: new Date().toISOString() }).eq('id', sel.id);
-      try { await supabase.functions.invoke('send-push-notification', {
-        body: { type: 'new_message', record: { user_id: sel.user_id, sender_id: adminId.current, message: content.slice(0, 100) } },
-      }); } catch (_) {}
+      // Push notification is handled by SQL trigger trg_chat_message_created
     } catch (e) {
       setMsgs(p => p.filter(m => m.id !== tmp));
       enqueueSnackbar('Erreur envoi', { variant: 'error' });

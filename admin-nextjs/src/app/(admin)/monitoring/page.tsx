@@ -439,7 +439,7 @@ export default function MonitoringPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Monitoring"
+        title="Surveillance"
         subtitle="Surveillance en temps réel"
         extra={
           <Button icon={<ReloadOutlined />} loading={refreshing} onClick={() => void refreshAll()}>
@@ -478,7 +478,7 @@ export default function MonitoringPage() {
 
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={12}>
-          <Card title="Top produits dans les paniers" extra={<Tag color="blue">Realtime</Tag>}>
+          <Card title="Top produits dans les paniers" extra={<Tag color="blue">Temps réel</Tag>}>
             {loading ? (
               <div className="py-8 flex justify-center"><Spin /></div>
             ) : topCartProducts.length ? (
@@ -505,7 +505,7 @@ export default function MonitoringPage() {
         </Col>
 
         <Col xs={24} lg={12}>
-          <Card title="Top produits en favoris" extra={<Tag color="blue">Realtime</Tag>}>
+          <Card title="Top produits en favoris" extra={<Tag color="blue">Temps réel</Tag>}>
             {favoritesLoading ? (
               <div className="py-8 flex justify-center"><Spin /></div>
             ) : favoritesTopProductsVisual.length ? (
@@ -665,12 +665,12 @@ export default function MonitoringPage() {
                 <div className="space-y-3">
                   <Row gutter={[12, 12]}>
                     <Col xs={24} lg={12}>
-                      <Card title="Top produits" extra={<Tag color="blue">Realtime</Tag>}>
+                      <Card title="Top produits" extra={<Tag color="blue">Temps réel</Tag>}>
                         {favoritesLoading ? <div className="py-10 flex justify-center"><Spin /></div> : <Bar {...favoritesBarConfig} />}
                       </Card>
                     </Col>
                     <Col xs={24} lg={12}>
-                      <Card title="Répartition par catégorie" extra={<Tag color="blue">Realtime</Tag>}>
+                      <Card title="Répartition par catégorie" extra={<Tag color="blue">Temps réel</Tag>}>
                         {favoritesLoading ? <div className="py-10 flex justify-center"><Spin /></div> : <Pie {...favoritesPieConfig} />}
                       </Card>
                     </Col>

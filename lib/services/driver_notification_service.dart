@@ -76,7 +76,19 @@ class DriverNotificationService {
           enableVibration: true,
         ),
       );
-      debugPrint('[DriverNotif] ✅ Android channel created: $_channelId');
+      // Also create the channel that FCM background messages use
+      // (must match AndroidManifest default_notification_channel_id)
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'high_importance_channel',
+          'Notifications importantes',
+          description: 'Canal pour les notifications push FCM',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        ),
+      );
+      debugPrint('[DriverNotif] ✅ Android channels created: $_channelId + high_importance_channel');
     }
 
     // FCM token

@@ -47,7 +47,7 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
       {
         key: 'dashboard',
         icon: <AppstoreOutlined />,
-        label: <Link href="/dashboard">Dashboard</Link>,
+        label: <Link href="/dashboard">Tableau de bord</Link>,
       },
       {
         key: 'orders',
@@ -57,7 +57,7 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
       {
         key: 'monitoring',
         icon: <RadarChartOutlined />,
-        label: <Link href="/monitoring">Monitoring</Link>,
+        label: <Link href="/monitoring">Surveillance</Link>,
       },
       {
         key: 'products',
@@ -76,7 +76,7 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
       {
         key: 'delivery-tracking',
         icon: <EnvironmentOutlined />,
-        label: <Link href="/delivery-tracking">Tracking</Link>,
+        label: <Link href="/delivery-tracking">Suivi livraisons</Link>,
       },
       {
         key: 'drivers',

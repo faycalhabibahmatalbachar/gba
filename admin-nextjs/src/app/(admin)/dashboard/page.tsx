@@ -1605,7 +1605,7 @@ export default function DashboardPage() {
 
             <div className="flex items-center justify-between">
               <Typography.Title level={5} style={{ margin: 0 }}>Articles</Typography.Title>
-              <Typography.Text type="secondary">{drawerItems.length} item(s)</Typography.Text>
+              <Typography.Text type="secondary">{drawerItems.length} article(s)</Typography.Text>
             </div>
 
             {drawerLoading ? (

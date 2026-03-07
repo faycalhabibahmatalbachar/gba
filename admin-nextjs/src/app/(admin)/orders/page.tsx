@@ -516,7 +516,7 @@ export default function OrdersPage() {
     <div className="space-y-5 pb-8">
       <PageHeader
         title="Commandes"
-        subtitle="Order Management Center — suivi et actions"
+        subtitle="Centre de gestion des commandes — suivi et actions"
         extra={
           <Space wrap>
             <Button icon={<ExportOutlined />} onClick={() => exportCsv(`orders_${dayjs().format('YYYYMMDD_HHmm')}.csv`, ['id', 'order_number', 'created_at', 'customer_name', 'customer_phone', 'status', 'total_amount', 'driver_id'], orders.map((o) => [o.id, o.order_number || '', o.created_at, o.customer_name || '', o.customer_phone_profile || o.customer_phone || '', o.status || '', Number(o.total_amount || 0), o.driver_id || '']))}>
@@ -627,7 +627,7 @@ export default function OrdersPage() {
             onRow={(r) => ({
               onClick: (e) => {
                 const target = e.target as HTMLElement;
-                if (target.closest('button') || target.closest('.ant-checkbox-wrapper') || target.closest('input[type=checkbox]')) return;
+                if (target.closest('button') || target.closest('.ant-checkbox-wrapper') || target.closest('input[type=checkbox]') || target.closest('.ant-select')) return;
                 setSelected(r);
                 setDetailsOpen(true);
                 void loadOrderDetails(r.id);

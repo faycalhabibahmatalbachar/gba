@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:go_router/go_router.dart';
-import 'dart:ui';
-import 'dart:math' as math;
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/category.dart';
-import '../animations/app_animations.dart';
 import '../providers/categories_provider.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/app_state_view.dart';
 import '../localization/app_localizations.dart';
 import 'products_by_category_screen.dart';
+
+const _kAccent = Color(0xFF667eea);
 
 class CategoriesScreenPremium extends StatefulWidget {
   const CategoriesScreenPremium({super.key});
@@ -21,791 +20,423 @@ class CategoriesScreenPremium extends StatefulWidget {
   State<CategoriesScreenPremium> createState() => _CategoriesScreenPremiumState();
 }
 
-class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium>
-    with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late AnimationController _scaleController;
-  late AnimationController _rotationController;
-  late AnimationController _pulseController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _pulseAnimation;
-  final Map<String, bool> _hoveredCategories = {};
-  final Map<String, int> _productCounts = {};
+class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Map<String, int> _productCounts = {};
+  bool _countsLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _rotationController = AnimationController(
-      duration: const Duration(seconds: 20),
-      vsync: this,
-    )..repeat();
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeIn,
-    );
-    _scaleAnimation = CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.elasticOut,
-    );
-    _pulseAnimation = Tween<double>(
-      begin: 0.95,
-      end: 1.05,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-
-    _fadeController.forward();
-    _scaleController.forward();
-
     _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.trim().toLowerCase();
-      });
+      setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
     });
+    _loadProductCounts();
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _scaleController.dispose();
-    _rotationController.dispose();
-    _pulseController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  IconData _getCategoryIcon(String categoryName) {
-    final Map<String, IconData> categoryIcons = {
-      'électronique': FontAwesomeIcons.microchip,
-      'electronics': FontAwesomeIcons.microchip,
-      'mode': FontAwesomeIcons.shirt,
-      'fashion': FontAwesomeIcons.shirt,
-      'vêtements': FontAwesomeIcons.shirt,
-      'clothes': FontAwesomeIcons.shirt,
-      'maison': FontAwesomeIcons.house,
-      'home': FontAwesomeIcons.house,
-      'jardin': FontAwesomeIcons.leaf,
-      'garden': FontAwesomeIcons.leaf,
-      'sport': FontAwesomeIcons.dumbbell,
-      'sports': FontAwesomeIcons.dumbbell,
-      'fitness': FontAwesomeIcons.dumbbell,
-      'jouets': FontAwesomeIcons.gamepad,
-      'toys': FontAwesomeIcons.gamepad,
-      'jeux': FontAwesomeIcons.gamepad,
-      'games': FontAwesomeIcons.gamepad,
-      'beauté': FontAwesomeIcons.spa,
-      'beauty': FontAwesomeIcons.spa,
-      'cosmétiques': FontAwesomeIcons.spa,
-      'cosmetics': FontAwesomeIcons.spa,
-      'livres': FontAwesomeIcons.book,
-      'books': FontAwesomeIcons.book,
-      'nourriture': FontAwesomeIcons.utensils,
-      'food': FontAwesomeIcons.utensils,
-      'alimentation': FontAwesomeIcons.utensils,
-      'musique': FontAwesomeIcons.music,
-      'music': FontAwesomeIcons.music,
-      'auto': FontAwesomeIcons.car,
-      'car': FontAwesomeIcons.car,
-      'automobile': FontAwesomeIcons.car,
-      'bébé': FontAwesomeIcons.baby,
-      'baby': FontAwesomeIcons.baby,
-      'enfants': FontAwesomeIcons.child,
-      'kids': FontAwesomeIcons.child,
-      'santé': FontAwesomeIcons.heartPulse,
-      'health': FontAwesomeIcons.heartPulse,
-      'bijoux': FontAwesomeIcons.gem,
-      'jewelry': FontAwesomeIcons.gem,
-      'chaussures': FontAwesomeIcons.shoePrints,
-      'shoes': FontAwesomeIcons.shoePrints,
-      'sacs': FontAwesomeIcons.bagShopping,
-      'bags': FontAwesomeIcons.bagShopping,
-      'montres': FontAwesomeIcons.clock,
-      'watches': FontAwesomeIcons.clock,
-      'bureau': FontAwesomeIcons.briefcase,
-      'office': FontAwesomeIcons.briefcase,
-      'outils': FontAwesomeIcons.wrench,
-      'tools': FontAwesomeIcons.wrench,
-      'animaux': FontAwesomeIcons.paw,
-      'pets': FontAwesomeIcons.paw,
-      'voyage': FontAwesomeIcons.plane,
-      'travel': FontAwesomeIcons.plane,
-    };
-
-    final lowerName = categoryName.toLowerCase();
-    for (var entry in categoryIcons.entries) {
-      if (lowerName.contains(entry.key)) {
-        return entry.value;
+  Future<void> _loadProductCounts() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('products')
+          .select('category_id');
+      final rows = response as List;
+      final counts = <String, int>{};
+      for (final row in rows) {
+        final catId = row['category_id']?.toString();
+        if (catId != null) {
+          counts[catId] = (counts[catId] ?? 0) + 1;
+        }
       }
+      if (mounted) setState(() { _productCounts = counts; _countsLoaded = true; });
+    } catch (_) {
+      if (mounted) setState(() => _countsLoaded = true);
     }
-    return FontAwesomeIcons.boxOpen;
-  }
-
-  Color _getCategoryColor(int index) {
-    final colors = [
-      Colors.blue,
-      Colors.purple,
-      Colors.pink,
-      Colors.orange,
-      Colors.green,
-      Colors.teal,
-      Colors.indigo,
-      Colors.red,
-      Colors.amber,
-      Colors.cyan,
-    ];
-    return colors[index % colors.length];
   }
 
   String _fixImageUrl(String url) {
-    // Correction des URLs avec double "/categories/categories/"
     if (url.contains('/categories/categories/')) {
       url = url.replaceAll('/categories/categories/', '/categories/');
     }
-    
-    // Si l'URL est relative, ajouter le domaine Supabase
     if (!url.startsWith('http')) {
-      final supabaseUrl = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
-      if (url.startsWith('/')) {
-        url = '$supabaseUrl$url';
-      } else {
-        url = '$supabaseUrl/$url';
-      }
+      const base = 'https://uvlrgwdbjegoavjfdrzb.supabase.co';
+      url = url.startsWith('/') ? '$base$url' : '$base/$url';
     }
-    
     return url;
   }
 
+  IconData _getCategoryIcon(String name) {
+    final m = <String, IconData>{
+      'électronique': Icons.memory_rounded, 'electronics': Icons.memory_rounded,
+      'mode': Icons.checkroom_rounded, 'fashion': Icons.checkroom_rounded,
+      'vêtements': Icons.checkroom_rounded, 'clothes': Icons.checkroom_rounded,
+      'maison': Icons.home_rounded, 'home': Icons.home_rounded,
+      'jardin': Icons.park_rounded, 'garden': Icons.park_rounded,
+      'sport': Icons.fitness_center_rounded, 'sports': Icons.fitness_center_rounded,
+      'jouets': Icons.toys_rounded, 'toys': Icons.toys_rounded,
+      'jeux': Icons.sports_esports_rounded, 'games': Icons.sports_esports_rounded,
+      'beauté': Icons.spa_rounded, 'beauty': Icons.spa_rounded,
+      'cosmétiques': Icons.spa_rounded, 'cosmetics': Icons.spa_rounded,
+      'livres': Icons.menu_book_rounded, 'books': Icons.menu_book_rounded,
+      'nourriture': Icons.restaurant_rounded, 'food': Icons.restaurant_rounded,
+      'alimentation': Icons.restaurant_rounded,
+      'musique': Icons.music_note_rounded, 'music': Icons.music_note_rounded,
+      'auto': Icons.directions_car_rounded, 'automobile': Icons.directions_car_rounded,
+      'bébé': Icons.child_friendly_rounded, 'baby': Icons.child_friendly_rounded,
+      'enfants': Icons.child_care_rounded, 'kids': Icons.child_care_rounded,
+      'santé': Icons.health_and_safety_rounded, 'health': Icons.health_and_safety_rounded,
+      'bijoux': Icons.diamond_rounded, 'jewelry': Icons.diamond_rounded,
+      'chaussures': Icons.ice_skating_rounded, 'shoes': Icons.ice_skating_rounded,
+      'sacs': Icons.shopping_bag_rounded, 'bags': Icons.shopping_bag_rounded,
+      'montres': Icons.watch_rounded, 'watches': Icons.watch_rounded,
+      'bureau': Icons.business_center_rounded, 'office': Icons.business_center_rounded,
+      'outils': Icons.build_rounded, 'tools': Icons.build_rounded,
+      'animaux': Icons.pets_rounded, 'pets': Icons.pets_rounded,
+      'voyage': Icons.flight_rounded, 'travel': Icons.flight_rounded,
+    };
+    final lower = name.toLowerCase();
+    for (final e in m.entries) {
+      if (lower.contains(e.key)) return e.value;
+    }
+    return Icons.category_rounded;
+  }
+
+  static const _cardGradients = <List<Color>>[
+    [Color(0xFF667eea), Color(0xFF764ba2)],
+    [Color(0xFFf093fb), Color(0xFFf5576c)],
+    [Color(0xFF4facfe), Color(0xFF00f2fe)],
+    [Color(0xFF43e97b), Color(0xFF38f9d7)],
+    [Color(0xFFfa709a), Color(0xFFfee140)],
+    [Color(0xFF7f00ff), Color(0xFFe100ff)],
+    [Color(0xFFfc5c7d), Color(0xFF6a82fb)],
+    [Color(0xFFffecd2), Color(0xFFfcb69f)],
+    [Color(0xFFa18cd1), Color(0xFFfbc2eb)],
+    [Color(0xFF89f7fe), Color(0xFF66a6ff)],
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final categoriesProvider = Provider.of<CategoriesProvider>(context);
-    final categories = categoriesProvider.categories;
-    final localizations = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final prov = Provider.of<CategoriesProvider>(context);
+    final categories = prov.categories;
+    final l = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final filteredCategories = _searchQuery.isEmpty
+    final filtered = _searchQuery.isEmpty
         ? categories
         : categories.where((c) {
-            final name = (c['name'] ?? '').toString().toLowerCase();
-            final desc = (c['description'] ?? '').toString().toLowerCase();
-            return name.contains(_searchQuery) || desc.contains(_searchQuery);
+            final n = (c['name'] ?? '').toString().toLowerCase();
+            final d = (c['description'] ?? '').toString().toLowerCase();
+            return n.contains(_searchQuery) || d.contains(_searchQuery);
           }).toList();
 
     return AdaptiveScaffold(
       currentIndex: 1,
-      extendBodyBehindAppBar: true,
-      appBar: _buildAppBar(context, localizations),
-      body: Stack(
-        children: [
-          // Animated gradient background
-          _buildAnimatedBackground(),
-          // Main content
-          SafeArea(
-            child: categoriesProvider.isLoading
-                ? _buildLoadingState(localizations)
-                : (categoriesProvider.error != null)
-                    ? _buildErrorState(categoriesProvider.error!, localizations, categoriesProvider)
-                    : RefreshIndicator(
-                        onRefresh: () => categoriesProvider.loadCategories(),
-                        child: categories.isEmpty
-                            ? ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: [
-                                  const SizedBox(height: 80),
-                                  _buildEmptyState(localizations),
-                                ],
+      backgroundColor: isDark ? const Color(0xFF0f0f1a) : const Color(0xFFF5F6FA),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        title: Text(
+          l.translate('categories'),
+          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: prov.isLoading && categories.isEmpty
+          ? _buildShimmerGrid(isDark)
+          : (prov.error != null && categories.isEmpty)
+              ? _buildErrorState(prov.error!, l, prov)
+              : RefreshIndicator(
+                  color: _kAccent,
+                  onRefresh: () async {
+                    await prov.loadCategories(force: true);
+                    _loadProductCounts();
+                  },
+                  child: categories.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [const SizedBox(height: 80), _buildEmptyState(l)],
+                        )
+                      : CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                          slivers: [
+                            SliverToBoxAdapter(child: _buildSearchBar(l, isDark)),
+                            if (filtered.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: AppStateView(
+                                  state: AppViewState.empty,
+                                  title: l.translate('no_results'),
+                                  subtitle: l.translate('try_another_keyword'),
+                                ),
                               )
-                            : Column(
-                                children: [
-                                  _buildSearchBar(theme, localizations),
-                                  Expanded(
-                                    child: filteredCategories.isEmpty
-                                        ? ListView(
-                                            physics: const AlwaysScrollableScrollPhysics(),
-                                            padding: const EdgeInsets.all(24),
-                                            children: [
-                                              const SizedBox(height: 40),
-                                              _buildNoResultsState(localizations),
-                                            ],
-                                          )
-                                        : _buildCategoriesGrid(filteredCategories, localizations, theme),
+                            else
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                                sliver: SliverGrid(
+                                  delegate: SliverChildBuilderDelegate(
+                                    (ctx, i) => _buildCategoryCard(filtered[i], i, l, isDark),
+                                    childCount: filtered.length,
                                   ),
-                                ],
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 0.82,
+                                    crossAxisSpacing: 14,
+                                    mainAxisSpacing: 14,
+                                  ),
+                                ),
                               ),
-                      ),
-          ),
-        ],
-      ),
+                          ],
+                        ),
+                ),
     );
   }
 
-  Widget _buildSearchBar(ThemeData theme, AppLocalizations localizations) {
+  Widget _buildSearchBar(AppLocalizations l, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? theme.colorScheme.surface.withOpacity(0.7)
-                  : Colors.white.withOpacity(0.55),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? theme.dividerColor
-                    : Colors.white.withOpacity(0.35),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(FontAwesomeIcons.magnifyingGlass, size: 16),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: localizations.translate('search_category_hint'),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                if (_searchQuery.isNotEmpty)
-                  IconButton(
-                    onPressed: () {
-                      _searchController.clear();
-                    },
-                    icon: const Icon(Icons.close),
-                  ),
-              ],
-            ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isDark
+              ? []
+              : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        child: TextField(
+          controller: _searchController,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: l.translate('search_category_hint'),
+            hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade400, fontSize: 14),
+            prefixIcon: Icon(Icons.search_rounded, color: isDark ? Colors.white38 : Colors.grey.shade400, size: 20),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white38 : Colors.grey.shade400),
+                    onPressed: () => _searchController.clear(),
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1, end: 0, curve: Curves.easeOut);
   }
 
-  Widget _buildNoResultsState(AppLocalizations localizations) {
-    return AppStateView(
-      state: AppViewState.empty,
-      animationId: AppAnimations.searchNoResult,
-      title: localizations.translate('no_results'),
-      subtitle: localizations.translate('try_another_keyword'),
-    );
-  }
+  Widget _buildCategoryCard(dynamic category, int index, AppLocalizations l, bool isDark) {
+    final name = (category['name'] ?? l.translate('category')).toString();
+    final imageUrl = category['image_url']?.toString();
+    final catId = category['id']?.toString() ?? '';
+    final count = _productCounts[catId] ?? 0;
+    final gradient = _cardGradients[index % _cardGradients.length];
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, AppLocalizations localizations) {
-    return AppBar(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      title: Row(
-        children: [
-          const Icon(FontAwesomeIcons.grip, size: 20),
-          const SizedBox(width: 12),
-          Text(
-            localizations.translate('categories'),
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-      actions: [
-        const SizedBox(width: 16),
-      ],
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: Theme.of(context).brightness == Brightness.dark
-                    ? [
-                        Theme.of(context).colorScheme.surface.withOpacity(0.1),
-                        Theme.of(context).colorScheme.surface.withOpacity(0.05),
-                      ]
-                    : [
-                        Colors.white.withOpacity(0.1),
-                        Colors.white.withOpacity(0.05),
-                      ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<int> _getProductCount(String categoryId) async {
-    if (_productCounts.containsKey(categoryId)) {
-      return _productCounts[categoryId]!;
-    }
-    try {
-      final response = await Supabase.instance.client
-          .from('products')
-          .select('id')
-          .eq('category_id', categoryId)
-          .eq('is_active', true);
-      final count = (response as List).length;
-      _productCounts[categoryId] = count;
-      return count;
-    } catch (e) {
-      return 0;
-    }
-  }
-
-  Widget _buildAnimatedBackground() {
-    return AnimatedBuilder(
-      animation: _rotationController,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: Theme.of(context).brightness == Brightness.dark
-                ? [
-                    Colors.purple.shade900.withOpacity(0.3),
-                    Colors.blue.shade900.withOpacity(0.3),
-                    Colors.pink.shade900.withOpacity(0.3),
-                  ]
-                : [
-                    Colors.purple.shade50,
-                    Colors.blue.shade50,
-                    Colors.pink.shade50,
-                  ],
-              transform: GradientRotation(_rotationController.value * 2 * math.pi),
-            ),
-          ),
-          child: CustomPaint(
-            painter: CategoryMeshGradientPainter(_rotationController.value),
-            child: Container(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCategoriesGrid(List<dynamic> categories, AppLocalizations localizations, ThemeData theme) {
-    return Column(
-      children: [
-        // Header with stats
-        _buildStatsHeader(categories.length, localizations),
-        // Categories grid
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 1.0,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: categories.length,
-            itemBuilder: (context, index) {
-              final category = categories[index];
-              final categoryKey = 'category_${category['id']}';
-              final isHovered = _hoveredCategories[categoryKey] ?? false;
-              
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: _buildCategoryCard(
-                    category,
-                    index,
-                    isHovered,
-                    categoryKey,
-                    theme,
-                    localizations,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatsHeader(int totalCategories, AppLocalizations localizations) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: Theme.of(context).brightness == Brightness.dark
-              ? [
-                  Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                  Theme.of(context).colorScheme.surface.withOpacity(0.7),
-                ]
-              : [
-                  Colors.white.withOpacity(0.9),
-                  Colors.white.withOpacity(0.7),
-                ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                icon: FontAwesomeIcons.boxOpen,
-                value: '$totalCategories',
-                label: localizations.translate('categories'),
-                color: Colors.blue,
-              ),
-              _buildStatItem(
-                icon: FontAwesomeIcons.fire,
-                value: '12',
-                label: localizations.translate('popular'),
-                color: Colors.orange,
-              ),
-              _buildStatItem(
-                icon: FontAwesomeIcons.star,
-                value: '5',
-                label: localizations.translate('new'),
-                color: Colors.purple,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _pulseAnimation.value,
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      color.withOpacity(0.2),
-                      color.withOpacity(0.1),
-                    ],
-                  ),
-                ),
-                child: Icon(icon, size: 20, color: color),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCategoryCard(
-    dynamic category,
-    int index,
-    bool isHovered,
-    String categoryKey,
-    ThemeData theme,
-    AppLocalizations localizations,
-  ) {
-    final color = _getCategoryColor(index);
-    
     return GestureDetector(
-      onTapDown: (_) {
-        setState(() => _hoveredCategories[categoryKey] = true);
+      onTap: () {
         HapticFeedback.lightImpact();
-      },
-      onTapUp: (_) {
-        setState(() => _hoveredCategories[categoryKey] = false);
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductsByCategoryScreen(
-              categoryId: category['id'].toString(),
-              categoryName: category['name'] ?? localizations.translate('category'),
+            builder: (_) => ProductsByCategoryScreen(
+              categoryId: catId,
+              categoryName: name,
             ),
           ),
         );
       },
-      onTapCancel: () {
-        setState(() => _hoveredCategories[categoryKey] = false);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        transform: Matrix4.identity()
-          ..scale(isHovered ? 0.95 : 1.0),
+      child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.surface,
-              theme.colorScheme.surface.withOpacity(0.95),
-            ],
-          ),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(isHovered ? 0.3 : 0.15),
-              blurRadius: isHovered ? 25 : 20,
-              offset: Offset(0, isHovered ? 8 : 10),
+              color: gradient[0].withOpacity(isDark ? 0.2 : 0.25),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            if (theme.brightness != Brightness.dark)
-              BoxShadow(
-                color: Colors.white,
-                blurRadius: 20,
-                offset: const Offset(-5, -5),
-              ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              // Gradient overlay
-              Positioned(
-                top: -30,
-                right: -30,
-                child: Container(
-                  width: 100,
-                  height: 100,
+              // Background: image or gradient
+              if (hasImage)
+                CachedNetworkImage(
+                  imageUrl: _fixImageUrl(imageUrl),
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: gradient,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: gradient,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(_getCategoryIcon(name), size: 48, color: Colors.white.withOpacity(0.7)),
+                    ),
+                  ),
+                )
+              else
+                Container(
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        color.withOpacity(0.3),
-                        color.withOpacity(0.0),
-                      ],
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: gradient,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      _getCategoryIcon(name),
+                      size: 52,
+                      color: Colors.white.withOpacity(0.35),
                     ),
                   ),
                 ),
+              // Dark overlay for text readability
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.15),
+                      Colors.black.withOpacity(0.65),
+                    ],
+                    stops: const [0.0, 0.4, 1.0],
+                  ),
+                ),
               ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
+              // Top-right icon badge
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    _getCategoryIcon(name),
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              // Bottom text content
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 14,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Category image or icon
-                    Flexible(
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            color.withOpacity(0.2),
-                            color.withOpacity(0.1),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withOpacity(0.2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: FaIcon(
-                          _getCategoryIcon(category['icon'] ?? category['name'] ?? 'default'),
-                          size: 40,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Category name
                     Text(
-                      category['name'] ?? localizations.translate('category'),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: theme.textTheme.bodyLarge?.color,
+                      name,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        height: 1.2,
+                        shadows: [Shadow(color: Colors.black.withOpacity(0.3), blurRadius: 4)],
                       ),
                       maxLines: 2,
-                      textAlign: TextAlign.center,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    FutureBuilder<int>(
-                      future: _getProductCount(category['id'].toString()),
-                      builder: (context, snapshot) {
-                        final count = snapshot.data ?? 0;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: snapshot.connectionState == ConnectionState.waiting
-                              ? SizedBox(
-                                  width: 40,
-                                  height: 14,
-                                  child: LinearProgressIndicator(
-                                    minHeight: 2,
-                                    color: color,
-                                    backgroundColor: color.withOpacity(0.2),
-                                  ),
-                                )
-                              : Text(
-                                  localizations.translateParams('products_count', {'count': count.toString()}),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: color,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        );
-                      },
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: _countsLoaded
+                          ? Text(
+                              l.translateParams('products_count', {'count': count.toString()}),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            )
+                          : SizedBox(
+                              width: 40,
+                              height: 12,
+                              child: LinearProgressIndicator(
+                                minHeight: 2,
+                                color: Colors.white54,
+                                backgroundColor: Colors.white24,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
                     ),
                   ],
                 ),
               ),
-              // Shine effect
-              if (isHovered)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withOpacity(0.0),
-                          Colors.white.withOpacity(0.1),
-                          Colors.white.withOpacity(0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
       ),
+    ).animate().fadeIn(duration: 400.ms, delay: (60 * index).ms).slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic);
+  }
+
+  Widget _buildShimmerGrid(bool isDark) {
+    final baseColor = isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade200;
+    final highlightColor = isDark ? Colors.white.withOpacity(0.12) : Colors.grey.shade100;
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, childAspectRatio: 0.82, crossAxisSpacing: 14, mainAxisSpacing: 14,
+      ),
+      itemCount: 6,
+      itemBuilder: (_, i) => Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: baseColor,
+        ),
+      ).animate(onPlay: (c) => c.repeat(reverse: true)).shimmer(
+        duration: 1200.ms,
+        color: highlightColor,
+      ),
     );
   }
 
-  Widget _buildLoadingState(AppLocalizations localizations) {
-    return AppStateView(
-      state: AppViewState.loading,
-      title: localizations.translate('loading_categories'),
-    );
-  }
-
-  Widget _buildEmptyState(AppLocalizations localizations) {
+  Widget _buildEmptyState(AppLocalizations l) {
     return AppStateView(
       state: AppViewState.empty,
-      title: localizations.translate('no_categories'),
-      subtitle: localizations.translate('no_categories_hint'),
+      title: l.translate('no_categories'),
+      subtitle: l.translate('no_categories_hint'),
     );
   }
 
-  Widget _buildErrorState(String error, AppLocalizations localizations, CategoriesProvider provider) {
+  Widget _buildErrorState(String error, AppLocalizations l, CategoriesProvider prov) {
     return AppStateView(
       state: AppViewState.error,
-      title: localizations.translate('error_loading'),
+      title: l.translate('error_loading'),
       subtitle: error,
-      primaryActionLabel: localizations.translate('retry'),
-      onPrimaryAction: () => provider.loadCategories(),
+      primaryActionLabel: l.translate('retry'),
+      onPrimaryAction: () => prov.loadCategories(),
     );
   }
-}
-
-// Custom painter for mesh gradient background
-class CategoryMeshGradientPainter extends CustomPainter {
-  final double animation;
-
-  CategoryMeshGradientPainter(this.animation);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          Colors.purple.withOpacity(0.05),
-          Colors.blue.withOpacity(0.05),
-          Colors.pink.withOpacity(0.05),
-        ],
-        transform: GradientRotation(animation * 2 * math.pi),
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    // Draw animated mesh circles
-    for (int i = 0; i < 3; i++) {
-      final offset = Offset(
-        size.width * (0.2 + i * 0.3) * (1 + 0.1 * math.sin(animation * 2 * math.pi + i)),
-        size.height * (0.3 + i * 0.2) * (1 + 0.1 * math.cos(animation * 2 * math.pi + i)),
-      );
-      canvas.drawCircle(
-        offset,
-        size.width * 0.2 * (1 + 0.1 * math.sin(animation * 2 * math.pi + i)),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(CategoryMeshGradientPainter oldDelegate) => true;
 }

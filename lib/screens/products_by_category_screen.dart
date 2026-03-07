@@ -77,7 +77,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.arrow_back),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
+                        backgroundColor: theme.colorScheme.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -99,7 +99,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                           Text(
                             localizations.translate('products'),
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.grey.shade700,
+                              color: theme.colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -110,7 +110,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                       onPressed: _refresh,
                       icon: const Icon(Icons.refresh),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
+                        backgroundColor: theme.colorScheme.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -124,16 +124,18 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.grey.withOpacity(0.12)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 14,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+                    border: Border.all(color: theme.dividerColor),
+                    boxShadow: theme.brightness == Brightness.dark
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 14,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                   ),
                   child: Row(
                     children: [
@@ -183,7 +185,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                                       Icon(
                                         FontAwesomeIcons.boxOpen,
                                         size: 60,
-                                        color: Colors.grey.shade400,
+                                        color: theme.colorScheme.onSurfaceVariant,
                                       ),
                                       const SizedBox(height: 14),
                                       Text(
@@ -202,7 +204,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                                             ? localizations.translate('pull_to_refresh')
                                             : localizations.translate('try_another_keyword'),
                                         style: TextStyle(
-                                          color: Colors.grey.shade700,
+                                          color: theme.colorScheme.onSurfaceVariant,
                                           fontWeight: FontWeight.w600,
                                         ),
                                         textAlign: TextAlign.center,
@@ -249,7 +251,7 @@ class _ProductsByCategoryScreenState extends ConsumerState<ProductsByCategoryScr
                             const SizedBox(height: 8),
                             Text(
                               error.toString(),
-                              style: TextStyle(color: Colors.grey.shade700),
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 14),

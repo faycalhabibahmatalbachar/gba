@@ -16,17 +16,17 @@ type Props = {
 };
 
 function buildBreadcrumb(pathname: string | null): { title: string; href?: string }[] {
-  if (!pathname) return [{ title: 'Dashboard' }];
+  if (!pathname) return [{ title: 'Tableau de bord' }];
   const parts = pathname.split('/').filter(Boolean);
-  if (parts.length === 0) return [{ title: 'Dashboard' }];
+  if (parts.length === 0) return [{ title: 'Tableau de bord' }];
 
   const map: Record<string, string> = {
-    dashboard: 'Dashboard',
+    dashboard: 'Tableau de bord',
     orders: 'Commandes',
-    monitoring: 'Monitoring',
+    monitoring: 'Surveillance',
     products: 'Produits',
     categories: 'Catégories',
-    tags: 'Tags',
+    tags: 'Étiquettes',
     deliveries: 'Livraisons',
     'delivery-tracking': 'Suivi livraisons',
     drivers: 'Livreurs',

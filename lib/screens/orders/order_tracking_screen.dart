@@ -147,7 +147,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -171,7 +171,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               expandedHeight: 100,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => context.pop(),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/orders');
+                  }
+                },
               ),
               title: Text(
                 localizations.translate('track_order'),
@@ -205,7 +211,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         Text(
                           _error!,
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade500),
+                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                         ),
                       ],
                       const SizedBox(height: 16),
@@ -332,6 +338,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   }
 
   Widget _buildStatusTimeline(ThemeData theme, AppLocalizations localizations) {
+    final isDark = theme.brightness == Brightness.dark;
     final status = _order!['status']?.toString() ?? 'pending';
     final isCancelled = status == 'cancelled';
     final currentIndex = _statusPipeline.indexOf(status);
@@ -390,7 +397,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 final isCurrent = i == currentIndex;
                 final isLast = i == _statusPipeline.length - 1;
 
-                final Color stepColor = isDone ? const Color(0xFF667eea) : Colors.grey.shade300;
+                final Color stepColor = isDone
+                    ? const Color(0xFF667eea)
+                    : (isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade300);
 
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,7 +412,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           decoration: BoxDecoration(
                             color: isDone
                                 ? const Color(0xFF667eea)
-                                : Colors.grey.shade200,
+                                : (isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade200),
                             shape: BoxShape.circle,
                             boxShadow: isCurrent
                                 ? [
@@ -417,7 +426,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           ),
                           child: Icon(
                             _stepIcon(step),
-                            color: isDone ? Colors.white : Colors.grey.shade400,
+                            color: isDone ? Colors.white : theme.colorScheme.onSurfaceVariant,
                             size: 20,
                           ),
                         ),
@@ -442,7 +451,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
                             color: isDone
                                 ? const Color(0xFF667eea)
-                                : Colors.grey.shade500,
+                                : theme.colorScheme.onSurfaceVariant,
                             fontSize: isCurrent ? 15 : 14,
                           ),
                         ),
@@ -476,6 +485,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   }
 
   Widget _buildOrderItems(ThemeData theme, AppLocalizations localizations) {
+    final isDark = theme.brightness == Brightness.dark;
     final items = (_order!['items'] as List?) ?? [];
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -523,7 +533,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     height: 52,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      color: Colors.grey.shade200,
+                      color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade200,
                     ),
                     child: image != null
                         ? ClipRRect(
@@ -532,10 +542,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                               image,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) =>
-                                  Icon(Icons.shopping_bag_outlined, color: Colors.grey.shade400),
+                                  Icon(Icons.shopping_bag_outlined, color: theme.colorScheme.onSurfaceVariant),
                             ),
                           )
-                        : Icon(Icons.shopping_bag_outlined, color: Colors.grey.shade400),
+                        : Icon(Icons.shopping_bag_outlined, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -547,7 +557,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         const SizedBox(height: 2),
                         Text(
                           '$qty × ${unitPrice.toStringAsFixed(0)} FCFA',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                         ),
                       ],
                     ),
