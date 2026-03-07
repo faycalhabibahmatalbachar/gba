@@ -488,25 +488,26 @@ class MessagingService extends ChangeNotifier {
       
       _log('Messages marqués comme lus', level: 'SUCCESS');
 
-      // Reset unread count on the conversation that owns these messages
-      // Find conversation IDs from the cached messages
-      final affectedConvIds = <String>{};
+      // Recalculate unread counts from database
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null) {
+        await _refreshUnreadCounts(userId);
+      }
+      
+      // Update local cache
       for (final entry in _messagesCache.entries) {
         for (final m in entry.value) {
           if (messageIds.contains(m.id)) {
-            affectedConvIds.add(entry.key);
+            final index = entry.value.indexOf(m);
+            if (index >= 0) {
+              entry.value[index] = m.copyWith(isRead: true);
+            }
           }
         }
       }
-      if (affectedConvIds.isNotEmpty) {
-        _conversations = _conversations.map((c) {
-          if (affectedConvIds.contains(c.id)) {
-            return c.copyWith(unreadCount: 0);
-          }
-          return c;
-        }).toList();
-        notifyListeners();
-      }
+      
+      notifyListeners();
+      _log('Badge messages mis à jour', level: 'SUCCESS');
     } catch (e) {
       _log('Erreur marquage messages: $e', level: 'ERROR');
     }

@@ -163,8 +163,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context);
 
-    return AdaptiveScaffold(
-      currentIndex: 3,
+    return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context, localizations),
       body: Stack(

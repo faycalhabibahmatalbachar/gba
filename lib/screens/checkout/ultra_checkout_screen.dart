@@ -15,6 +15,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/order_service.dart';
+import '../../services/background_location_tracking_service.dart';
 
 class UltraCheckoutScreen extends ConsumerStatefulWidget {
   const UltraCheckoutScreen({super.key});
@@ -89,6 +90,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyProfilePrefill(ref.read(app_auth.authProvider));
+      _autoCaptureGPS();
     });
 
     _authSub = ref.listenManual<app_auth.AuthState>(
@@ -108,6 +110,30 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     _addressController.dispose();
     _cityController.dispose();
     super.dispose();
+  }
+
+  Future<void> _autoCaptureGPS() async {
+    if (!mounted) return;
+    setState(() => _isGettingLocation = true);
+
+    try {
+      final service = BackgroundLocationTrackingService();
+      final position = service.lastPosition ?? await service.getCurrentPosition();
+      
+      if (position != null && mounted) {
+        setState(() {
+          _deliveryLat = position.latitude;
+          _deliveryLng = position.longitude;
+          _deliveryAccuracy = position.accuracy;
+        });
+      }
+    } catch (e) {
+      debugPrint('Auto GPS capture error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isGettingLocation = false);
+      }
+    }
   }
 
   Future<void> _captureDeliveryLocation() async {
@@ -454,23 +480,55 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                                   icon: FontAwesomeIcons.city,
                                 ),
                                 const SizedBox(height: 12),
-                                OutlinedButton.icon(
-                                  onPressed: _isProcessing || _isGettingLocation
-                                      ? null
-                                      : _captureDeliveryLocation,
-                                  icon: _isGettingLocation
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(FontAwesomeIcons.locationCrosshairs, size: 16),
-                                  label: Text(
-                                    (_deliveryLat != null && _deliveryLng != null)
-                                        ? 'Position prête (±${(_deliveryAccuracy ?? 0).toStringAsFixed(0)}m)'
-                                        : 'Utiliser ma position',
+                                // GPS automatically captured in background
+                                if (_deliveryLat != null && _deliveryLng != null)
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Position capturée automatiquement (±${(_deliveryAccuracy ?? 0).toStringAsFixed(0)}m)',
+                                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
+                                if (_isGettingLocation)
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            'Capture automatique de votre position...',
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -503,21 +561,6 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                                   title: const Text('Paiement à la livraison'),
                                   subtitle: const Text('Payez en espèces'),
                                   secondary: const Icon(FontAwesomeIcons.moneyBill),
-                                ),
-                                const Divider(height: 1),
-                                RadioListTile<String>(
-                                  value: 'stripe_card',
-                                  groupValue: _paymentMethod,
-                                  onChanged: (kIsWeb || Stripe.publishableKey.isEmpty)
-                                      ? null
-                                      : (value) => setState(() => _paymentMethod = value!),
-                                  title: const Text('Carte bancaire (Stripe)'),
-                                  subtitle: Text(
-                                    (kIsWeb || Stripe.publishableKey.isEmpty)
-                                        ? 'Indisponible sur cette plateforme'
-                                        : 'Paiement sécurisé (Visa/Mastercard)',
-                                  ),
-                                  secondary: const Icon(FontAwesomeIcons.creditCard),
                                 ),
                                 const Divider(height: 1),
                                 RadioListTile<String>(
@@ -763,58 +806,137 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
 
   Widget _buildSuccessDialog(String orderNumber) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              FontAwesomeIcons.circleCheck,
-              color: Colors.green,
-              size: 60,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Commande confirmée!',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'N° $orderNumber',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 30),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      context.go('/home');
-                    },
-                    child: const Text('Continuer'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      context.go('/orders');
-                    },
-                    child: const Text('Mes commandes'),
-                  ),
-                ),
-              ],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+          ),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF667eea).withOpacity(0.4),
+              blurRadius: 30,
+              offset: const Offset(0, 15),
             ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  FontAwesomeIcons.circleCheck,
+                  color: Color(0xFF667eea),
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Commande confirmée !',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'N° $orderNumber',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Votre commande est en cours de traitement.\nVous recevrez une notification dès qu\'un livreur sera assigné.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.95),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        context.go('/home');
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white, width: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Accueil',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        context.go('/orders');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF667eea),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 8,
+                        shadowColor: Colors.black.withOpacity(0.3),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Mes commandes',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

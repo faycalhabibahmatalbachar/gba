@@ -135,8 +135,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
             return n.contains(_searchQuery) || d.contains(_searchQuery);
           }).toList();
 
-    return AdaptiveScaffold(
-      currentIndex: 1,
+    return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0f0f1a) : const Color(0xFFF5F6FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,

@@ -773,8 +773,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
       return _buildErrorState();
     }
     
-    return AdaptiveScaffold(
-      currentIndex: 4,
+    return Scaffold(
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [

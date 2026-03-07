@@ -36,6 +36,10 @@ CREATE INDEX IF NOT EXISTS idx_user_locations_user_time ON public.user_locations
 ALTER TABLE public.user_locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_current_location ENABLE ROW LEVEL SECURITY;
 
+-- Grant permissions
+GRANT SELECT, INSERT ON public.user_locations TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.user_current_location TO authenticated;
+
 -- RLS Policies for user_locations
 
 -- Users can insert their own locations

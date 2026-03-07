@@ -121,8 +121,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
 
     final appBar = _buildAppBar(context, localizations);
 
-    return AdaptiveScaffold(
-      currentIndex: 2,
+    return Scaffold(
       appBar: appBar,
       extendBodyBehindAppBar: true,
       body: Stack(
@@ -139,7 +138,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                   (sum, item) => sum + ((item.product?.price ?? 0) * item.quantity),
                 );
 
-                if (cartState.isLoading) {
+                if (cartState.isLoading && cartItems.isNotEmpty) {
                   return _buildLoadingState(localizations);
                 }
 
@@ -418,7 +417,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
             ),
             const SizedBox(height: 32),
             _buildGlassmorphicButton(
-              onPressed: () => context.go('/'),
+              onPressed: () => context.go('/home'),
               icon: FontAwesomeIcons.arrowLeft,
               label: localizations.translate('continue_shopping'),
             ),

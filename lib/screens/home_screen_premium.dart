@@ -624,8 +624,7 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
           ),
         );
       },
-      child: AdaptiveScaffold(
-      currentIndex: 0,
+      child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF1a1a2e) : const Color(0xFFF5F7FA),
       extendBody: true,
       drawer: _buildSideDrawer(context),

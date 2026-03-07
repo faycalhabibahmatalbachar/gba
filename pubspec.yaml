@@ -73,8 +73,3 @@ flutter:
     - assets/icons/
     - assets/animations/
     - assets/animations/lottie/
-    - assets/animations/lottie/ui/
-    - assets/animations/lottie/cart/
-    - assets/animations/lottie/checkout/
-    - assets/animations/lottie/navigation/
-    - assets/animations/lottie/navigation/nav_active_pulse_v1.json
