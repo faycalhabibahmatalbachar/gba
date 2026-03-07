@@ -37,3 +37,22 @@ next-env.d.ts
 
 # vitest
 .vitest
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Firebase credentials (NEVER commit these)
+android/app/*firebase*.json
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# Android
+*.jks
+*.keystore
+key.properties
