@@ -551,7 +551,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
-                    FontAwesomeIcons.imageSlash,
+                    FontAwesomeIcons.image,
                     color: Colors.white,
                     size: 60,
                   ),

@@ -20,7 +20,7 @@ class BackgroundLocationTrackingService {
   static const int _batchSize = 5;
   static const Duration _batchInterval = Duration(seconds: 30);
   static const Duration _updateInterval = Duration(seconds: 10);
-  static const double _distanceFilter = 10.0; // meters
+  static const int _distanceFilter = 10; // meters
   
   bool _isTracking = false;
   Position? _lastPosition;

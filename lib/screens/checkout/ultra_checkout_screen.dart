@@ -479,56 +479,6 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                                   label: 'Ville',
                                   icon: FontAwesomeIcons.city,
                                 ),
-                                const SizedBox(height: 12),
-                                // GPS automatically captured in background
-                                if (_deliveryLat != null && _deliveryLng != null)
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.green.withOpacity(0.3)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.check_circle, color: Colors.green, size: 20),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            'Position capturée automatiquement (±${(_deliveryAccuracy ?? 0).toStringAsFixed(0)}m)',
-                                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                if (_isGettingLocation)
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            'Capture automatique de votre position...',
-                                            style: TextStyle(
-                                              color: Theme.of(context).colorScheme.primary,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
@@ -567,7 +517,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                                   value: 'flutterwave_card',
                                   groupValue: _paymentMethod,
                                   onChanged: (value) => setState(() => _paymentMethod = value!),
-                                  title: const Text('Carte bancaire (Flutterwave)'),
+                                  title: const Text('Carte bancaire'),
                                   subtitle: const Text('Paiement sécurisé (Visa/Mastercard)'),
                                   secondary: const Icon(FontAwesomeIcons.creditCard),
                                 ),
@@ -879,7 +829,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
               ),
               const SizedBox(height: 20),
               Text(
-                'Votre commande est en cours de traitement.\nVous recevrez une notification dès qu\'un livreur sera assigné.',
+                'Votre commande est en cours de traitement.\nUn livreur sera automatiquement assigné.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
