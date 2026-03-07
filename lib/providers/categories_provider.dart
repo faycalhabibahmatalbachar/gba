@@ -16,11 +16,13 @@ class CategoriesProvider extends ChangeNotifier {
   static const String _cacheKey = 'cache_categories_v1';
   static const String _cacheSyncKey = 'cache_categories_v1_sync';
   List<dynamic> _categories = [];
+  Map<String, int> _productCounts = {};
   bool _isLoading = false;
   String? _error;
   DateTime? _lastSyncedAt;
   
   List<dynamic> get categories => _categories;
+  Map<String, int> get productCounts => _productCounts;
   bool get isLoading => _isLoading;
   String? get error => _error;
   
@@ -150,12 +152,37 @@ class CategoriesProvider extends ChangeNotifier {
         _categories.whereType<Map<String, dynamic>>().toList(),
         _lastSyncedAt,
       );
+      
+      // Load product counts per category
+      await _loadProductCounts();
     } catch (e) {
       _error = e.toString();
       print('Erreur chargement catégories: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+  
+  Future<void> _loadProductCounts() async {
+    try {
+      final response = await _supabase
+          .from('products')
+          .select('category_id')
+          .eq('is_active', true);
+      
+      final counts = <String, int>{};
+      for (final product in (response as List)) {
+        final catId = product['category_id']?.toString();
+        if (catId != null && catId.isNotEmpty) {
+          counts[catId] = (counts[catId] ?? 0) + 1;
+        }
+      }
+      
+      _productCounts = counts;
+      print('✅ Product counts loaded: ${counts.length} categories');
+    } catch (e) {
+      print('❌ Error loading product counts: $e');
     }
   }
 }

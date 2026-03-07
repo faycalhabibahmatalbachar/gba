@@ -328,14 +328,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
             ),
             const SizedBox(height: 32),
             _buildGlassmorphicButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/home');
-                }
-              },
+              onPressed: () => context.go('/home'),
               icon: FontAwesomeIcons.magnifyingGlass,
               label: localizations.translate('explore_products'),
             ),
