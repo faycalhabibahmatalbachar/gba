@@ -665,7 +665,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     return _card(
       child: Form(
         key: _detailsFormKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
+        autovalidateMode: AutovalidateMode.disabled,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -691,6 +691,10 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
               controller: _quantityController,
               decoration: _fieldDecoration(localizations.translate('quantity'), hint: 'Ex: 2', icon: FontAwesomeIcons.hashtag),
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(4),
+              ],
               validator: (value) {
                 final q = int.tryParse(value?.trim() ?? '');
                 if (q == null || q <= 0) {
@@ -803,7 +807,7 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     return _card(
       child: Form(
         key: _deliveryFormKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
+        autovalidateMode: AutovalidateMode.disabled,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

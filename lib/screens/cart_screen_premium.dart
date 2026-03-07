@@ -5,6 +5,7 @@ import 'package:provider/provider.dart' as classic_provider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../providers/cart_provider.dart';
@@ -912,9 +913,83 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                 final checkoutButton = SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: _isProcessingCheckout ? null : () async {
+                      if (_isProcessingCheckout) return;
+                      
+                      final cartState = classic_provider.Provider.of<CartProvider>(context, listen: false);
+                      
+                      // Validation: check if cart is not empty
+                      if (cartState.items.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(FontAwesomeIcons.triangleExclamation, color: Colors.white, size: 16),
+                                const SizedBox(width: 12),
+                                Text(localizations.translate('cart_empty')),
+                              ],
+                            ),
+                            backgroundColor: Colors.orange.shade600,
+                            behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      // Check if user is authenticated
+                      final supabase = Supabase.instance.client;
+                      if (supabase.auth.currentUser == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(FontAwesomeIcons.userLock, color: Colors.white, size: 16),
+                                const SizedBox(width: 12),
+                                Text(localizations.translate('login_required')),
+                              ],
+                            ),
+                            backgroundColor: Colors.red.shade600,
+                            behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
+                          ),
+                        );
+                        context.go('/login');
+                        return;
+                      }
+                      
+                      setState(() => _isProcessingCheckout = true);
                       HapticFeedback.heavyImpact();
-                      GoRouter.of(context).go('/checkout');
+                      
+                      try {
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        if (!mounted) return;
+                        context.go('/checkout');
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(FontAwesomeIcons.triangleExclamation, color: Colors.white, size: 16),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    localizations.translateParams(
+                                      'error_with_details',
+                                      {'error': e.toString()},
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: Colors.red.shade600,
+                            behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
+                          ),
+                        );
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isProcessingCheckout = false);
+                        }
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,

@@ -79,10 +79,10 @@ class _BottomNavBarState extends State<BottomNavBar>
 
     final items = <_NavItemData>[
       _NavItemData(Icons.home_rounded, Icons.home_outlined, l.translate('home')),
-      _NavItemData(Icons.grid_view_rounded, Icons.grid_view_outlined, l.translate('categories')),
-      _NavItemData(Icons.shopping_bag_rounded, Icons.shopping_bag_outlined, l.translate('cart'), badge: cart.itemCount),
-      _NavItemData(Icons.favorite_rounded, Icons.favorite_border_rounded, l.translate('favorites')),
-      _NavItemData(Icons.person_rounded, Icons.person_outline_rounded, l.translate('profile')),
+      _NavItemData(Icons.apps_rounded, Icons.apps_outlined, l.translate('categories')),
+      _NavItemData(Icons.shopping_cart_rounded, Icons.shopping_cart_outlined, l.translate('cart'), badge: cart.itemCount),
+      _NavItemData(Icons.favorite_rounded, Icons.favorite_outline_rounded, l.translate('favorites')),
+      _NavItemData(Icons.account_circle_rounded, Icons.account_circle_outlined, l.translate('profile')),
     ];
 
     final bg = isDark ? const Color(0xFF141420) : Colors.white;

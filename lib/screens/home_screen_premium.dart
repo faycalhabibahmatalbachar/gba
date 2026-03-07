@@ -395,7 +395,32 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                 ListTile(
                   leading: const Icon(Icons.message_outlined),
                   title: Text(localizations.translate('messages')),
-                  onTap: () => _navigateFromDrawerProtected(context, '/chat'),
+                  trailing: _unreadMessages > 0
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _unreadMessages > 99 ? '99+' : '$_unreadMessages',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : null,
+                  onTap: () {
+                    _navigateFromDrawerProtected(context, '/chat');
+                    // Refresh badge after 1 second delay
+                    Future.delayed(const Duration(seconds: 1), () {
+                      if (mounted && _messagingService != null) {
+                        _messagingService!.loadConversations();
+                      }
+                    });
+                  },
                 ),
                 ListTile(
                   leading: const Icon(Icons.settings_outlined),

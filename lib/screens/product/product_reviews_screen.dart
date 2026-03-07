@@ -521,7 +521,13 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(who, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        Text(
+                          who,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
                         if (isMyReview) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -545,7 +551,10 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
                     if (dateStr.isNotEmpty)
                       Text(
                         dateStr,
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          fontSize: 11,
+                        ),
                       ),
                   ],
                 ),
@@ -563,7 +572,11 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
             const SizedBox(height: 10),
             Text(
               comment.trim(),
-              style: const TextStyle(height: 1.4, fontSize: 14),
+              style: TextStyle(
+                height: 1.4,
+                fontSize: 14,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
           ],
         ],
