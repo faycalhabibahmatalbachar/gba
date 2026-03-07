@@ -446,32 +446,57 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                           }
                           
                           final item = items[index];
-                          return Container(
-                            width: 60,
-                            height: 60,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: theme.brightness == Brightness.dark
-                                  ? theme.colorScheme.surfaceContainerHighest
-                                  : Colors.grey.shade200,
-                            ),
-                            child: item['product_image'] != null
-                                ? ClipRRect(
+                          final hasImage = item['product_image'] != null;
+                          return GestureDetector(
+                            onTap: hasImage ? () => _showImagePreview(item['product_image'], item['product_name'] ?? 'Produit') : null,
+                            child: Stack(
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(10),
-                                    child: Image.network(
-                                      item['product_image'],
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Icon(
-                                        FontAwesomeIcons.boxOpen,
-                                        color: theme.colorScheme.onSurfaceVariant,
+                                    color: theme.brightness == Brightness.dark
+                                        ? theme.colorScheme.surfaceContainerHighest
+                                        : Colors.grey.shade200,
+                                  ),
+                                  child: hasImage
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Image.network(
+                                            item['product_image'],
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Icon(
+                                              FontAwesomeIcons.boxOpen,
+                                              color: theme.colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        )
+                                      : Icon(
+                                          FontAwesomeIcons.boxOpen,
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                ),
+                                if (hasImage)
+                                  Positioned(
+                                    bottom: 2,
+                                    right: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.6),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        FontAwesomeIcons.eye,
+                                        color: Colors.white,
+                                        size: 10,
                                       ),
                                     ),
-                                  )
-                                : Icon(
-                                    FontAwesomeIcons.boxOpen,
-                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
+                              ],
+                            ),
                           );
                         },
                       ),
@@ -501,6 +526,71 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showImagePreview(String imageUrl, String productName) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  padding: const EdgeInsets.all(40),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade800,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    FontAwesomeIcons.imageSlash,
+                    color: Colors.white,
+                    size: 60,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close, color: Colors.white),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withOpacity(0.6),
+                  shape: const CircleBorder(),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  productName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
