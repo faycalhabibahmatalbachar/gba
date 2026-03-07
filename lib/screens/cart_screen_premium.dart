@@ -6,6 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:lottie/lottie.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../providers/cart_provider.dart';
@@ -384,15 +385,19 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AppAnimation(
-              id: AppAnimations.emptyCart,
-              width: 200,
-              height: 200,
-              fallback: Icon(
-                FontAwesomeIcons.cartShopping,
-                size: 80,
-                color: Colors.purple.shade300,
-              ),
+            Lottie.asset(
+              'assets/animations/lottie/empty_cart_v1.json',
+              width: 250,
+              height: 250,
+              fit: BoxFit.contain,
+              repeat: true,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  FontAwesomeIcons.cartShopping,
+                  size: 80,
+                  color: Colors.purple.shade300,
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text(

@@ -282,6 +282,11 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
       }
     }
 
+    // Auto-capture GPS when entering delivery step
+    if (_currentStep == 1 && _deliveryLat == null) {
+      _captureDeliveryLocation();
+    }
+
     if (_currentStep == 2) {
       final ok = _deliveryFormKey.currentState?.validate() ?? false;
       if (!ok) {
@@ -818,26 +823,59 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
                   ),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _isSubmitting || _isGettingLocation
-                  ? null
-                  : _captureDeliveryLocation,
-              icon: _isGettingLocation
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.my_location),
-              label: Text(
-                (_deliveryLat != null && _deliveryLng != null)
-                    ? localizations.translateParams(
-                        'special_order_location_ready_with_accuracy',
-                        {'meters': (_deliveryAccuracy ?? 0).toStringAsFixed(0)},
-                      )
-                    : localizations.translate('special_order_use_my_location'),
+            // GPS location automatically captured in background
+            if (_deliveryLat != null && _deliveryLng != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        localizations.translateParams(
+                          'special_order_location_ready_with_accuracy',
+                          {'meters': (_deliveryAccuracy ?? 0).toStringAsFixed(0)},
+                        ),
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            if (_isGettingLocation)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Capture automatique de votre position...',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
                 color: Theme.of(context).brightness == Brightness.dark

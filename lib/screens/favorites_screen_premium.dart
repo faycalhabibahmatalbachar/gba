@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart' as classic_provider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lottie/lottie.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../providers/favorites_provider.dart';
@@ -295,15 +296,19 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AppAnimation(
-              id: AppAnimations.addToFavorites,
-              width: 200,
-              height: 200,
-              fallback: Icon(
-                FontAwesomeIcons.heartCrack,
-                size: 80,
-                color: Colors.pink.shade300,
-              ),
+            Lottie.asset(
+              'assets/animations/lottie/Add to favorites.json',
+              width: 250,
+              height: 250,
+              fit: BoxFit.contain,
+              repeat: true,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  FontAwesomeIcons.heartCrack,
+                  size: 80,
+                  color: Colors.pink.shade300,
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text(

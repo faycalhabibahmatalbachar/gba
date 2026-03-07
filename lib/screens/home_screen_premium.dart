@@ -967,10 +967,30 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                       final isDark = Theme.of(context).brightness == Brightness.dark;
                       return GestureDetector(
                         onTap: () {
-                          HapticFeedback.selectionClick();
-                          final catId = category['id'].toString();
-                          final catName = (category['name'] ?? '').toString();
-                          context.push('/category/$catId?name=${Uri.encodeComponent(catName)}');
+                          try {
+                            HapticFeedback.selectionClick();
+                            final catId = category['id']?.toString() ?? '';
+                            final catName = (category['name'] ?? '').toString();
+                            
+                            // Validation: ensure valid data before navigation
+                            if (catId.isEmpty || catName.isEmpty) {
+                              debugPrint('⚠️ Invalid category data: id=$catId, name=$catName');
+                              return;
+                            }
+                            
+                            context.push('/category/$catId?name=${Uri.encodeComponent(catName)}');
+                          } catch (e, stackTrace) {
+                            debugPrint('❌ Error navigating to category: $e');
+                            debugPrint('Stack trace: $stackTrace');
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Erreur lors de l\'ouverture de la catégorie'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
                         },
                         child: Container(
                           margin: const EdgeInsets.only(right: 14),

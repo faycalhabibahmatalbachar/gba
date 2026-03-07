@@ -73,7 +73,11 @@ class MessagingService extends ChangeNotifier {
   
   // Getters
   List<Conversation> get conversations => _conversations;
-  int get unreadCount => _conversations.where((c) => c.unreadCount > 0).length;
+  int get unreadCount {
+    final total = _conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+    debugPrint('📊 [MessagingService] Total unread messages: $total');
+    return total;
+  }
   Stream<Message> get newMessageStream => _newMessageController.stream;
   
   // Logging robuste
