@@ -133,19 +133,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  -- Check if table and column exist before attempting delete
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' AND table_name = 'user_locations'
-  ) AND EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-      AND table_name = 'user_locations' 
-      AND column_name = 'recorded_at'
-  ) THEN
-    DELETE FROM public.user_locations
-    WHERE recorded_at < NOW() - INTERVAL '30 days';
-  END IF;
+  -- Use created_at column which always exists
+  DELETE FROM public.user_locations
+  WHERE created_at < NOW() - INTERVAL '30 days';
 END;
 $$;
 

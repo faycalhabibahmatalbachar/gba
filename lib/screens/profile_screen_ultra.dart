@@ -757,12 +757,19 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
   
   @override
   Widget build(BuildContext context) {
-    // Get data from state
+    final theme = Theme.of(context);
+    final localizations = AppLocalizations.of(context);
+    final user = Supabase.instance.client.auth.currentUser;
+    
+    // Auth guard: require login
+    if (user == null) {
+      return _buildLoginRequiredScreen(context, localizations);
+    }
+    
     final profile = _profile;
     final isLoading = _isLoadingProfile;
     final stats = _stats;
     final favoritesCount = 0; // TODO: Get from FavoritesProvider
-    final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
     
     if (isLoading) {
@@ -844,6 +851,105 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     );
   }
   
+  Widget _buildLoginRequiredScreen(BuildContext context, AppLocalizations localizations) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF667eea).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          FontAwesomeIcons.userLock,
+                          color: Color(0xFF667eea),
+                          size: 36,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        localizations.translate('login_required'),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Connectez-vous ou créez un compte pour accéder à cette fonctionnalité.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => context.go('/home'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(localizations.translate('cancel')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => context.go('/login'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF667eea),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(localizations.translate('login')),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () => context.go('/register'),
+                        child: Text(localizations.translate('register')),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingState() {
     return Center(
       child: CircularProgressIndicator(
