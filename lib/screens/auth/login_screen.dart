@@ -83,7 +83,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       await ref.read(authProvider.notifier).signIn(email, password, rememberMe: _rememberMe);
       if (!mounted) return;
       final authState = ref.read(authProvider);
-      if (authState.user != null) {
+      // Only redirect if login was successful (user exists AND no error)
+      if (authState.user != null && authState.error == null) {
         context.go('/home');
       }
     } finally {
@@ -136,8 +137,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         _ErrorBanner(
                           message: _authErrorMessage(localizations, authState.error!, authState.errorCode),
                           onClose: () => ref.read(authProvider.notifier).clearError(),
-                          extra: authState.errorCode == 'invalid_credentials'
-                              ? TextButton(
+                          extra: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (authState.errorCode == 'invalid_credentials')
+                                TextButton(
                                   onPressed: () async {
                                     final email = _emailController.text.trim();
                                     if (email.isEmpty) return;
@@ -150,8 +155,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   },
                                   child: Text(localizations.translate('auth_resend_confirmation'),
                                       style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
-                                )
-                              : null,
+                                ),
+                              const SizedBox(height: 8),
+                              ElevatedButton.icon(
+                                onPressed: () => context.go('/home'),
+                                icon: const Icon(Icons.visibility_outlined, size: 18),
+                                label: Text(localizations.translate('browse_without_account')),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey.shade100,
+                                  foregroundColor: Colors.grey.shade800,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ).animate().fadeIn(duration: 300.ms),
                         const SizedBox(height: 12),
                       ],

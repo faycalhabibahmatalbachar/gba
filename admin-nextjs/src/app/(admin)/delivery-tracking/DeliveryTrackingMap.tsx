@@ -4,15 +4,19 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { DriverPopup } from '@/components/delivery/DriverPopup';
+import { ClientPopup } from '@/components/delivery/ClientPopup';
 
-type LocRow = { lat: number; lng: number; accuracy?: number | null; captured_at?: string | null };
+type LocRow = { latitude: number; longitude: number; accuracy?: number | null; speed?: number | null; captured_at?: string | null };
 
 type Props = {
   driverLoc: LocRow;
   clientLoc: LocRow | null;
   trail: [number, number][];
-  fitterPos: { lat: number; lng: number }[];
+  fitterPos: { latitude: number; longitude: number }[];
   selectedDriver: any;
+  selectedOrder?: any;
+  orders?: any[];
   mapName: (d: any) => string;
 };
 
@@ -24,21 +28,21 @@ const PolylineAny = Polyline as any;
 
 type DivIconLike = any;
 
-function MapFitter({ positions }: { positions: { lat: number; lng: number }[] }) {
+function MapFitter({ positions }: { positions: { latitude: number; longitude: number }[] }) {
   const map = useMap();
   useEffect(() => {
     if (!positions.length) return;
     if (positions.length === 1) {
-      map.setView([positions[0].lat, positions[0].lng], 15);
+      map.setView([positions[0].latitude, positions[0].longitude], 15);
       return;
     }
-    const bounds = L.latLngBounds(positions.map((p) => [p.lat, p.lng]));
+    const bounds = L.latLngBounds(positions.map((p) => [p.latitude, p.longitude]));
     map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
   }, [positions, map]);
   return null;
 }
 
-export default function DeliveryTrackingMap({ driverLoc, clientLoc, trail, fitterPos, selectedDriver, mapName }: Props) {
+export default function DeliveryTrackingMap({ driverLoc, clientLoc, trail, fitterPos, selectedDriver, selectedOrder, orders, mapName }: Props) {
   const [driverIcon, setDriverIcon] = useState<DivIconLike | null>(null);
   const [clientIcon, setClientIcon] = useState<DivIconLike | null>(null);
 
@@ -79,7 +83,7 @@ export default function DeliveryTrackingMap({ driverLoc, clientLoc, trail, fitte
   }, []);
 
   return (
-    <MapContainerAny center={[driverLoc.lat, driverLoc.lng]} zoom={14} style={{ width: '100%', height: '100%' }}>
+    <MapContainerAny center={[driverLoc.latitude, driverLoc.longitude]} zoom={14} style={{ width: '100%', height: '100%' }}>
       <TileLayerAny
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -89,29 +93,24 @@ export default function DeliveryTrackingMap({ driverLoc, clientLoc, trail, fitte
         <PolylineAny positions={trail} pathOptions={{ color: '#667eea', weight: 3, opacity: 0.6, dashArray: '6 4' }} />
       ) : null}
 
-      <MarkerAny position={[driverLoc.lat, driverLoc.lng]} {...(driverIcon ? { icon: driverIcon } : {})}>
+      <MarkerAny position={[driverLoc.latitude, driverLoc.longitude]} {...(driverIcon ? { icon: driverIcon } : {})}>
         <PopupAny>
-          <strong>🚚 {selectedDriver ? mapName(selectedDriver) : 'Livreur'}</strong>
-          <br />
-          Lat: {Number(driverLoc.lat).toFixed(6)}
-          <br />
-          Lng: {Number(driverLoc.lng).toFixed(6)}
-          <br />
-          {driverLoc.accuracy != null ? <>Précision: ±{Number(driverLoc.accuracy).toFixed(0)} m<br /></> : null}
-          {driverLoc.captured_at ? <small>{new Date(driverLoc.captured_at).toLocaleString('fr-FR')}</small> : null}
+          <DriverPopup 
+            driver={selectedDriver} 
+            location={driverLoc} 
+            orders={orders || []} 
+            mapName={mapName} 
+          />
         </PopupAny>
       </MarkerAny>
 
-      {clientLoc?.lat != null ? (
-        <MarkerAny position={[clientLoc.lat, clientLoc.lng]} {...(clientIcon ? { icon: clientIcon } : {})}>
+      {clientLoc ? (
+        <MarkerAny position={[clientLoc.latitude, clientLoc.longitude]} {...(clientIcon ? { icon: clientIcon } : {})}>
           <PopupAny>
-            <strong>👤 Client</strong>
-            <br />
-            Lat: {Number(clientLoc.lat).toFixed(6)}
-            <br />
-            Lng: {Number(clientLoc.lng).toFixed(6)}
-            <br />
-            {clientLoc.captured_at ? <small>{new Date(clientLoc.captured_at).toLocaleString('fr-FR')}</small> : null}
+            <ClientPopup 
+              location={clientLoc} 
+              order={selectedOrder} 
+            />
           </PopupAny>
         </MarkerAny>
       ) : null}

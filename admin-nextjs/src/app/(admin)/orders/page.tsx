@@ -91,6 +91,14 @@ function KpiCard({
   return tooltip ? <Tooltip title={tooltip}>{content}</Tooltip> : content;
 }
 
+function formatPaymentMethod(method: string | null | undefined): string {
+  if (!method) return '—';
+  if (method === 'cash_on_delivery' || method === 'manual') return 'Cash';
+  if (method === 'stripe_card') return 'Carte bancaire';
+  if (method === 'flutterwave_card') return 'Carte bancaire';
+  return method.replace(/_/g, ' ');
+}
+
 function copyToClipboard(text: string): Promise<boolean> {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
     return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
@@ -138,6 +146,7 @@ export default function OrdersPage() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [orderDetails, setOrderDetails] = useState<OrderDetailsRow | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignDriverId, setAssignDriverId] = useState<string | null>(null);
@@ -152,6 +161,7 @@ export default function OrdersPage() {
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reloadRef = useRef<(() => void) | undefined>(undefined);
+  const statusChangeRef = useRef<number>(0);
 
   const fetchParams = useMemo(() => {
     const [dateFrom, dateTo] = dateRange ?? [null, null];
@@ -309,16 +319,17 @@ export default function OrdersPage() {
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setStatusUpdating(true);
+    setUpdatingOrderId(orderId);
+    statusChangeRef.current = Date.now();
     try {
       await updateOrderStatus(orderId, newStatus);
       message.success('Statut mis à jour');
-      await loadOrderDetails(orderId);
       void load();
-      void loadKpis();
     } catch (e: any) {
       message.error(e?.message || 'Erreur');
     } finally {
       setStatusUpdating(false);
+      setUpdatingOrderId(null);
     }
   };
 
@@ -431,8 +442,8 @@ export default function OrdersPage() {
       {
         title: 'Paiement',
         dataIndex: 'payment_method',
-        width: 110,
-        render: (v) => (v ? <span className="text-xs capitalize">{String(v).replace(/_/g, ' ')}</span> : '—'),
+        width: 150,
+        render: (v) => <span className="text-xs">{formatPaymentMethod(v)}</span>,
       },
       {
         title: 'Statut',
@@ -468,17 +479,6 @@ export default function OrdersPage() {
         align: 'right',
         render: (_, r) => (
           <Space size={4}>
-            <Tooltip title="Copier ID">
-              <Button
-                type="text"
-                size="small"
-                icon={<CopyOutlined />}
-                onClick={async () => {
-                  const ok = await copyToClipboard(r.id);
-                  message[ok ? 'success' : 'error'](ok ? 'ID copié' : 'Copie impossible');
-                }}
-              />
-            </Tooltip>
             <Tooltip title="Détails">
               <Button
                 type="text"
@@ -500,6 +500,18 @@ export default function OrdersPage() {
                   setSelected(r);
                   setAssignDriverId(r.driver_id || null);
                   setAssignOpen(true);
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="Supprimer">
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  setCancelOrderId(r.id);
+                  setCancelConfirmOpen(true);
                 }}
               />
             </Tooltip>
@@ -628,6 +640,8 @@ export default function OrdersPage() {
               onClick: (e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('button') || target.closest('.ant-checkbox-wrapper') || target.closest('input[type=checkbox]') || target.closest('.ant-select')) return;
+                if (updatingOrderId === r.id) return;
+                if (Date.now() - statusChangeRef.current < 1500) return;
                 setSelected(r);
                 setDetailsOpen(true);
                 void loadOrderDetails(r.id);
@@ -688,9 +702,8 @@ export default function OrdersPage() {
             <Card size="small" title="Paiement">
               <Row gutter={[16, 8]}>
                 <Col span={12}><span className="text-slate-500">Total</span><div className="font-bold text-lg">{Math.round(orderDetails.total_amount || 0).toLocaleString('fr-FR')} FCFA</div></Col>
-                <Col span={12}><span className="text-slate-500">Méthode</span><div>{(orderDetails as any).payment_method || '—'}</div></Col>
+                <Col span={12}><span className="text-slate-500">Méthode</span><div>{formatPaymentMethod((orderDetails as any).payment_method)}</div></Col>
                 <Col span={12}><span className="text-slate-500">Statut paiement</span><div>{orderDetails.paid_at ? 'Payé' : 'En attente'}</div></Col>
-                <Col span={12}><span className="text-slate-500">Frais / Taxes / Remise</span><div>{Number((orderDetails as any).shipping_fee || 0).toLocaleString('fr-FR')} / {Number((orderDetails as any).tax_amount || 0).toLocaleString('fr-FR')} / -{Number((orderDetails as any).discount_amount || 0).toLocaleString('fr-FR')} FCFA</div></Col>
               </Row>
             </Card>
 

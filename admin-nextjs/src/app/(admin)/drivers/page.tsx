@@ -278,8 +278,32 @@ export default function DriversPage() {
         onOk={async () => {
           setCreating(true);
           try {
-            // In this phase we only create profile record stub (auth user creation can be added later)
-            const { error } = await supabase.from('profiles').insert({
+            // Validate required fields
+            if (!form.email || !form.password) {
+              message.error('Email et mot de passe sont requis');
+              setCreating(false);
+              return;
+            }
+
+            // Create auth user with admin API
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+              email: form.email,
+              password: form.password,
+              email_confirm: true,
+              user_metadata: {
+                first_name: form.firstName,
+                last_name: form.lastName,
+                phone: form.phone,
+                city: form.city,
+                role: 'driver',
+              },
+            });
+
+            if (authError) throw authError;
+
+            // Create profile record
+            const { error: profileError } = await supabase.from('profiles').insert({
+              id: authData.user.id,
               email: form.email,
               first_name: form.firstName,
               last_name: form.lastName,
@@ -288,13 +312,15 @@ export default function DriversPage() {
               role: 'driver',
               is_available: true,
             });
-            if (error) throw error;
-            message.success('Livreur créé');
+
+            if (profileError) throw profileError;
+
+            message.success('Livreur créé avec succès');
             setCreateOpen(false);
             setForm({ email: '', password: '', firstName: '', lastName: '', phone: '', city: '' });
             void load();
           } catch (e: any) {
-            message.error(e?.message || 'Erreur');
+            message.error(e?.message || 'Erreur lors de la création');
           } finally {
             setCreating(false);
           }
@@ -302,6 +328,7 @@ export default function DriversPage() {
       >
         <div className="space-y-3">
           <Input placeholder="Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+          <Input.Password placeholder="Mot de passe" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
           <Input placeholder="Prénom" value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} />
           <Input placeholder="Nom" value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} />
           <Input placeholder="Téléphone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />

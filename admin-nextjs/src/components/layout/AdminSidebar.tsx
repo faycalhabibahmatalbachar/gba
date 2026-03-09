@@ -35,9 +35,13 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
     if (pathname.startsWith('/products/categories')) return ['products-categories'];
     if (pathname.startsWith('/products')) return ['products-all'];
     if (pathname.startsWith('/orders')) return ['orders'];
+    if (pathname.startsWith('/monitoring')) return ['monitoring'];
+    if (pathname.startsWith('/delivery-tracking')) return ['delivery-tracking'];
     if (pathname.startsWith('/deliveries')) return ['deliveries'];
     if (pathname.startsWith('/drivers')) return ['drivers'];
     if (pathname.startsWith('/users')) return ['users'];
+    if (pathname.startsWith('/messages')) return ['messages'];
+    if (pathname.startsWith('/banners')) return ['banners'];
     if (pathname.startsWith('/settings')) return ['settings'];
     return ['dashboard'];
   }, [pathname]);

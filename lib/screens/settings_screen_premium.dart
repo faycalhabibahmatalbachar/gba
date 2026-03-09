@@ -96,7 +96,18 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context);
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (didPop) return;
+        if (!context.mounted) return;
+        if (GoRouter.of(context).canPop()) {
+          GoRouter.of(context).pop();
+        } else {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context, localizations),
       body: Stack(
@@ -121,6 +132,7 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
           ),
           _buildSettingsContent(theme, localizations),
         ],
+      ),
       ),
     );
   }

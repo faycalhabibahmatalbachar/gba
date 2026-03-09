@@ -15,6 +15,7 @@ import '../localization/app_localizations.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../animations/app_animations.dart';
 import '../widgets/app_animation.dart';
+import '../utils/error_handler.dart';
 
 class CartScreenPremium extends StatefulWidget {
   const CartScreenPremium({super.key});
@@ -234,6 +235,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
   }
 
   Widget _buildErrorState(String error, AppLocalizations localizations, CartProvider cartProvider) {
+    final sanitizedError = ErrorHandler.getLocalizedError(error, localizations.locale.languageCode);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -253,7 +255,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
             ),
             const SizedBox(height: 8),
             Text(
-              error,
+              sanitizedError,
               style: TextStyle(color: Colors.grey.shade700),
               textAlign: TextAlign.center,
             ),
@@ -278,7 +280,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
       toolbarHeight: 80,
       titleSpacing: 0,
       title: Padding(
-        padding: const EdgeInsets.only(left: 16),
+        padding: const EdgeInsetsDirectional.only(start: 16),
         child: Builder(
           builder: (context) {
             final count = classic_provider.Provider.of<CartProvider>(context).itemCount;
@@ -414,12 +416,6 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
                 fontSize: 16,
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
-            ),
-            const SizedBox(height: 32),
-            _buildGlassmorphicButton(
-              onPressed: () => context.go('/home'),
-              icon: FontAwesomeIcons.arrowLeft,
-              label: localizations.translate('continue_shopping'),
             ),
           ],
         ),
@@ -1059,42 +1055,51 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
     required IconData icon,
     required String label,
   }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.2),
-              Colors.white.withOpacity(0.1),
-            ],
-          ),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.2),
+            Colors.white.withOpacity(0.1),
+          ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onPressed();
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../localization/app_localizations.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
@@ -9,7 +10,18 @@ class PrivacyPolicyScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context);
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (!context.mounted) return;
+        if (GoRouter.of(context).canPop()) {
+          GoRouter.of(context).pop();
+        } else {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(localizations.translate('privacy_policy')),
       ),
@@ -73,6 +85,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

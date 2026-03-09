@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../localization/app_localizations.dart';
 
 class AdminChatScreen extends StatefulWidget {
@@ -250,7 +251,18 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     final localizations = AppLocalizations.of(context);
     final userId = supabase.auth.currentUser?.id;
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (!context.mounted) return;
+        if (GoRouter.of(context).canPop()) {
+          GoRouter.of(context).pop();
+        } else {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         elevation: 2,
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -355,15 +367,81 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
 
                             return Align(
                               alignment: isMe
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
+                                  ? Alignment.centerLeft
+                                  : Alignment.centerRight,
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
+                                    Flexible(
+                                      child: Container(
+                                        constraints: BoxConstraints(
+                                          maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isMe
+                                              ? Theme.of(context).colorScheme.surfaceVariant
+                                              : isAdmin
+                                                  ? Theme.of(context).primaryColor
+                                                  : Theme.of(context).brightness == Brightness.dark
+                                                      ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                                      : Theme.of(context).colorScheme.surfaceVariant,
+                                          borderRadius: BorderRadius.only(
+                                            topLeft: const Radius.circular(18),
+                                            topRight: const Radius.circular(18),
+                                            bottomLeft: Radius.circular(isMe ? 4 : 18),
+                                            bottomRight: Radius.circular(isMe ? 18 : 4),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              msg['message'] ?? '',
+                                              style: TextStyle(
+                                                color: isMe
+                                                    ? Theme.of(context).colorScheme.onSurface
+                                                    : Colors.white,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  _formatTime(msg['created_at']),
+                                                  style: TextStyle(
+                                                    color: isMe
+                                                        ? Colors.grey[600]
+                                                        : Colors.white70,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                                if (isMe) ...[
+                                                  const SizedBox(width: 4),
+                                                  Icon(
+                                                    msg['is_read'] == true
+                                                        ? Icons.done_all
+                                                        : Icons.done,
+                                                    size: 14,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                     if (isAdmin) ...[
+                                      const SizedBox(width: 8),
                                       Container(
                                         width: 32,
                                         height: 32,
@@ -377,73 +455,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                                           color: Colors.orange.shade700,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
                                     ],
-                                    Flexible(
-                                      child: Container(
-                                        constraints: BoxConstraints(
-                                          maxWidth: MediaQuery.of(context).size.width * 0.7,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 10,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isMe
-                                              ? Theme.of(context).primaryColor
-                                              : isAdmin
-                                                  ? Colors.orange.shade100
-                                                  : Theme.of(context).brightness == Brightness.dark
-                                                      ? Theme.of(context).colorScheme.surfaceContainerHighest
-                                                      : Theme.of(context).colorScheme.surfaceVariant,
-                                          borderRadius: BorderRadius.only(
-                                            topLeft: const Radius.circular(18),
-                                            topRight: const Radius.circular(18),
-                                            bottomLeft: Radius.circular(isMe ? 18 : 4),
-                                            bottomRight: Radius.circular(isMe ? 4 : 18),
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              msg['message'] ?? '',
-                                              style: TextStyle(
-                                                color: isMe
-                                                    ? Colors.white
-                                                    : Theme.of(context).colorScheme.onSurface,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  _formatTime(msg['created_at']),
-                                                  style: TextStyle(
-                                                    color: isMe
-                                                        ? Colors.white70
-                                                        : Colors.grey[600],
-                                                    fontSize: 11,
-                                                  ),
-                                                ),
-                                                if (isMe) ...[
-                                                  const SizedBox(width: 4),
-                                                  Icon(
-                                                    msg['is_read'] == true
-                                                        ? Icons.done_all
-                                                        : Icons.done,
-                                                    size: 14,
-                                                    color: Colors.white70,
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -515,6 +527,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -9,9 +9,11 @@ export type DriverProfile = {
 };
 
 export type DriverLocation = {
-  lat: number;
-  lng: number;
+  latitude: number;
+  longitude: number;
   accuracy?: number | null;
+  speed?: number | null;
+  heading?: number | null;
   captured_at?: string | null;
 };
 
@@ -51,8 +53,8 @@ export async function fetchAllDriversWithState(): Promise<DriverWithState[]> {
   const driverList = (drivers || []) as DriverProfile[];
 
   const { data: locs } = await supabase
-    .from('driver_locations')
-    .select('driver_id, lat, lng, accuracy, captured_at')
+    .from('driver_location_history')
+    .select('driver_id, latitude, longitude, accuracy, speed, heading, captured_at')
     .order('captured_at', { ascending: false })
     .limit(500);
   const locRows = (locs || []) as any[];
@@ -60,9 +62,11 @@ export async function fetchAllDriversWithState(): Promise<DriverWithState[]> {
   for (const r of locRows) {
     if (!r.driver_id || latestByDriver[r.driver_id]) continue;
     latestByDriver[r.driver_id] = {
-      lat: r.lat,
-      lng: r.lng,
+      latitude: r.latitude,
+      longitude: r.longitude,
       accuracy: r.accuracy,
+      speed: r.speed,
+      heading: r.heading,
       captured_at: r.captured_at,
     };
   }
@@ -127,8 +131,8 @@ export async function fetchAllDriversWithState(): Promise<DriverWithState[]> {
 
 export async function fetchDriverLocation(driverId: string): Promise<DriverLocation | null> {
   const { data, error } = await supabase
-    .from('driver_locations')
-    .select('lat, lng, accuracy, captured_at')
+    .from('driver_location_history')
+    .select('latitude, longitude, accuracy, speed, heading, captured_at')
     .eq('driver_id', driverId)
     .order('captured_at', { ascending: false })
     .limit(1)
@@ -139,17 +143,42 @@ export async function fetchDriverLocation(driverId: string): Promise<DriverLocat
 
 export async function fetchDriverTrail(driverId: string, limit = 10): Promise<[number, number][]> {
   const { data, error } = await supabase
-    .from('driver_locations')
-    .select('lat, lng')
+    .from('driver_location_history')
+    .select('latitude, longitude')
     .eq('driver_id', driverId)
     .order('captured_at', { ascending: true })
     .limit(limit);
   if (error) throw error;
-  return ((data || []) as any[]).map((r) => [r.lat, r.lng] as [number, number]);
+  return ((data || []) as any[]).map((r) => [r.latitude, r.longitude] as [number, number]);
 }
 
 export async function fetchClientLocation(userId: string): Promise<DriverLocation | null> {
-  const { data, error } = await supabase.from('user_locations').select('lat, lng, accuracy, captured_at').eq('user_id', userId).maybeSingle();
+  // Try history first, then current location
+  const { data: historyData } = await supabase
+    .from('user_location_history')
+    .select('latitude, longitude, accuracy, speed, heading, captured_at')
+    .eq('user_id', userId)
+    .order('captured_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  
+  if (historyData) return historyData as DriverLocation;
+  
+  const { data, error } = await supabase
+    .from('user_current_location')
+    .select('latitude, longitude, accuracy, speed, heading, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  
   if (error) throw error;
-  return data as DriverLocation | null;
+  if (!data) return null;
+  
+  return {
+    latitude: data.latitude,
+    longitude: data.longitude,
+    accuracy: data.accuracy,
+    speed: data.speed,
+    heading: data.heading,
+    captured_at: data.updated_at,
+  } as DriverLocation;
 }

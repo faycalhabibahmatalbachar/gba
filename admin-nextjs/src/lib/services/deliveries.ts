@@ -21,6 +21,8 @@ export type DeliveryOrderRow = {
   shipping_city?: string | null;
   shipping_district?: string | null;
   shipping_country?: string | null;
+  delivered_at?: string | null;
+  cancelled_at?: string | null;
 };
 
 export type FetchDeliveriesParams = {
@@ -41,7 +43,7 @@ export async function fetchDeliveries(params: FetchDeliveriesParams) {
   let q = supabase
     .from('order_details_view')
     .select(
-      'id, order_number, created_at, updated_at, customer_name, customer_phone, customer_phone_profile, status, total_amount, driver_id, driver_name, driver_phone, payment_provider, paid_at, items, total_items, shipping_address, shipping_city, shipping_district, shipping_country',
+      'id, order_number, created_at, updated_at, customer_name, customer_phone, customer_phone_profile, status, total_amount, driver_id, driver_name, driver_phone, payment_provider, paid_at, items, total_items, shipping_address, shipping_city, shipping_district, shipping_country, delivered_at, cancelled_at',
       { count: 'exact' },
     )
     .order('created_at', { ascending: false })

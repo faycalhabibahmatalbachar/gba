@@ -12,6 +12,8 @@ import 'package:provider/provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderScope, ConsumerState, ConsumerStatefulWidget;
 import 'services/activity_tracking_service.dart';
+import 'services/location_background_service.dart';
+import 'services/mandatory_location_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'localization/app_localizations.dart';
 import 'config/app_config.dart';
@@ -117,6 +119,10 @@ void main() async {
   // Initialize activity tracking
   await ActivityTrackingService().initSession();
   
+  // Initialize background GPS tracking service
+  await LocationBackgroundService.instance.initialize();
+  await LocationBackgroundService.instance.startService();
+  
   runApp(
     ProviderScope(
       child: MultiProvider(
@@ -158,6 +164,30 @@ class _AppBootstrapState extends ConsumerState<AppBootstrap> with WidgetsBinding
     WidgetsBinding.instance.addObserver(this);
     ref.read(authProvider);
     _initDeepLinks();
+    _initGPSTracking();
+  }
+
+  void _initGPSTracking() {
+    // Listen to auth changes and associate userId with GPS tracking
+    ref.listen(authProvider, (previous, next) {
+      final userId = next.user?.id;
+      if (userId != null) {
+        // User logged in - start tracking
+        LocationBackgroundService.instance.setUserId(userId);
+        debugPrint('[Main] GPS tracking activated for user: $userId');
+      } else {
+        // User logged out - clear userId but keep service running
+        LocationBackgroundService.instance.clearUserId();
+        debugPrint('[Main] GPS tracking deactivated (user logged out)');
+      }
+    });
+
+    // If already logged in, activate immediately
+    final currentUser = ref.read(authProvider).user;
+    if (currentUser != null) {
+      LocationBackgroundService.instance.setUserId(currentUser.id);
+      debugPrint('[Main] GPS tracking activated for existing user: ${currentUser.id}');
+    }
   }
 
   Future<void> _initDeepLinks() async {

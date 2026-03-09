@@ -706,7 +706,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
                         _buildDetailRow(localizations.translate('label_status'), _getStatusLabel(order['status'])),
                         _buildDetailRow(
                           localizations.translate('payment'),
-                          (order['payment_method'] ?? localizations.translate('not_available'))?.toString(),
+                          _formatPaymentMethod(order['payment_method'], localizations),
                         ),
                       ],
                     ),
@@ -921,6 +921,14 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
     } catch (e) {
       return dateStr;
     }
+  }
+
+  String _formatPaymentMethod(String? method, AppLocalizations localizations) {
+    if (method == null) return localizations.translate('not_available');
+    if (method == 'cash_on_delivery') return localizations.translate('cash_on_delivery');
+    if (method == 'stripe_card') return 'Carte bancaire';
+    if (method == 'flutterwave_card') return 'Carte bancaire';
+    return method;
   }
 
   String _getStatusLabel(String? status) {

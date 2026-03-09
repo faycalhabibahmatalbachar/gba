@@ -87,6 +87,18 @@ Future<void> main() async {
 
   // Background GPS tracking (driver mode) — configured once at app launch.
   await LocationBackgroundService.instance.initialize();
+  
+  // Request "Always" permission for 24/7 tracking
+  try {
+    final hasAlways = await LocationBackgroundService.instance.requestBackgroundLocationPermission();
+    if (hasAlways) {
+      debugPrint('[DriverMain] Background location permission granted (Always)');
+    } else {
+      debugPrint('[DriverMain] Background location permission denied - tracking limited to foreground');
+    }
+  } catch (e) {
+    debugPrint('[DriverMain] Background permission request failed: $e');
+  }
 
   // ── Initialize driver notification service EARLY (before runApp) ──
   // This ensures FCM foreground listener, token registration, and realtime

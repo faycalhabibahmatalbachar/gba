@@ -40,6 +40,7 @@ import {
   fetchAllDriversWithState,
   fetchDriverLocation,
   fetchDriverTrail,
+  fetchClientLocation,
   type DriverWithState,
   type DriverProfile,
   type DriverLocation,
@@ -47,6 +48,8 @@ import {
 } from '@/lib/services/delivery-tracking';
 import PageHeader from '@/components/ui/PageHeader';
 import { useThemeMode } from '@/components/layout/ThemeProvider';
+import FleetMetrics from '@/components/delivery/FleetMetrics';
+import AlertsPanel from '@/components/delivery/AlertsPanel';
 
 const DeliveryTrackingMap = dynamic(() => import('./DeliveryTrackingMap'), { ssr: false });
 
@@ -112,8 +115,13 @@ export default function DeliveryTrackingPage() {
   );
 
   const fetchClientLoc = useCallback(async (userId: string) => {
-    const { data } = await supabase.from('user_locations').select('*').eq('user_id', userId).maybeSingle();
-    setClientLoc((data as any) || null);
+    try {
+      const loc = await fetchClientLocation(userId);
+      setClientLoc(loc);
+    } catch (e) {
+      console.error('Error fetching client location:', e);
+      setClientLoc(null);
+    }
   }, []);
 
   const loadDriverDetail = useCallback(async (driverId: string) => {
@@ -138,21 +146,21 @@ export default function DeliveryTrackingPage() {
       .channel(`dt-drv-${driverId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${driverId}` },
+        { event: 'INSERT', schema: 'public', table: 'driver_location_history', filter: `driver_id=eq.${driverId}` },
         ({ new: loc }: any) => {
-          if (loc?.lat == null) return;
+          if (loc?.latitude == null) return;
           setDriverLoc(loc);
-          setTrail((p) => [...p.slice(-(TRAIL_MAX - 1)), [loc.lat, loc.lng]]);
+          setTrail((p) => [...p.slice(-(TRAIL_MAX - 1)), [loc.latitude, loc.longitude]]);
           void loadFleet(true);
         },
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'driver_locations', filter: `driver_id=eq.${driverId}` },
+        { event: 'UPDATE', schema: 'public', table: 'driver_location_history', filter: `driver_id=eq.${driverId}` },
         ({ new: loc }: any) => {
-          if (loc?.lat == null) return;
+          if (loc?.latitude == null) return;
           setDriverLoc(loc);
-          setTrail((p) => [...p.slice(-(TRAIL_MAX - 1)), [loc.lat, loc.lng]]);
+          setTrail((p) => [...p.slice(-(TRAIL_MAX - 1)), [loc.latitude, loc.longitude]]);
           void loadFleet(true);
         },
       )
@@ -166,9 +174,9 @@ export default function DeliveryTrackingPage() {
       .channel(`dt-cli-${userId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_locations', filter: `user_id=eq.${userId}` },
+        { event: '*', schema: 'public', table: 'user_location_history', filter: `user_id=eq.${userId}` },
         ({ new: loc }: any) => {
-          if (loc?.lat != null) setClientLoc(loc);
+          if (loc?.latitude != null) setClientLoc(loc);
         },
       )
       .subscribe();
@@ -206,9 +214,9 @@ export default function DeliveryTrackingPage() {
   }, [orders, selectedOrderId]);
 
   const fitterPos = useMemo(() => {
-    const pts: { lat: number; lng: number }[] = [];
-    if (driverLoc?.lat != null) pts.push({ lat: driverLoc.lat, lng: driverLoc.lng });
-    if (clientLoc?.lat != null) pts.push({ lat: clientLoc.lat, lng: clientLoc.lng });
+    const pts: { latitude: number; longitude: number }[] = [];
+    if (driverLoc?.latitude != null) pts.push({ latitude: driverLoc.latitude, longitude: driverLoc.longitude });
+    if (clientLoc?.latitude != null) pts.push({ latitude: clientLoc.latitude, longitude: clientLoc.longitude });
     return pts;
   }, [driverLoc, clientLoc]);
 
@@ -279,6 +287,22 @@ export default function DeliveryTrackingPage() {
           description={pageError}
         />
       ) : null}
+
+      {/* Métriques flotte */}
+      {fleet.length > 0 && (
+        <FleetMetrics 
+          fleet={fleet} 
+          allOrders={fleet.flatMap(f => f.orders)} 
+        />
+      )}
+
+      {/* Alertes critiques */}
+      {fleet.length > 0 && (
+        <AlertsPanel 
+          fleet={fleet} 
+          allOrders={fleet.flatMap(f => f.orders)} 
+        />
+      )}
 
       {fleet.length === 0 ? (
         <Card className="border-dashed">
@@ -543,7 +567,7 @@ export default function DeliveryTrackingPage() {
                       </Button>
                     </div>
                     <div className="flex-1 min-h-0" style={{ height: 'calc(100vh - 56px)' }}>
-                      {driverLoc?.lat != null ? (
+                      {driverLoc?.latitude != null ? (
                         <ClientOnly>
                           <div className="w-full h-full" style={{ height: 'calc(100vh - 56px)' }}>
                             <DeliveryTrackingMap
@@ -552,6 +576,8 @@ export default function DeliveryTrackingPage() {
                               trail={trail}
                               fitterPos={fitterPos}
                               selectedDriver={selectedDriverState?.driver}
+                              selectedOrder={selectedOrder}
+                              orders={orders}
                               mapName={mapName}
                             />
                           </div>
@@ -571,7 +597,7 @@ export default function DeliveryTrackingPage() {
                   </div>
                 ) : (
                   <div className="delivery-map-container" style={{ height: 480 }}>
-                    {driverLoc?.lat != null ? (
+                    {driverLoc?.latitude != null ? (
                       <ClientOnly>
                         <DeliveryTrackingMap
                           driverLoc={driverLoc}
@@ -579,6 +605,8 @@ export default function DeliveryTrackingPage() {
                           trail={trail}
                           fitterPos={fitterPos}
                           selectedDriver={selectedDriverState?.driver}
+                          selectedOrder={selectedOrder}
+                          orders={orders}
                           mapName={mapName}
                         />
                       </ClientOnly>

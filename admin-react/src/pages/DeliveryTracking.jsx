@@ -8,6 +8,8 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '../config/supabase';
 import { useDark } from '../components/Layout';
 import { Button } from '../components/ui/button';
+import FleetMetrics from '../components/delivery/FleetMetrics';
+import AlertsPanel from '../components/delivery/AlertsPanel';
 
 // Fix leaflet default icon path (Vite/webpack issue)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -68,6 +70,7 @@ export default function DeliveryTracking() {
   const [trail, setTrail]                = useState([]);
   const [orders, setOrders]              = useState([]);
   const [selectedOrderId, setSelOrder]   = useState('');
+  const [allDriverLocations, setAllDriverLocations] = useState([]);
   const driverChRef = useRef(null);
   const clientChRef = useRef(null);
 
@@ -84,15 +87,18 @@ export default function DeliveryTracking() {
       const mapped = rows.map(d => ({ ...d, name: mapName(d) }));
       setDrivers(mapped);
       if (!selectedDriverId && mapped.length) setSelDriver(mapped[0].id);
+      
+      // Fetch all driver locations for metrics
+      await fetchAllDriverLocations(mapped);
     } catch { enqueueSnackbar('Erreur chargement livreurs', { variant:'error' }); }
     finally { setLoading(false); }
   }, [selectedDriverId]);
 
   const fetchOrders = useCallback(async (driverId) => {
-    if (!driverId) return;
+    // Fetch ALL active orders for metrics (not just selected driver)
     const { data: ordersRaw } = await supabase.from('orders')
-      .select('id, user_id, status, order_number, customer_name').eq('driver_id', driverId)
-      .in('status',['confirmed','shipped','processing']).order('created_at',{ascending:false}).limit(10);
+      .select('id, user_id, driver_id, status, order_number, customer_name, created_at')
+      .in('status',['confirmed','shipped','processing','out_for_delivery']).order('created_at',{ascending:false});
     const rows = ordersRaw || [];
     // Fetch client names for orders without customer_name
     const missingIds = [...new Set(rows.filter(o => !o.customer_name && o.user_id).map(o => o.user_id))];
@@ -113,27 +119,63 @@ export default function DeliveryTracking() {
 
   const fetchDriverLoc = useCallback(async (driverId) => {
     if (!driverId) return;
-    const { data } = await supabase.from('driver_locations').select('*')
+    // Fetch from history table for trail
+    const { data } = await supabase.from('driver_location_history').select('*')
       .eq('driver_id', driverId).order('captured_at',{ascending:false}).limit(TRAIL_MAX);
-    if (data?.length) { setDriverLoc(data[0]); setTrail(data.reverse().map(p=>[p.lat,p.lng])); }
+    if (data?.length) { setDriverLoc(data[0]); setTrail(data.reverse().map(p=>[p.latitude,p.longitude])); }
     else { setDriverLoc(null); setTrail([]); }
+  }, []);
+
+  const fetchAllDriverLocations = useCallback(async (driverList) => {
+    try {
+      const driverIds = driverList.map(d => d.id);
+      if (driverIds.length === 0) return;
+      
+      // Fetch latest position for each driver from history
+      const { data } = await supabase
+        .from('driver_location_history')
+        .select('*')
+        .in('driver_id', driverIds)
+        .order('captured_at', { ascending: false });
+      
+      if (data) {
+        // Keep only latest position per driver
+        const latestByDriver = {};
+        data.forEach(loc => {
+          if (!latestByDriver[loc.driver_id]) {
+            latestByDriver[loc.driver_id] = loc;
+          }
+        });
+        setAllDriverLocations(Object.values(latestByDriver));
+      }
+    } catch (e) {
+      console.error('Error fetching all driver locations:', e);
+    }
   }, []);
 
   const fetchClientLoc = useCallback(async (orderId, orderList) => {
     const order = (orderList || orders).find(o => o.id === orderId);
     if (!order?.user_id) return;
-    const { data } = await supabase.from('user_locations').select('*').eq('user_id', order.user_id).maybeSingle();
-    setClientLoc(data || null);
+    // Fetch latest from history or current location
+    const { data: historyData } = await supabase.from('user_location_history')
+      .select('*').eq('user_id', order.user_id).order('captured_at', {ascending: false}).limit(1).maybeSingle();
+    if (historyData) {
+      setClientLoc(historyData);
+    } else {
+      const { data: currentData } = await supabase.from('user_current_location')
+        .select('*').eq('user_id', order.user_id).maybeSingle();
+      setClientLoc(currentData || null);
+    }
   }, [orders]);
 
   const subscribeDriver = useCallback((driverId) => {
     driverChRef.current?.unsubscribe();
     driverChRef.current = supabase.channel(`dt-drv-${driverId}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'driver_locations', filter:`driver_id=eq.${driverId}` },
+      .on('postgres_changes', { event:'*', schema:'public', table:'driver_location_history', filter:`driver_id=eq.${driverId}` },
         ({ new: loc }) => {
-          if (!loc?.lat) return;
+          if (!loc?.latitude) return;
           setDriverLoc(loc);
-          setTrail(p => [...p.slice(-(TRAIL_MAX-1)), [loc.lat, loc.lng]]);
+          setTrail(p => [...p.slice(-(TRAIL_MAX-1)), [loc.latitude, loc.longitude]]);
         })
       .subscribe();
   }, []);
@@ -142,8 +184,8 @@ export default function DeliveryTracking() {
     clientChRef.current?.unsubscribe();
     if (!userId) return;
     clientChRef.current = supabase.channel(`dt-cli-${userId}`)
-      .on('postgres_changes', { event:'*', schema:'public', table:'user_locations', filter:`user_id=eq.${userId}` },
-        ({ new: loc }) => { if (loc?.lat) setClientLoc(loc); })
+      .on('postgres_changes', { event:'*', schema:'public', table:'user_location_history', filter:`user_id=eq.${userId}` },
+        ({ new: loc }) => { if (loc?.latitude) setClientLoc(loc); })
       .subscribe();
   }, []);
 
@@ -169,8 +211,8 @@ export default function DeliveryTracking() {
   const selectedDriver = drivers.find(d => d.id === selectedDriverId) || null;
   const mapH = 'calc(100vh - 200px)';
   const fitterPos = [
-    driverLoc ? { lat: driverLoc.lat, lng: driverLoc.lng } : null,
-    clientLoc ? { lat: clientLoc.lat, lng: clientLoc.lng } : null,
+    driverLoc ? { lat: driverLoc.latitude, lng: driverLoc.longitude } : null,
+    clientLoc ? { lat: clientLoc.latitude, lng: clientLoc.longitude } : null,
   ].filter(Boolean);
 
   return (
@@ -178,12 +220,19 @@ export default function DeliveryTracking() {
       <motion.div initial={{ opacity:0, y:-12 }} animate={{ opacity:1, y:0 }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent'}`}>📡 Tracking GPS Live</h1>
-            <p className={`text-sm mt-0.5 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Carte interactive OpenStreetMap + Supabase Realtime</p>
+            <h1 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent'}`}>Suivi livraisons</h1>
+            <p className={`text-sm mt-0.5 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Delivery Operations Command Center</p>
+            <p className={`text-xs mt-0.5 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Centre de pilotage logistique temps réel</p>
           </div>
           <Button size="sm" onClick={fetchDrivers}><RefreshCw size={15} /> Actualiser</Button>
         </div>
       </motion.div>
+
+      {/* Métriques flotte */}
+      <FleetMetrics drivers={drivers} orders={orders} locations={allDriverLocations} />
+
+      {/* Alertes critiques */}
+      <AlertsPanel drivers={drivers} orders={orders} locations={allDriverLocations} />
 
       <div className="flex flex-col lg:flex-row gap-4" style={{ minHeight: mapH }}>
         {/* Sidebar */}
@@ -231,11 +280,11 @@ export default function DeliveryTracking() {
             </div>
           </div>
 
-          {driverLoc?.lat != null && (
+          {driverLoc?.latitude != null && (
             <div className={`rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
               <p className={`text-xs font-semibold uppercase mb-2 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Coordonnées</p>
-              <p className={`text-xs font-mono ${dark ? 'text-slate-300' : 'text-gray-700'}`}>🚚 {Number(driverLoc.lat).toFixed(6)}, {Number(driverLoc.lng).toFixed(6)}</p>
-              {clientLoc?.lat != null && <p className={`text-xs font-mono mt-1 ${dark ? 'text-slate-300' : 'text-gray-700'}`}>👤 {Number(clientLoc.lat).toFixed(6)}, {Number(clientLoc.lng).toFixed(6)}</p>}
+              <p className={`text-xs font-mono ${dark ? 'text-slate-300' : 'text-gray-700'}`}>🚚 {Number(driverLoc.latitude).toFixed(6)}, {Number(driverLoc.longitude).toFixed(6)}</p>
+              {clientLoc?.latitude != null && <p className={`text-xs font-mono mt-1 ${dark ? 'text-slate-300' : 'text-gray-700'}`}>👤 {Number(clientLoc.latitude).toFixed(6)}, {Number(clientLoc.longitude).toFixed(6)}</p>}
             </div>
           )}
 
@@ -251,24 +300,26 @@ export default function DeliveryTracking() {
         {/* Carte Leaflet */}
         <motion.div initial={{ opacity:0, scale:.98 }} animate={{ opacity:1, scale:1 }} transition={{ delay:0.2 }}
           className={`flex-1 rounded-2xl overflow-hidden shadow-md border ${dark ? 'border-slate-700' : 'border-gray-200'}`} style={{ minHeight: 400 }}>
-          {driverLoc?.lat != null ? (
-            <MapContainer center={[driverLoc.lat, driverLoc.lng]} zoom={14} style={{ width:'100%', height:'100%', minHeight:400 }}>
+          {driverLoc?.latitude != null ? (
+            <MapContainer center={[driverLoc.latitude, driverLoc.longitude]} zoom={14} style={{ width:'100%', height:'100%', minHeight:400 }}>
               <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <MapFitter positions={fitterPos} />
               {trail.length > 1 && <Polyline positions={trail} pathOptions={{ color:'#667eea', weight:3, opacity:0.6, dashArray:'6 4' }} />}
-              <Marker position={[driverLoc.lat, driverLoc.lng]} icon={driverIcon}>
+              <Marker position={[driverLoc.latitude, driverLoc.longitude]} icon={driverIcon}>
                 <Popup>
                   <strong>🚚 {selectedDriver?.name || 'Livreur'}</strong><br />
-                  Lat: {Number(driverLoc.lat).toFixed(6)}<br />Lng: {Number(driverLoc.lng).toFixed(6)}<br />
+                  Lat: {Number(driverLoc.latitude).toFixed(6)}<br />Lng: {Number(driverLoc.longitude).toFixed(6)}<br />
                   {driverLoc.accuracy != null && <>Précision: ±{Number(driverLoc.accuracy).toFixed(0)} m<br /></>}
+                  {driverLoc.speed != null && <>Vitesse: {(Number(driverLoc.speed) * 3.6).toFixed(1)} km/h<br /></>}
                   {driverLoc.captured_at && <small>{new Date(driverLoc.captured_at).toLocaleString('fr-FR')}</small>}
                 </Popup>
               </Marker>
-              {clientLoc?.lat != null && (
-                <Marker position={[clientLoc.lat, clientLoc.lng]} icon={clientIcon}>
+              {clientLoc?.latitude != null && (
+                <Marker position={[clientLoc.latitude, clientLoc.longitude]} icon={clientIcon}>
                   <Popup>
                     <strong>👤 Client</strong><br />
-                    Lat: {Number(clientLoc.lat).toFixed(6)}<br />Lng: {Number(clientLoc.lng).toFixed(6)}<br />
+                    Lat: {Number(clientLoc.latitude).toFixed(6)}<br />Lng: {Number(clientLoc.longitude).toFixed(6)}<br />
+                    {clientLoc.accuracy != null && <>Précision: ±{Number(clientLoc.accuracy).toFixed(0)} m<br /></>}
                     {clientLoc.captured_at && <small>{new Date(clientLoc.captured_at).toLocaleString('fr-FR')}</small>}
                   </Popup>
                 </Marker>

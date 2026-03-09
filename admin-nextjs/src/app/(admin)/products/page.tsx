@@ -3,9 +3,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { App, Button, Card, Checkbox, Collapse, Divider, Drawer, Empty, Image as AntdImage, Input, InputNumber, Select, Skeleton, Space, Switch, Table, Tag, Tooltip, Typography, Upload } from 'antd';
+import { App, Button, Card, Checkbox, Collapse, Divider, Drawer, Empty, Image as AntdImage, Input, InputNumber, Progress, Select, Skeleton, Space, Steps, Switch, Table, Tag, Tooltip, Typography, Upload } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { AppstoreOutlined, DeleteOutlined, EditOutlined, EyeOutlined, ReloadOutlined, TableOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, TableOutlined } from '@ant-design/icons';
 import type { ProductRow } from '@/lib/services/products';
 import { deleteProduct, fetchProducts } from '@/lib/services/products';
 import { supabase } from '@/lib/supabase/client';
@@ -132,6 +132,29 @@ export default function ProductsPage() {
   const [analyticsProductId, setAnalyticsProductId] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<Array<{ label: string; value: string }>>([{ label: 'Toutes catégories', value: 'all' }]);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createStep, setCreateStep] = useState(0);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createPatch, setCreatePatch] = useState<ProductEditPatch>({});
+  const [createTagsText, setCreateTagsText] = useState('');
+  const [createImagesText, setCreateImagesText] = useState('');
+  const [createMetadataText, setCreateMetadataText] = useState('');
+  const [createDimensionsText, setCreateDimensionsText] = useState('');
+  const [createSpecificationsText, setCreateSpecificationsText] = useState('');
+  const [createMetaKeywordsText, setCreateMetaKeywordsText] = useState('');
+  const [createUploading, setCreateUploading] = useState(false);
+  const [createUploadProgress, setCreateUploadProgress] = useState<number | null>(null);
+  const [createTempId] = useState(() => {
+    if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+      return (crypto as any).randomUUID() as string;
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  });
 
   const reloadTimer = useRef<any>(null);
 
@@ -497,7 +520,7 @@ export default function ProductsPage() {
 
       const parsedTags = tagsText.trim()
         ? tagsText.split(',').map((s) => s.trim()).filter(Boolean)
-        : null;
+        : [];
 
       const payload: ProductEditPatch = {
         name: editPatch.name ?? null,
@@ -561,6 +584,201 @@ export default function ProductsPage() {
       setEditSaving(false);
     }
   };
+
+  const openCreateDrawer = () => {
+    setCreateOpen(true);
+    setCreateStep(0);
+    setCreateSaving(false);
+    setCreateError(null);
+    setCreatePatch({
+      name: '',
+      sku: '',
+      slug: '',
+      price: 0,
+      compare_at_price: null,
+      cost_price: null,
+      quantity: 0,
+      low_stock_threshold: 10,
+      unit: 'pièce',
+      weight: null,
+      dimensions: null,
+      category_id: null,
+      description: '',
+      short_description: '',
+      brand: '',
+      model: '',
+      barcode: '',
+      main_image: '',
+      images: null,
+      is_active: true,
+      is_featured: false,
+      status: 'available',
+      track_quantity: true,
+      tags: null,
+      specifications: null,
+      metadata: null,
+      meta_title: '',
+      meta_description: '',
+      meta_keywords: null,
+    });
+    setCreateTagsText('');
+    setCreateImagesText('');
+    setCreateMetadataText('');
+    setCreateDimensionsText('');
+    setCreateSpecificationsText('');
+    setCreateMetaKeywordsText('');
+    setCreateUploadProgress(null);
+  };
+
+  const uploadCreateMainImage = async (file: File) => {
+    setCreateUploading(true);
+    setCreateUploadProgress(0);
+    try {
+      const safeName = String(file.name || 'image').replaceAll(' ', '_');
+      const ext = safeName.includes('.') ? safeName.split('.').pop() : 'jpg';
+      const path = `${createTempId}/${Date.now()}.${ext}`;
+
+      const { error: upErr } = await supabase
+        .storage
+        .from('products')
+        .upload(path, file, { upsert: true, contentType: file.type || undefined });
+      if (upErr) throw upErr;
+
+      setCreateUploadProgress(80);
+
+      const { data } = supabase.storage.from('products').getPublicUrl(path);
+      const publicUrl = data?.publicUrl;
+      if (!publicUrl) throw new Error('URL publique introuvable');
+
+      setCreatePatch((p) => ({ ...p, main_image: publicUrl }));
+      setCreateUploadProgress(100);
+      message.success('Image uploadée');
+    } catch (e: any) {
+      message.error(e?.message || 'Upload impossible');
+    } finally {
+      setCreateUploading(false);
+      setTimeout(() => setCreateUploadProgress(null), 800);
+    }
+  };
+
+  const saveCreate = async () => {
+    if (!createPatch.name?.trim()) {
+      setCreateError('Le nom du produit est obligatoire');
+      return;
+    }
+    if (!createPatch.price && createPatch.price !== 0) {
+      setCreateError('Le prix est obligatoire');
+      return;
+    }
+    setCreateSaving(true);
+    setCreateError(null);
+    try {
+      let parsedImages: string[] | null = null;
+      if (createImagesText.trim()) {
+        try {
+          const arr = JSON.parse(createImagesText);
+          parsedImages = Array.isArray(arr) ? arr.map(String) : null;
+        } catch {
+          throw new Error('Images: JSON invalide');
+        }
+      }
+
+      let parsedMetadata: any = null;
+      if (createMetadataText.trim()) {
+        try { parsedMetadata = JSON.parse(createMetadataText); } catch { throw new Error('Métadonnées: JSON invalide'); }
+      }
+
+      let parsedDimensions: any = null;
+      if (createDimensionsText.trim()) {
+        try { parsedDimensions = JSON.parse(createDimensionsText); } catch { throw new Error('Dimensions: JSON invalide'); }
+      }
+
+      let parsedSpecifications: any = null;
+      if (createSpecificationsText.trim()) {
+        try { parsedSpecifications = JSON.parse(createSpecificationsText); } catch { throw new Error('Spécifications: JSON invalide'); }
+      }
+
+      const parsedMetaKeywords = createMetaKeywordsText.trim()
+        ? createMetaKeywordsText.split(',').map((s) => s.trim()).filter(Boolean)
+        : null;
+
+      const parsedTags = createTagsText.trim()
+        ? createTagsText.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+
+      const payload: Record<string, unknown> = {
+        name: createPatch.name?.trim() || null,
+        sku: createPatch.sku?.trim() || null,
+        price: createPatch.price != null ? Number(createPatch.price) : 0,
+        compare_at_price: createPatch.compare_at_price != null ? Number(createPatch.compare_at_price) : null,
+        cost_price: createPatch.cost_price != null ? Number(createPatch.cost_price) : null,
+        quantity: createPatch.quantity != null ? Number(createPatch.quantity) : 0,
+        low_stock_threshold: createPatch.low_stock_threshold != null ? Number(createPatch.low_stock_threshold) : null,
+        unit: createPatch.unit?.trim() || null,
+        weight: createPatch.weight != null ? Number(createPatch.weight) : null,
+        dimensions: parsedDimensions,
+        category_id: createPatch.category_id || null,
+        description: createPatch.description?.trim() || null,
+        short_description: createPatch.short_description?.trim() || null,
+        brand: createPatch.brand?.trim() || null,
+        model: createPatch.model?.trim() || null,
+        barcode: createPatch.barcode?.trim() || null,
+        main_image: createPatch.main_image?.trim() || null,
+        images: parsedImages ?? [],
+        slug: createPatch.slug?.trim() || null,
+        is_active: createPatch.is_active !== false,
+        is_featured: !!createPatch.is_featured,
+        status: createPatch.status || 'available',
+        track_quantity: createPatch.track_quantity !== false,
+        tags: parsedTags,
+        specifications: parsedSpecifications ?? {},
+        metadata: parsedMetadata,
+        meta_title: createPatch.meta_title?.trim() || null,
+        meta_description: createPatch.meta_description?.trim() || null,
+        meta_keywords: parsedMetaKeywords,
+      };
+
+      const { error } = await supabase.from('products').insert(payload);
+      if (error) {
+        const msg = String((error as any)?.message || '').toLowerCase();
+        const isColumnIssue = msg.includes('does not exist') || msg.includes('column') || msg.includes('schema cache') || msg.includes('could not find');
+        if (!isColumnIssue) throw error;
+        const safe: Record<string, unknown> = {
+          name: payload.name,
+          sku: payload.sku,
+          price: payload.price,
+          quantity: payload.quantity,
+          category_id: payload.category_id,
+          description: payload.description,
+          main_image: payload.main_image,
+          images: payload.images,
+          tags: payload.tags,
+          is_active: payload.is_active,
+          is_featured: payload.is_featured,
+        };
+        const { error: narrowErr } = await supabase.from('products').insert(safe);
+        if (narrowErr) throw narrowErr;
+      }
+
+      message.success('Produit créé avec succès');
+      setCreateOpen(false);
+      await load({ page: 1, search });
+    } catch (e: any) {
+      setCreateError(e?.message || 'Erreur lors de la création');
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
+  const CREATE_STEPS = [
+    { title: 'Identité' },
+    { title: 'Prix' },
+    { title: 'Stock' },
+    { title: 'Médias' },
+    { title: 'Contenu' },
+    { title: 'SEO' },
+    { title: 'Avancé' },
+  ];
 
   const exportCsv = (filename: string, headers: string[], rows: Array<Array<string | number>>) => {
     const esc = (v: any) => {
@@ -774,6 +992,13 @@ export default function ProductsPage() {
         subtitle="Catalogue et stock"
         extra={
           <Space>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={openCreateDrawer}
+            >
+              Créer un produit
+            </Button>
             <Button
               onClick={() => {
                 exportCsv(
@@ -1385,6 +1610,303 @@ export default function ProductsPage() {
             ]}
           />
         </div>
+      </Drawer>
+
+      {/* Create Product Drawer */}
+      <Drawer
+        open={createOpen}
+        title="Créer un produit"
+        onClose={() => setCreateOpen(false)}
+        size="large"
+        styles={{ body: { padding: '16px 24px' } }}
+        footer={
+          <div className="flex items-center justify-between">
+            <div>
+              {createStep > 0 && (
+                <Button onClick={() => setCreateStep((s) => s - 1)}>Précédent</Button>
+              )}
+            </div>
+            <Space>
+              <Button onClick={() => setCreateOpen(false)}>Annuler</Button>
+              {createStep < CREATE_STEPS.length - 1 ? (
+                <Button type="primary" onClick={() => setCreateStep((s) => s + 1)}>Suivant</Button>
+              ) : (
+                <Button type="primary" loading={createSaving} onClick={() => void saveCreate()}>Créer le produit</Button>
+              )}
+            </Space>
+          </div>
+        }
+      >
+        <Steps
+          current={createStep}
+          size="small"
+          items={CREATE_STEPS}
+          onChange={(v) => setCreateStep(v)}
+          className="mb-6"
+        />
+
+        {createError && (
+          <Card className="mb-4 border-red-200 bg-red-50">
+            <Typography.Text type="danger">{createError}</Typography.Text>
+          </Card>
+        )}
+
+        {/* Step 0: Identité */}
+        {createStep === 0 && (
+          <Card title="Identité" styles={{ body: { padding: 14 } }}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div>
+                <Typography.Text type="secondary">Nom *</Typography.Text>
+                <Input value={String(createPatch.name ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, name: e.target.value }))} placeholder="Nom du produit" />
+              </div>
+              <div>
+                <Typography.Text type="secondary">SKU</Typography.Text>
+                <Input value={String(createPatch.sku ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, sku: e.target.value }))} placeholder="SKU-XXX-000" />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Slug</Typography.Text>
+                <Input value={String(createPatch.slug ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, slug: e.target.value }))} placeholder="mon-produit" />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Catégorie</Typography.Text>
+                <Select
+                  value={(createPatch.category_id as any) ?? undefined}
+                  onChange={(v) => setCreatePatch((p) => ({ ...p, category_id: v }))}
+                  options={categories.filter((c) => c.value !== 'all')}
+                  allowClear
+                  placeholder="Choisir une catégorie"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Marque</Typography.Text>
+                <Input value={String(createPatch.brand ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, brand: e.target.value }))} />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Modèle</Typography.Text>
+                <Input value={String(createPatch.model ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, model: e.target.value }))} />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Code-barres</Typography.Text>
+                <Input value={String(createPatch.barcode ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, barcode: e.target.value }))} />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Statut</Typography.Text>
+                <Select
+                  value={String(createPatch.status ?? 'available')}
+                  onChange={(v) => setCreatePatch((p) => ({ ...p, status: v }))}
+                  options={[
+                    { value: 'available', label: 'Disponible' },
+                    { value: 'out_of_stock', label: 'Rupture' },
+                    { value: 'discontinued', label: 'Arrêté' },
+                  ]}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Actif</Typography.Text>
+                <div style={{ marginTop: 6 }}>
+                  <Switch checked={createPatch.is_active !== false} onChange={(v) => setCreatePatch((p) => ({ ...p, is_active: v }))} />
+                </div>
+              </div>
+              <div>
+                <Typography.Text type="secondary">En vedette</Typography.Text>
+                <div style={{ marginTop: 6 }}>
+                  <Switch checked={!!createPatch.is_featured} onChange={(v) => setCreatePatch((p) => ({ ...p, is_featured: v }))} />
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 1: Prix */}
+        {createStep === 1 && (
+          <Card title="Prix" styles={{ body: { padding: 14 } }}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div>
+                <Typography.Text type="secondary">Prix (FCFA) *</Typography.Text>
+                <InputNumber style={{ width: '100%' }} min={0} value={Number(createPatch.price || 0)} onChange={(v) => setCreatePatch((p) => ({ ...p, price: Number(v || 0) }))} />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Prix barré (FCFA)</Typography.Text>
+                <InputNumber style={{ width: '100%' }} min={0} value={createPatch.compare_at_price == null ? undefined : Number(createPatch.compare_at_price)} onChange={(v) => setCreatePatch((p) => ({ ...p, compare_at_price: v == null ? null : Number(v) }))} placeholder="Ancien prix" />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Prix de revient (FCFA)</Typography.Text>
+                <InputNumber style={{ width: '100%' }} min={0} value={createPatch.cost_price == null ? undefined : Number(createPatch.cost_price)} onChange={(v) => setCreatePatch((p) => ({ ...p, cost_price: v == null ? null : Number(v) }))} placeholder="Coût" />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 2: Stock */}
+        {createStep === 2 && (
+          <Card title="Stock" styles={{ body: { padding: 14 } }}>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+              <div>
+                <Typography.Text type="secondary">Suivi de stock</Typography.Text>
+                <div style={{ marginTop: 6 }}>
+                  <Switch checked={createPatch.track_quantity !== false} onChange={(v) => setCreatePatch((p) => ({ ...p, track_quantity: v }))} />
+                </div>
+              </div>
+              <div>
+                <Typography.Text type="secondary">Stock</Typography.Text>
+                <InputNumber style={{ width: '100%' }} min={0} disabled={createPatch.track_quantity === false} value={Number(createPatch.quantity || 0)} onChange={(v) => setCreatePatch((p) => ({ ...p, quantity: Number(v || 0) }))} />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Seuil stock faible</Typography.Text>
+                <InputNumber style={{ width: '100%' }} min={0} disabled={createPatch.track_quantity === false} value={Number(createPatch.low_stock_threshold || 0)} onChange={(v) => setCreatePatch((p) => ({ ...p, low_stock_threshold: Number(v || 0) }))} />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Unité</Typography.Text>
+                <Input value={String(createPatch.unit ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, unit: e.target.value }))} placeholder="pièce" />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Poids (kg)</Typography.Text>
+                <InputNumber style={{ width: '100%' }} min={0} value={createPatch.weight == null ? undefined : Number(createPatch.weight)} onChange={(v) => setCreatePatch((p) => ({ ...p, weight: v == null ? null : Number(v) }))} />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 3: Médias */}
+        {createStep === 3 && (
+          <Card title="Médias" styles={{ body: { padding: 14 } }}>
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div style={{ width: 220, height: 220, borderRadius: 16, overflow: 'hidden', background: 'rgba(0,0,0,0.04)', flexShrink: 0 }}>
+                {createPatch.main_image ? (
+                  <AntdImage src={String(createPatch.main_image)} alt="" width={220} height={220} preview={false} style={{ objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
+                    <PlusOutlined style={{ fontSize: 32, opacity: 0.3 }} />
+                    <Typography.Text type="secondary">Aucune image</Typography.Text>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0 space-y-3">
+                <div>
+                  <Typography.Text type="secondary">Image principale (URL)</Typography.Text>
+                  <Input value={String(createPatch.main_image ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, main_image: e.target.value }))} placeholder="https://..." />
+                </div>
+                <div>
+                  <Upload
+                    accept="image/*"
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      void uploadCreateMainImage(file as any as File);
+                      return false;
+                    }}
+                  >
+                    <Button icon={<PlusOutlined />} loading={createUploading}>
+                      Uploader depuis le PC
+                    </Button>
+                  </Upload>
+                  {createUploadProgress != null && (
+                    <Progress percent={createUploadProgress} size="small" className="mt-2" />
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 4: Contenu */}
+        {createStep === 4 && (
+          <Card title="Contenu" styles={{ body: { padding: 14 } }}>
+            <div className="space-y-3">
+              <div>
+                <Typography.Text type="secondary">Description courte</Typography.Text>
+                <Input.TextArea
+                  value={String(createPatch.short_description ?? '')}
+                  onChange={(e) => setCreatePatch((p) => ({ ...p, short_description: e.target.value }))}
+                  autoSize={{ minRows: 2, maxRows: 5 }}
+                  placeholder="Résumé court du produit"
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Description</Typography.Text>
+                <Input.TextArea
+                  value={String(createPatch.description ?? '')}
+                  onChange={(e) => setCreatePatch((p) => ({ ...p, description: e.target.value }))}
+                  autoSize={{ minRows: 4, maxRows: 10 }}
+                  placeholder="Description complète du produit"
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Tags (séparés par virgule)</Typography.Text>
+                <Input value={createTagsText} onChange={(e) => setCreateTagsText(e.target.value)} placeholder="ex: textile, sneakers, cuir" />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 5: SEO */}
+        {createStep === 5 && (
+          <Card title="SEO" styles={{ body: { padding: 14 } }}>
+            <div className="space-y-3">
+              <div>
+                <Typography.Text type="secondary">Meta title</Typography.Text>
+                <Input value={String(createPatch.meta_title ?? '')} onChange={(e) => setCreatePatch((p) => ({ ...p, meta_title: e.target.value }))} />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Meta description</Typography.Text>
+                <Input.TextArea
+                  value={String(createPatch.meta_description ?? '')}
+                  onChange={(e) => setCreatePatch((p) => ({ ...p, meta_description: e.target.value }))}
+                  autoSize={{ minRows: 2, maxRows: 5 }}
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Meta keywords (séparés par virgule)</Typography.Text>
+                <Input value={createMetaKeywordsText} onChange={(e) => setCreateMetaKeywordsText(e.target.value)} placeholder="ex: chaussures, kappa, sneakers" />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 6: Avancé */}
+        {createStep === 6 && (
+          <Card title="Avancé (JSON)" styles={{ body: { padding: 14 } }}>
+            <div className="space-y-3">
+              <div>
+                <Typography.Text type="secondary">Images supplémentaires (JSON)</Typography.Text>
+                <Input.TextArea
+                  value={createImagesText}
+                  onChange={(e) => setCreateImagesText(e.target.value)}
+                  placeholder='["https://...", "https://..."]'
+                  autoSize={{ minRows: 3, maxRows: 8 }}
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Dimensions (JSON)</Typography.Text>
+                <Input.TextArea
+                  value={createDimensionsText}
+                  onChange={(e) => setCreateDimensionsText(e.target.value)}
+                  placeholder='{"length":0,"width":0,"height":0}'
+                  autoSize={{ minRows: 3, maxRows: 8 }}
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Spécifications (JSON)</Typography.Text>
+                <Input.TextArea
+                  value={createSpecificationsText}
+                  onChange={(e) => setCreateSpecificationsText(e.target.value)}
+                  placeholder='{"color":"rouge","size":"XL"}'
+                  autoSize={{ minRows: 3, maxRows: 8 }}
+                />
+              </div>
+              <div>
+                <Typography.Text type="secondary">Métadonnées (JSON)</Typography.Text>
+                <Input.TextArea
+                  value={createMetadataText}
+                  onChange={(e) => setCreateMetadataText(e.target.value)}
+                  placeholder='{"material":"cuir"}'
+                  autoSize={{ minRows: 3, maxRows: 8 }}
+                />
+              </div>
+            </div>
+          </Card>
+        )}
       </Drawer>
     </div>
   );

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { App, Badge, Button, Card, Col, DatePicker, Drawer, Input, Popconfirm, Row, Select, Skeleton, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import Image from 'next/image';
+import { App, Badge, Button, Card, Col, DatePicker, Divider, Drawer, Input, Popconfirm, Row, Select, Skeleton, Space, Table, Tag, Timeline, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ExportOutlined, EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ExportOutlined, EnvironmentOutlined, PhoneOutlined, ReloadOutlined, ShoppingOutlined, UserOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, CarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { supabase } from '@/lib/supabase/client';
 import type { DeliveryOrderRow } from '@/lib/services/deliveries';
@@ -12,8 +13,6 @@ import {
   bulkAssignDriver,
   bulkUpdateDeliveryStatus,
   buildDestinationAddress,
-  buildGoogleMapsDirectionsUrl,
-  buildOsmUrl,
   fetchDeliveries,
   fetchDeliveryKpis,
   updateDeliveryStatus,
@@ -291,8 +290,6 @@ export default function DeliveriesPage() {
       align: 'right',
       width: 200,
       render: (_v, r) => {
-        const g = buildGoogleMapsDirectionsUrl(r);
-        const o = buildOsmUrl(r);
         const trackUrl = `/delivery-tracking?driverId=${encodeURIComponent(String(r.driver_id || ''))}&orderId=${encodeURIComponent(String(r.id || ''))}`;
         const canTrack = !!r.id && !!r.driver_id;
         return (
@@ -307,18 +304,6 @@ export default function DeliveriesPage() {
                   window.location.href = trackUrl;
                 }}
               />
-            </Tooltip>
-
-            <Tooltip title="OSM">
-              <Button size="small" disabled={!o} onClick={() => o && window.open(o, '_blank', 'noopener')}>
-                OSM
-              </Button>
-            </Tooltip>
-
-            <Tooltip title="Google Maps">
-              <Button size="small" disabled={!g} onClick={() => g && window.open(g, '_blank', 'noopener')}>
-                Maps
-              </Button>
             </Tooltip>
 
             <Button
@@ -533,43 +518,229 @@ export default function DeliveriesPage() {
       </Card>
 
       <Drawer
-        title={active ? `Commande ${active.order_number || active.id.slice(0, 8)}` : 'Détails'}
+        title={null}
         open={detailsOpen}
         onClose={() => {
           setDetailsOpen(false);
           setActive(null);
         }}
         size="large"
-        styles={{ body: { padding: 16 } }}
+        styles={{ body: { padding: 0 } }}
       >
         {active ? (
-          <div className="space-y-3">
-            <Card size="small" title="Client">
-              <div className="font-semibold">{active.customer_name || '—'}</div>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{active.customer_phone_profile || active.customer_phone || '—'}</div>
-            </Card>
-            <Card size="small" title="Livraison">
-              <div className="flex items-center justify-between">
-                <div>Statut</div>
-                <Tag color={statusColor(String(active.status || 'pending'))}>{STATUS_LABELS[String((active.status || 'pending')).toLowerCase()] || String(active.status || 'pending')}</Tag>
+          <div>
+            {/* Header with gradient */}
+            <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' }}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-white/70 text-xs font-medium">Commande</div>
+                  <div className="text-white text-xl font-bold mt-0.5">{active.order_number || active.id.slice(0, 8)}</div>
+                  <div className="text-white/60 text-xs mt-1">{dayjs(active.created_at).format('DD/MM/YYYY à HH:mm')}</div>
+                </div>
+                <Tag
+                  color={statusColor(String(active.status || 'pending'))}
+                  style={{ fontSize: 13, padding: '4px 12px', borderRadius: 20, fontWeight: 600 }}
+                >
+                  {STATUS_LABELS[String((active.status || 'pending')).toLowerCase()] || String(active.status || 'pending')}
+                </Tag>
               </div>
-              <div className="flex items-center justify-between" style={{ marginTop: 8 }}>
-                <div>Total</div>
-                <div style={{ fontWeight: 800 }}>{Number(active.total_amount || 0).toFixed(0)} FCFA</div>
+              <div className="flex items-center gap-4 mt-4">
+                <div className="bg-white/15 rounded-xl px-4 py-2">
+                  <div className="text-white/60 text-xs">Total</div>
+                  <div className="text-white font-bold text-lg">{Number(active.total_amount || 0).toLocaleString('fr-FR')} FCFA</div>
+                </div>
+                <div className="bg-white/15 rounded-xl px-4 py-2">
+                  <div className="text-white/60 text-xs">Paiement</div>
+                  <div className="text-white font-semibold">{active.paid_at ? '✓ Payé' : 'Non payé'}</div>
+                </div>
+                <div className="bg-white/15 rounded-xl px-4 py-2">
+                  <div className="text-white/60 text-xs">Articles</div>
+                  <div className="text-white font-semibold">{active.total_items ?? (Array.isArray(active.items) ? active.items.length : 0)}</div>
+                </div>
               </div>
-              <div className="flex items-center justify-between" style={{ marginTop: 8 }}>
-                <div>Paiement</div>
-                <div>{paymentBadge(active)}</div>
-              </div>
-              <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>{buildDestinationAddress(active) || '—'}</div>
-            </Card>
-            <Card size="small" title="Livreur">
-              <div className="font-semibold">{active.driver_name || 'Non assigné'}</div>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{active.driver_phone || ''}</div>
-            </Card>
-            <Card size="small" title="Articles">
-              <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, opacity: 0.85, margin: 0 }}>{JSON.stringify(active.items || [], null, 2)}</pre>
-            </Card>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Client */}
+              <Card
+                size="small"
+                styles={{ body: { padding: 16 } }}
+                title={<span className="flex items-center gap-2"><UserOutlined className="text-indigo-500" /> Client</span>}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-base">{active.customer_name || '—'}</div>
+                    {(active.customer_phone_profile || active.customer_phone) && (
+                      <a
+                        href={`tel:${active.customer_phone_profile || active.customer_phone}`}
+                        className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 mt-1 text-sm"
+                      >
+                        <PhoneOutlined /> {active.customer_phone_profile || active.customer_phone}
+                      </a>
+                    )}
+                  </div>
+                </div>
+                {buildDestinationAddress(active) && (
+                  <div className="mt-3 flex items-start gap-2 text-sm text-slate-500">
+                    <EnvironmentOutlined className="mt-0.5 text-slate-400" />
+                    <span>{buildDestinationAddress(active)}</span>
+                  </div>
+                )}
+              </Card>
+
+              {/* Driver */}
+              <Card
+                size="small"
+                styles={{ body: { padding: 16 } }}
+                title={<span className="flex items-center gap-2"><CarOutlined className="text-indigo-500" /> Livreur</span>}
+              >
+                {active.driver_name ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold">{active.driver_name}</div>
+                      {active.driver_phone && (
+                        <a
+                          href={`tel:${active.driver_phone}`}
+                          className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 mt-1 text-sm"
+                        >
+                          <PhoneOutlined /> {active.driver_phone}
+                        </a>
+                      )}
+                    </div>
+                    <Tag color="blue">Assigné</Tag>
+                  </div>
+                ) : (
+                  <div className="text-slate-400 italic">Aucun livreur assigné</div>
+                )}
+              </Card>
+
+              {/* Payment */}
+              <Card
+                size="small"
+                styles={{ body: { padding: 16 } }}
+                title={<span className="flex items-center gap-2"><DollarOutlined className="text-indigo-500" /> Paiement</span>}
+              >
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-slate-500">Total</div>
+                    <div className="font-bold text-lg">{Number(active.total_amount || 0).toLocaleString('fr-FR')} FCFA</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Méthode</div>
+                    <div className="font-medium">{active.payment_provider || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Statut</div>
+                    <div>{active.paid_at ? <Tag color="green">Payé</Tag> : <Tag color="orange">Non payé</Tag>}</div>
+                  </div>
+                  {active.paid_at && (
+                    <div>
+                      <div className="text-xs text-slate-500">Payé le</div>
+                      <div className="text-sm">{dayjs(active.paid_at).format('DD/MM/YYYY HH:mm')}</div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              {/* Articles */}
+              <Card
+                size="small"
+                styles={{ body: { padding: 16 } }}
+                title={<span className="flex items-center gap-2"><ShoppingOutlined className="text-indigo-500" /> Articles</span>}
+              >
+                {(() => {
+                  const items = Array.isArray(active.items) ? active.items : [];
+                  if (!items.length) return <Typography.Text type="secondary">Aucun article</Typography.Text>;
+                  return (
+                    <div className="space-y-3">
+                      {items.map((item: any, idx: number) => (
+                        <div key={item.id || idx} className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                          <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden shrink-0">
+                            {item.product_image ? (
+                              <Image src={item.product_image} alt="" width={56} height={56} className="object-cover w-full h-full" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{item.product_name || `Article ${idx + 1}`}</div>
+                            <div className="text-sm text-slate-500">× {item.quantity || 1} — {Math.round(Number(item.unit_price || 0)).toLocaleString('fr-FR')} FCFA/u</div>
+                          </div>
+                          <div className="font-semibold text-indigo-600 whitespace-nowrap">
+                            {Math.round(Number(item.total_price || (item.quantity || 1) * (item.unit_price || 0))).toLocaleString('fr-FR')} FCFA
+                          </div>
+                        </div>
+                      ))}
+                      <Divider style={{ margin: '8px 0' }} />
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-500">{items.reduce((s: number, i: any) => s + Number(i.quantity || 1), 0)} article(s)</span>
+                        <span className="font-bold text-base">{Number(active.total_amount || 0).toLocaleString('fr-FR')} FCFA</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </Card>
+
+              {/* Timeline */}
+              <Card
+                size="small"
+                styles={{ body: { padding: 16 } }}
+                title={<span className="flex items-center gap-2"><ClockCircleOutlined className="text-indigo-500" /> Historique</span>}
+              >
+                <Timeline
+                  items={[
+                    ...(active.created_at ? [{
+                      color: 'blue' as const,
+                      children: (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Créée</span>
+                          <span className="text-slate-500 text-sm">{dayjs(active.created_at).format('DD/MM/YYYY HH:mm:ss')}</span>
+                        </div>
+                      ),
+                    }] : []),
+                    ...(active.updated_at && active.updated_at !== active.created_at ? [{
+                      color: 'gray' as const,
+                      children: (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Modifiée</span>
+                          <span className="text-slate-500 text-sm">{dayjs(active.updated_at).format('DD/MM/YYYY HH:mm:ss')}</span>
+                        </div>
+                      ),
+                    }] : []),
+                    ...(active.paid_at ? [{
+                      color: 'green' as const,
+                      dot: <CheckCircleOutlined />,
+                      children: (
+                        <div className="flex justify-between">
+                          <span className="font-medium text-green-600">Payée</span>
+                          <span className="text-slate-500 text-sm">{dayjs(active.paid_at).format('DD/MM/YYYY HH:mm:ss')}</span>
+                        </div>
+                      ),
+                    }] : []),
+                    ...(active.delivered_at ? [{
+                      color: 'green' as const,
+                      dot: <CheckCircleOutlined />,
+                      children: (
+                        <div className="flex justify-between">
+                          <span className="font-medium text-green-600">Livrée</span>
+                          <span className="text-slate-500 text-sm">{dayjs(active.delivered_at).format('DD/MM/YYYY HH:mm:ss')}</span>
+                        </div>
+                      ),
+                    }] : []),
+                    ...(active.cancelled_at ? [{
+                      color: 'red' as const,
+                      dot: <CloseCircleOutlined />,
+                      children: (
+                        <div className="flex justify-between">
+                          <span className="font-medium text-red-600">Annulée</span>
+                          <span className="text-slate-500 text-sm">{dayjs(active.cancelled_at).format('DD/MM/YYYY HH:mm:ss')}</span>
+                        </div>
+                      ),
+                    }] : []),
+                  ]}
+                />
+              </Card>
+            </div>
           </div>
         ) : null}
       </Drawer>

@@ -270,16 +270,34 @@ class BackgroundLocationTrackingService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // Update or insert current location
-      await _supabase.from('user_current_location').upsert({
-        'user_id': userId,
-        'latitude': locationData['latitude'],
-        'longitude': locationData['longitude'],
-        'accuracy': locationData['accuracy'],
-        'speed': locationData['speed'],
-        'heading': locationData['heading'],
-        'updated_at': DateTime.now().toIso8601String(),
-      });
+      final now = DateTime.now().toIso8601String();
+
+      // Double write: current + history
+      await Future.wait([
+        // Table temps réel (upsert)
+        _supabase.from('user_current_location').upsert({
+          'user_id': userId,
+          'latitude': locationData['latitude'],
+          'longitude': locationData['longitude'],
+          'accuracy': locationData['accuracy'],
+          'speed': locationData['speed'],
+          'heading': locationData['heading'],
+          'updated_at': now,
+        }),
+        
+        // Table historique (insert)
+        _supabase.from('user_location_history').insert({
+          'user_id': userId,
+          'order_id': null,
+          'latitude': locationData['latitude'],
+          'longitude': locationData['longitude'],
+          'accuracy': locationData['accuracy'],
+          'altitude': locationData['altitude'],
+          'speed': locationData['speed'],
+          'heading': locationData['heading'],
+          'captured_at': locationData['timestamp'],
+        }),
+      ]);
     } catch (e) {
       debugPrint('❌ [BackgroundLocationTracking] Realtime update error: $e');
     }

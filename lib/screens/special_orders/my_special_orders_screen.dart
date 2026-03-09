@@ -180,7 +180,7 @@ class _MySpecialOrdersScreenState extends State<MySpecialOrdersScreen> {
                           ? AppStateView(
                               state: AppViewState.empty,
                               title: localizations.translate('special_order_empty_title'),
-                              primaryActionLabel: localizations.translate('special_order_create_button'),
+                              primaryActionLabel: localizations.translate('create_order'),
                               onPrimaryAction: () => context.go('/special-order'),
                               secondaryActionLabel: localizations.translate('refresh'),
                               onSecondaryAction: _load,

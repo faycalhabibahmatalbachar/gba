@@ -8,6 +8,7 @@ import '../providers/language_provider.dart';
 import '../providers/notification_preferences_provider.dart';
 import '../services/onboarding_service.dart';
 import '../services/supabase_service.dart';
+import '../localization/app_localizations.dart';
 
 class OnboardingFlowScreen extends ConsumerStatefulWidget {
   const OnboardingFlowScreen({super.key});
@@ -160,7 +161,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Bienvenue',
+                          AppLocalizations.of(context).translate('welcome'),
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
@@ -168,7 +169,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                       ),
                       TextButton(
                         onPressed: _saving ? null : _skip,
-                        child: const Text('Passer'),
+                        child: Text(AppLocalizations.of(context).translate('skip')),
                       ),
                     ],
                   ),
@@ -182,7 +183,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$percent% complété',
+                    AppLocalizations.of(context).translateParams('percent_completed', {'percent': percent.toString()}),
                     textAlign: TextAlign.right,
                     style: TextStyle(color: Colors.grey.shade700),
                   ),
@@ -219,7 +220,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                                   curve: Curves.easeOutCubic,
                                 );
                               },
-                        child: const Text('Retour'),
+                        child: Text(AppLocalizations.of(context).translate('back')),
                       ),
                     ),
                   if (_step > 0) const SizedBox(width: 12),
@@ -232,7 +233,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_step == 2 ? 'Terminer' : 'Suivant'),
+                          : Text(_step == 2 ? AppLocalizations.of(context).translate('finish') : AppLocalizations.of(context).translate('next')),
                     ),
                   ),
                 ],
@@ -251,23 +252,23 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Complète ton profil',
+            AppLocalizations.of(context).translate('complete_profile'),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Ces informations accélèrent le checkout et la livraison.',
+            AppLocalizations.of(context).translate('profile_info_speeds_checkout'),
             style: TextStyle(color: Colors.grey.shade700),
           ),
           const SizedBox(height: 18),
           TextField(
             controller: _firstNameController,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Prénom',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context).translate('first_name'),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -275,9 +276,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           TextField(
             controller: _lastNameController,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Nom',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context).translate('last_name'),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -286,9 +287,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             controller: _phoneController,
             textInputAction: TextInputAction.next,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Téléphone',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context).translate('phone'),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -296,9 +297,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           TextField(
             controller: _addressController,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Adresse',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context).translate('address'),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -306,9 +307,9 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
           TextField(
             controller: _cityController,
             textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              labelText: 'Ville',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context).translate('city'),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -324,14 +325,14 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Langue',
+            AppLocalizations.of(context).translate('language'),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choisis la langue de l\'application.',
+            AppLocalizations.of(context).translate('choose_app_language'),
             style: TextStyle(color: Colors.grey.shade700),
           ),
           const SizedBox(height: 18),
@@ -339,19 +340,19 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
             value: 'fr',
             groupValue: _language,
             onChanged: (v) => setState(() => _language = v ?? 'fr'),
-            title: const Text('Français'),
+            title: Text(AppLocalizations.of(context).translate('language_french')),
           ),
           RadioListTile<String>(
             value: 'en',
             groupValue: _language,
             onChanged: (v) => setState(() => _language = v ?? 'en'),
-            title: const Text('English'),
+            title: Text(AppLocalizations.of(context).translate('language_english')),
           ),
           RadioListTile<String>(
             value: 'ar',
             groupValue: _language,
             onChanged: (v) => setState(() => _language = v ?? 'ar'),
-            title: const Text('العربية'),
+            title: Text(AppLocalizations.of(context).translate('language_arabic')),
           ),
         ],
       ),
@@ -367,21 +368,21 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Notifications',
+            AppLocalizations.of(context).translate('notifications'),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choisis ce que tu veux recevoir.',
+            AppLocalizations.of(context).translate('choose_what_to_receive'),
             style: TextStyle(color: Colors.grey.shade700),
           ),
           const SizedBox(height: 18),
           SwitchListTile(
             value: prefs.pushEnabled,
             onChanged: _saving ? null : prefs.setPushEnabled,
-            title: const Text('Activer les notifications'),
+            title: Text(AppLocalizations.of(context).translate('enable_notifications')),
           ),
           const SizedBox(height: 10),
           Opacity(
@@ -391,17 +392,17 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
                 SwitchListTile(
                   value: prefs.ordersEnabled,
                   onChanged: _saving || !prefs.pushEnabled ? null : prefs.setOrdersEnabled,
-                  title: const Text('Commandes'),
+                  title: Text(AppLocalizations.of(context).translate('orders_notifications')),
                 ),
                 SwitchListTile(
                   value: prefs.promotionsEnabled,
                   onChanged: _saving || !prefs.pushEnabled ? null : prefs.setPromotionsEnabled,
-                  title: const Text('Promotions'),
+                  title: Text(AppLocalizations.of(context).translate('promotions_notifications')),
                 ),
                 SwitchListTile(
                   value: prefs.chatEnabled,
                   onChanged: _saving || !prefs.pushEnabled ? null : prefs.setChatEnabled,
-                  title: const Text('Messages'),
+                  title: Text(AppLocalizations.of(context).translate('messages_notifications')),
                 ),
               ],
             ),

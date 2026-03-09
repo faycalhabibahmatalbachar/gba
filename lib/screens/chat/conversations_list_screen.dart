@@ -56,8 +56,19 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (didPop) return;
+        if (!context.mounted) return;
+        if (GoRouter.of(context).canPop()) {
+          GoRouter.of(context).pop();
+        } else {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
+        body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -88,7 +99,8 @@ class _ConversationsListScreenState extends State<ConversationsListScreen>
                 ),
         ),
       ),
-      floatingActionButton: _buildFAB(),
+        floatingActionButton: _buildFAB(),
+      ),
     );
   }
 

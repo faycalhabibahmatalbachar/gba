@@ -6,6 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'dart:math';
@@ -21,7 +22,7 @@ class SpecialOrderScreen extends StatefulWidget {
 }
 
 class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
-  static const String _draftKey = 'special_order_draft_v1';
+  static const String _draftKeyPrefix = 'special_order_draft_v1';
   static const int _maxImages = 6;
   static const int _maxImageBytes = 6 * 1024 * 1024;
 
@@ -93,10 +94,30 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     setState(() => _isGettingLocation = true);
 
     try {
+      final localizations = AppLocalizations.of(context);
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        final localizations = AppLocalizations.of(context);
-        _showSnack(localizations.translate('special_order_enable_location_services'));
+        if (!mounted) return;
+        final shouldOpen = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(localizations.translate('location_services_disabled')),
+            content: Text(localizations.translate('enable_location_to_continue')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(localizations.translate('cancel')),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(localizations.translate('open_settings')),
+              ),
+            ],
+          ),
+        );
+        if (shouldOpen == true) {
+          await Geolocator.openLocationSettings();
+        }
         return;
       }
 
@@ -105,10 +126,33 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        final localizations = AppLocalizations.of(context);
-        _showSnack(localizations.translate('special_order_location_permission_denied'));
+      if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        final shouldOpen = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(localizations.translate('location_permission_denied')),
+            content: Text(localizations.translate('location_permission_permanently_denied')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(localizations.translate('cancel')),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(localizations.translate('open_settings')),
+              ),
+            ],
+          ),
+        );
+        if (shouldOpen == true) {
+          await Geolocator.openAppSettings();
+        }
+        return;
+      }
+
+      if (permission == LocationPermission.denied) {
+        _showSnack(localizations.translate('location_permission_required'));
         return;
       }
 
@@ -147,9 +191,21 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     }
   }
 
+  String? _getDraftKey() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return null;
+    return '${_draftKeyPrefix}_$userId';
+  }
+
   Future<void> _loadDraft() async {
+    final draftKey = _getDraftKey();
+    if (draftKey == null) {
+      _draftLoaded = true;
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_draftKey);
+    final raw = prefs.getString(draftKey);
     if (raw == null || raw.trim().isEmpty) {
       _draftLoaded = true;
       return;
@@ -167,6 +223,18 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     final notes = parts[3];
     final shippingMethod = parts[4];
     final step = int.tryParse(parts[5]) ?? 0;
+
+    // Restore GPS location if available (parts 6, 7, 8)
+    if (parts.length >= 9) {
+      final lat = double.tryParse(parts[6]);
+      final lng = double.tryParse(parts[7]);
+      final accuracy = double.tryParse(parts[8]);
+      if (lat != null && lng != null) {
+        _deliveryLat = lat;
+        _deliveryLng = lng;
+        _deliveryAccuracy = accuracy;
+      }
+    }
 
     _productNameController.text = productName;
     _quantityController.text = quantity;
@@ -186,6 +254,9 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
   }
 
   Future<void> _saveDraft() async {
+    final draftKey = _getDraftKey();
+    if (draftKey == null) return;
+
     final prefs = await SharedPreferences.getInstance();
     final raw = [
       _productNameController.text,
@@ -194,13 +265,19 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
       _notesController.text,
       _shippingMethod,
       _currentStep.toString(),
+      _deliveryLat?.toString() ?? '',
+      _deliveryLng?.toString() ?? '',
+      _deliveryAccuracy?.toString() ?? '',
     ].join('||');
-    await prefs.setString(_draftKey, raw);
+    await prefs.setString(draftKey, raw);
   }
 
   Future<void> _clearDraft() async {
+    final draftKey = _getDraftKey();
+    if (draftKey == null) return;
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_draftKey);
+    await prefs.remove(draftKey);
   }
 
   Future<void> _pickImages() async {
@@ -911,9 +988,37 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
           ),
           const SizedBox(height: 10),
           _SummaryRow(
-            label: localizations.translate('special_order_summary_images'),
-            value: _selectedImages.length.toString(),
+            label: localizations.translate('special_order_summary_description'),
+            value: _descriptionController.text.trim(),
           ),
+          const SizedBox(height: 10),
+          _SummaryRow(
+            label: localizations.translate('special_order_summary_images'),
+            value: '${_selectedImages.length} ${localizations.translate('image')}(s)',
+          ),
+          if (_selectedImages.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedImages.map((img) => ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  img.bytes,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                ),
+              )).toList(),
+            ),
+          ],
+          if (_deliveryLat != null && _deliveryLng != null) ...[
+            const SizedBox(height: 10),
+            _SummaryRow(
+              label: localizations.translate('special_order_gps_location'),
+              value: '${_deliveryLat!.toStringAsFixed(6)}, ${_deliveryLng!.toStringAsFixed(6)} (±${_deliveryAccuracy?.toStringAsFixed(0) ?? '?'}m)',
+            ),
+          ],
           if (_notesController.text.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             _SummaryRow(

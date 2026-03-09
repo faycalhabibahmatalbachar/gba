@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lottie/lottie.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/profile.dart';
@@ -905,7 +906,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Connectez-vous ou créez un compte pour accéder à cette fonctionnalité.',
+                        localizations.translate('login_required_message'),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),

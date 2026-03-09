@@ -351,7 +351,7 @@ export default function MonitoringPage() {
   ];
 
   const favoritesBarConfig = useMemo(() => ({
-    data: favoritesTopProducts,
+    data: favoritesTopProducts.map(item => ({ ...item, name: item.name || 'Sans nom' })),
     xField: 'count',
     yField: 'name',
     seriesField: 'name',
@@ -361,7 +361,7 @@ export default function MonitoringPage() {
   }), [favoritesTopProducts]);
 
   const favoritesPieConfig = useMemo(() => ({
-    data: favoritesTopCategories,
+    data: favoritesTopCategories.map(item => ({ ...item, name: item.name || 'Sans catégorie' })),
     angleField: 'count',
     colorField: 'name',
     radius: 0.9,

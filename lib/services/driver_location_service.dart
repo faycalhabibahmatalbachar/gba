@@ -20,7 +20,7 @@ class DriverLocationService {
   bool _isTracking = false;
 
   /// Minimum seconds between upserts (DB write throttle).
-  static const int intervalSeconds = 3;
+  static const int intervalSeconds = 2;
 
   /// Broadcast stream of live positions (for in-app map).
   final _positionController = StreamController<Position>.broadcast();
@@ -107,22 +107,43 @@ class DriverLocationService {
     debugPrint('[DriverGPS] tracking stopped');
   }
 
-  /// Upsert a position into `driver_locations`.
+  /// Upsert a position into `driver_locations` AND insert into history.
   Future<void> _upsertPosition(String driverId, Position pos) async {
     try {
-      await _supabase.from('driver_locations').upsert({
-        'driver_id': driverId,
-        'order_id': null,
-        'lat': pos.latitude,
-        'lng': pos.longitude,
-        'accuracy': pos.accuracy,
-        'speed': pos.speed,
-        'heading': pos.heading,
-        'captured_at': DateTime.now().toUtc().toIso8601String(),
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'driver_id');
+      final now = DateTime.now().toUtc().toIso8601String();
+      
+      // Double write: current table + history table
+      await Future.wait([
+        // Table temps réel (upsert - une seule ligne par driver)
+        _supabase.from('driver_locations').upsert({
+          'driver_id': driverId,
+          'order_id': null,
+          'lat': pos.latitude,
+          'lng': pos.longitude,
+          'accuracy': pos.accuracy,
+          'speed': pos.speed,
+          'heading': pos.heading,
+          'captured_at': now,
+          'created_at': now,
+        }, onConflict: 'driver_id'),
+        
+        // Table historique (insert - archive complète)
+        _supabase.from('driver_location_history').insert({
+          'driver_id': driverId,
+          'order_id': null,
+          'latitude': pos.latitude,
+          'longitude': pos.longitude,
+          'accuracy': pos.accuracy,
+          'altitude': pos.altitude,
+          'speed': pos.speed,
+          'heading': pos.heading,
+          'battery_level': null, // TODO: add battery_plus package
+          'captured_at': now,
+        }),
+      ]);
+      
       debugPrint(
-          '[DriverGPS] sent: ${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}');
+          '[DriverGPS] sent: ${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)} (±${pos.accuracy.toStringAsFixed(1)}m)');
     } catch (e) {
       debugPrint('[DriverGPS] upsert error: $e');
     }

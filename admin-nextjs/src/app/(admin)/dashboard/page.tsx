@@ -548,10 +548,9 @@ export default function DashboardPage() {
       smooth: true,
       point: { size: 4, shape: 'circle' },
       area: true,
-      areaStyle: () => ({ fill: 'l(90) 0:rgba(79,70,229,0.25) 1:rgba(79,70,229,0.02)' }),
-      line: { style: { lineWidth: 2 } },
-      tooltip: { showMarkers: true, formatter: (d: any) => ({ name: 'Commandes', value: d.orders }) },
-      xAxis: { label: { formatter: (v: string) => dayjs(v).format('DD/MM') } },
+      style: { fill: 'linear-gradient(90deg, rgba(79,70,229,0.25) 0%, rgba(79,70,229,0.02) 100%)', lineWidth: 2 },
+      tooltip: { channel: 'y', valueFormatter: (v: number) => `${v} commandes` },
+      axis: { x: { labelFormatter: (v: string) => dayjs(v).format('DD/MM') } },
     } as any;
   }, [ordersSeries]);
 
@@ -564,9 +563,8 @@ export default function DashboardPage() {
       legend: false,
       colorField: 'step',
       style: { radius: [6, 6, 0, 0] },
-      xAxis: { label: { autoRotate: true } },
-      yAxis: { title: { text: 'Sessions' } },
-      tooltip: { formatter: (d: any) => ({ name: d.step, value: d.sessions }) },
+      axis: { x: { labelAutoRotate: true }, y: { title: 'Sessions' } },
+      tooltip: { channel: 'y', valueFormatter: (v: number) => `${v} sessions` },
     } as any;
   }, [funnel]);
 
@@ -1434,7 +1432,7 @@ export default function DashboardPage() {
                         radius={1}
                         innerRadius={0.6}
                         legend={{ position: 'right', layout: 'vertical' }}
-                        tooltip={{ formatter: (d: any) => ({ name: d.type, value: `${d.value} unités` }) }}
+                        tooltip={{ channel: 'y', valueFormatter: (v: number) => `${v} unités` }}
                       />
                     </div>
                     <div className="flex-1 min-w-0 w-full">

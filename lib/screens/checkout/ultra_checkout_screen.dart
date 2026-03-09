@@ -16,6 +16,9 @@ import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/order_service.dart';
 import '../../services/background_location_tracking_service.dart';
+import '../../services/mandatory_location_service.dart';
+import '../../utils/error_handler.dart';
+import '../../localization/app_localizations.dart';
 
 class UltraCheckoutScreen extends ConsumerStatefulWidget {
   const UltraCheckoutScreen({super.key});
@@ -152,9 +155,26 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Active la localisation du téléphone pour continuer.')),
+        final shouldOpen = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Services de localisation désactivés'),
+            content: const Text('Activez les services de localisation pour continuer'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Ouvrir les paramètres'),
+              ),
+            ],
+          ),
         );
+        if (shouldOpen == true) {
+          await Geolocator.openLocationSettings();
+        }
         return;
       }
 
@@ -163,11 +183,35 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        final shouldOpen = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Permission de localisation refusée'),
+            content: const Text('Permission de localisation refusée définitivement. Veuillez l\'activer dans les paramètres.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Ouvrir les paramètres'),
+              ),
+            ],
+          ),
+        );
+        if (shouldOpen == true) {
+          await Geolocator.openAppSettings();
+        }
+        return;
+      }
+
+      if (permission == LocationPermission.denied) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Permission localisation refusée.')),
+          const SnackBar(content: Text('Permission de localisation requise.')),
         );
         return;
       }
@@ -206,16 +250,18 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_paymentMethod == 'stripe_card' && (kIsWeb || Stripe.publishableKey.isEmpty)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Paiement Stripe indisponible sur cette plateforme. '
-            'Choisis Flutterwave ou paiement à la livraison.',
+    // VALIDATION GPS OBLIGATOIRE
+    final gpsValid = await MandatoryLocationService().validateForCheckout(context);
+    if (!gpsValid) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('GPS requis pour passer commande. Activez votre localisation.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
           ),
-        ),
-      );
+        );
+      }
       return;
     }
     
@@ -281,116 +327,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
         throw Exception(result['error']?.toString() ?? 'Erreur lors de la création de commande');
       }
 
-      final orderId = result['order_id']?.toString();
-
-      if (_paymentMethod == 'stripe_card') {
-        if (kIsWeb) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Paiement Stripe indisponible sur web pour le moment. '
-                'Choisis Flutterwave ou paiement à la livraison.',
-              ),
-            ),
-          );
-          return;
-        }
-
-        if (orderId == null || orderId.isEmpty) {
-          throw Exception('order_id manquant');
-        }
-
-        final resp = await Supabase.instance.client.functions.invoke(
-          'create-checkout-session',
-          body: {'order_id': orderId},
-        );
-
-        final data = resp.data;
-        Map<String, dynamic>? parsed;
-        if (data is Map) {
-          parsed = Map<String, dynamic>.from(data);
-        } else if (data is String && data.trim().isNotEmpty) {
-          parsed = jsonDecode(data) as Map<String, dynamic>;
-        }
-
-        final clientSecret = parsed?['clientSecret']?.toString();
-        if (clientSecret == null || clientSecret.isEmpty) {
-          throw Exception('clientSecret manquant');
-        }
-
-        await Stripe.instance.initPaymentSheet(
-          paymentSheetParameters: SetupPaymentSheetParameters(
-            paymentIntentClientSecret: clientSecret,
-            merchantDisplayName: 'GBA Store',
-            returnURL: 'flutterstripe://redirect',
-          ),
-        );
-
-        try {
-          await Stripe.instance.presentPaymentSheet();
-        } on StripeException catch (e) {
-          final message = e.error.localizedMessage ?? 'Paiement annulé';
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Stripe: $message'),
-              backgroundColor: Colors.red,
-              behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
-              margin: kIsWeb ? null : const EdgeInsets.fromLTRB(16, 0, 16, 90),
-            ),
-          );
-          return;
-        }
-
-        await cart.clearCart();
-
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => _buildSuccessDialog(result['order_number']),
-          );
-        }
-
-        return;
-      }
-
-      if (_paymentMethod == 'flutterwave_card') {
-        if (orderId == null || orderId.isEmpty) {
-          throw Exception('order_id manquant');
-        }
-
-        final resp = await Supabase.instance.client.functions.invoke(
-          'create-flutterwave-payment',
-          body: {'order_id': orderId},
-        );
-
-        final data = resp.data;
-        Map<String, dynamic>? parsed;
-        if (data is Map) {
-          parsed = Map<String, dynamic>.from(data);
-        } else if (data is String && data.trim().isNotEmpty) {
-          parsed = jsonDecode(data) as Map<String, dynamic>;
-        }
-
-        final link = parsed?['link']?.toString();
-        if (link == null || link.isEmpty) {
-          throw Exception('URL de paiement manquante');
-        }
-
-        final ok = await launchUrl(
-          Uri.parse(link),
-          mode: LaunchMode.platformDefault,
-          webOnlyWindowName: '_self',
-        );
-
-        if (!ok) {
-          throw Exception('Impossible d\'ouvrir la page de paiement');
-        }
-
-        return;
-      }
+      // Payment is cash on delivery - no payment processing needed
 
       await cart.clearCart();
 
@@ -402,9 +339,11 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
         );
       }
     } catch (e) {
+      final localizations = AppLocalizations.of(context);
+      final sanitizedError = ErrorHandler.getLocalizedError(e, localizations.locale.languageCode);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur: $e'),
+          content: Text(sanitizedError),
           backgroundColor: Colors.red,
           behavior: kIsWeb ? SnackBarBehavior.fixed : SnackBarBehavior.floating,
           margin: kIsWeb ? null : const EdgeInsets.fromLTRB(16, 0, 16, 90),
@@ -509,17 +448,8 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
                                   groupValue: _paymentMethod,
                                   onChanged: (value) => setState(() => _paymentMethod = value!),
                                   title: const Text('Paiement à la livraison'),
-                                  subtitle: const Text('Payez en espèces'),
+                                  subtitle: const Text('Payez en espèces lors de la réception'),
                                   secondary: const Icon(FontAwesomeIcons.moneyBill),
-                                ),
-                                const Divider(height: 1),
-                                RadioListTile<String>(
-                                  value: 'flutterwave_card',
-                                  groupValue: _paymentMethod,
-                                  onChanged: (value) => setState(() => _paymentMethod = value!),
-                                  title: const Text('Carte bancaire'),
-                                  subtitle: const Text('Paiement sécurisé (Visa/Mastercard)'),
-                                  secondary: const Icon(FontAwesomeIcons.creditCard),
                                 ),
                               ],
                             ),
