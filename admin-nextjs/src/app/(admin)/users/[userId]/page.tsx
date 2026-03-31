@@ -6,6 +6,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { DeleteOutlined, EyeOutlined, LockOutlined, UnlockOutlined, UserOutlined } from '@ant-design/icons';
 import { useParams } from 'next/navigation';
 import type { ProfileRow, UserActivityRow, UserCartItemRow, UserFavoriteRow, UserOrderRow, UserSessionRow } from '@/lib/services/users';
+import { translateOrderStatus } from '@/lib/i18n/translations';
 import {
   clearUserCart,
   deleteUserFavorite,
@@ -261,7 +262,7 @@ export default function UserDetailPage() {
       render: (v) => {
         const s = String(v || '—');
         const color = s === 'delivered' ? 'green' : s === 'cancelled' ? 'red' : s === 'in_delivery' ? 'blue' : 'default';
-        return <Tag color={color}>{s}</Tag>;
+        return <Tag color={color}>{translateOrderStatus(v)}</Tag>;
       },
     },
     {

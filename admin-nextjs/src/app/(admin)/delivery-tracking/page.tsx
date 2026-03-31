@@ -3,12 +3,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   Card,
+  Col,
+  Progress,
+  Row,
   Select,
   Space,
   Spin,
+  Statistic,
   Tag,
   Typography,
   App,
@@ -31,6 +36,9 @@ import {
   CheckCircleOutlined,
   MenuOutlined,
   MenuFoldOutlined,
+  ShoppingCartOutlined,
+  RiseOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
@@ -48,8 +56,12 @@ import {
 } from '@/lib/services/delivery-tracking';
 import PageHeader from '@/components/ui/PageHeader';
 import { useThemeMode } from '@/components/layout/ThemeProvider';
-import FleetMetrics from '@/components/delivery/FleetMetrics';
-import AlertsPanel from '@/components/delivery/AlertsPanel';
+import { formatDuration } from '@/lib/i18n/translations';
+// TODO: Créer ces composants extraits
+// import FleetMetrics from './FleetMetrics';
+// import AlertsPanel from './AlertsPanel';
+// import DriverCard from './DriverCard';
+// import OrderDetailsDrawer from './OrderDetailsDrawer';
 
 const DeliveryTrackingMap = dynamic(() => import('./DeliveryTrackingMap'), { ssr: false });
 
@@ -229,30 +241,11 @@ export default function DeliveryTrackingPage() {
     return { online, offline, overloaded, delayed, total: fleet.length, totalOrders };
   }, [fleet]);
 
-  const alerts = useMemo(() => {
-    const items: { type: 'warning' | 'error'; msg: string; driverId?: string }[] = [];
-    fleet.forEach((f) => {
-      if (f.isStale && f.lastSeenMinutes != null)
-        items.push({
-          type: 'warning',
-          msg: `${mapName(f.driver)} hors ligne depuis ${f.lastSeenMinutes} min`,
-          driverId: f.driver.id,
-        });
-      if (f.isOverloaded)
-        items.push({
-          type: 'warning',
-          msg: `${mapName(f.driver)} surchargé (${f.orders.length} livraisons)`,
-          driverId: f.driver.id,
-        });
-      if (f.delayedOrdersCount > 0)
-        items.push({
-          type: 'error',
-          msg: `${mapName(f.driver)} : ${f.delayedOrdersCount} livraison(s) > 2h (SLA)`,
-          driverId: f.driver.id,
-        });
-    });
-    return items;
-  }, [fleet]);
+  // Alertes désactivées - supprimées à la demande de l'utilisateur
+  // const alerts = useMemo(() => {
+  //   const items: { type: 'warning' | 'error'; msg: string; driverId?: string }[] = [];
+  //   return items;
+  // }, [fleet]);
 
   if (loading) {
     return (
@@ -288,20 +281,71 @@ export default function DeliveryTrackingPage() {
         />
       ) : null}
 
-      {/* Métriques flotte */}
+      {/* Section KPIs - Ops Center Style */}
       {fleet.length > 0 && (
-        <FleetMetrics 
-          fleet={fleet} 
-          allOrders={fleet.flatMap(f => f.orders)} 
-        />
-      )}
+        <Row gutter={[16, 16]}>
+          {/* Livreurs en ligne */}
+          <Col xs={24} sm={12} lg={6}>
+            <div className="ops-kpi-card success">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="kpi-label mb-2">LIVREURS EN LIGNE</div>
+                  <div className="kpi-value mb-1">
+                    {kpis.online}<span style={{ fontSize: '18px', opacity: 0.6 }}>/{kpis.total}</span>
+                  </div>
+                  <div className="kpi-sublabel">Actifs maintenant</div>
+                </div>
+                <TeamOutlined className="ops-kpi-icon success" />
+              </div>
+            </div>
+          </Col>
 
-      {/* Alertes critiques */}
-      {fleet.length > 0 && (
-        <AlertsPanel 
-          fleet={fleet} 
-          allOrders={fleet.flatMap(f => f.orders)} 
-        />
+          {/* Commandes actives */}
+          <Col xs={24} sm={12} lg={6}>
+            <div className="ops-kpi-card accent">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="kpi-label mb-2">COMMANDES ACTIVES</div>
+                  <div className="kpi-value mb-1">{kpis.totalOrders}</div>
+                  <div className="kpi-sublabel">En cours de livraison</div>
+                </div>
+                <ShoppingCartOutlined className="ops-kpi-icon accent" />
+              </div>
+            </div>
+          </Col>
+
+          {/* Livraisons en retard */}
+          <Col xs={24} sm={12} lg={6}>
+            <div className="ops-kpi-card warning">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="kpi-label mb-2">EN RETARD</div>
+                  <div className="kpi-value mb-1">{kpis.delayed}</div>
+                  <div className="kpi-sublabel">
+                    {kpis.delayed > 0 ? 'Livraisons > 2h' : 'Tout est à jour'}
+                  </div>
+                </div>
+                <ClockCircleOutlined className="ops-kpi-icon warning" />
+              </div>
+            </div>
+          </Col>
+
+          {/* Livreurs surchargés */}
+          <Col xs={24} sm={12} lg={6}>
+            <div className="ops-kpi-card danger">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="kpi-label mb-2">SURCHARGÉS</div>
+                  <div className="kpi-value mb-1">{kpis.overloaded}</div>
+                  <div className="kpi-sublabel">
+                    {kpis.overloaded > 0 ? 'Livreurs > 5 commandes' : 'Charge équilibrée'}
+                  </div>
+                </div>
+                <WarningOutlined className="ops-kpi-icon danger" />
+              </div>
+            </div>
+          </Col>
+        </Row>
       )}
 
       {fleet.length === 0 ? (
@@ -317,47 +361,19 @@ export default function DeliveryTrackingPage() {
         </Card>
       ) : (
         <>
-          {alerts.length > 0 && (
-            <div className="delivery-alert-strip flex flex-wrap gap-2">
-              {alerts.slice(0, 5).map((a, i) => (
-                <div
-                  key={i}
-                  className="flex-1 min-w-[200px] cursor-pointer"
-                  onClick={() => a.driverId && setSelectedDriverId(a.driverId)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && a.driverId && setSelectedDriverId(a.driverId)}
-                >
-                  <Alert
-                    type={a.type}
-                    showIcon
-                    icon={<WarningOutlined />}
-                    title={a.msg}
-                    action={
-                      a.driverId ? (
-                        <Button
-                          size="small"
-                          type="link"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedDriverId(a.driverId!);
-                          }}
-                        >
-                          Voir
-                        </Button>
-                      ) : undefined
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Alertes supprimées - section désactivée */}
 
           <div className={`grid grid-cols-1 gap-4 ${sidebarVisible ? 'lg:grid-cols-[340px_1fr]' : 'lg:grid-cols-1'}`}>
             {sidebarVisible && (
             <Card
-              title="Livreurs"
-              className="overflow-hidden"
+              title={
+                <div className="flex items-center gap-2">
+                  <TeamOutlined className="text-lg" />
+                  <span className="font-semibold">Livreurs actifs</span>
+                  <Badge count={fleet.length} showZero style={{ backgroundColor: '#52c41a' }} />
+                </div>
+              }
+              className="glass-card overflow-hidden border-0 shadow-md"
               extra={
                 <Button
                   type="text"
@@ -365,48 +381,114 @@ export default function DeliveryTrackingPage() {
                   icon={<MenuFoldOutlined />}
                   onClick={() => setSidebarVisible(false)}
                   title="Masquer la liste"
+                  className="hover:bg-slate-100 dark:hover:bg-slate-700"
                 />
               }
             >
-              <div className="max-h-[480px] overflow-y-auto space-y-1 pr-1">
-                {fleet.map((f) => (
-                  <div
-                    key={f.driver.id}
-                    className={`delivery-driver-row cursor-pointer rounded-lg border p-3 ${
-                      selectedDriverId === f.driver.id ? 'delivery-driver-row--selected' : ''
-                    }`}
-                    onClick={() => setSelectedDriverId(f.driver.id)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                            f.isOnline ? 'delivery-status-dot bg-emerald-500' : 'delivery-status-dot--offline bg-gray-400'
-                          }`}
-                        />
-                        <span className="font-medium truncate">{mapName(f.driver)}</span>
+              <div className="max-h-[calc(100vh-400px)] overflow-y-auto space-y-2 pr-1">
+                {fleet.map((f) => {
+                  const initials = mapName(f.driver).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                  const loadPercent = Math.min((f.orders.length / OVERLOAD_THRESHOLD) * 100, 100);
+                  const isSelected = selectedDriverId === f.driver.id;
+                  
+                  return (
+                    <div
+                      key={f.driver.id}
+                      className={`driver-card cursor-pointer ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setSelectedDriverId(f.driver.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Avatar avec badge de statut */}
+                        <div className="relative shrink-0">
+                          <Avatar 
+                            size={48} 
+                            className={`font-semibold ${
+                              f.isOnline 
+                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' 
+                                : 'bg-gradient-to-br from-slate-400 to-slate-500'
+                            }`}
+                          >
+                            {initials}
+                          </Avatar>
+                          <span 
+                            className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 ${
+                              f.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                            }`}
+                          />
+                        </div>
+
+                        {/* Informations livreur */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="font-semibold text-sm truncate text-slate-800 dark:text-slate-100">
+                              {mapName(f.driver)}
+                            </span>
+                            <Badge 
+                              count={f.orders.length} 
+                              showZero 
+                              style={{ 
+                                backgroundColor: f.isOverloaded ? '#ff4d4f' : f.orders.length > 0 ? '#1890ff' : '#d9d9d9' 
+                              }} 
+                            />
+                          </div>
+                          
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                            {f.isOnline ? (
+                              <span className="flex items-center gap-1">
+                                <CheckCircleOutlined className="text-emerald-500" />
+                                Actif {f.lastSeenMinutes != null ? `il y a ${f.lastSeenMinutes} min` : 'maintenant'}
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <ClockCircleOutlined className="text-slate-400" />
+                                Hors ligne {f.lastSeenMinutes != null ? `depuis ${formatDuration(f.lastSeenMinutes)}` : ''}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Barre de progression de charge */}
+                          {f.orders.length > 0 && (
+                            <div className="space-y-1">
+                              <Progress 
+                                percent={Math.round(loadPercent)} 
+                                size="small"
+                                strokeColor={
+                                  f.isOverloaded 
+                                    ? { from: '#ff4d4f', to: '#ff7875' }
+                                    : loadPercent > 60
+                                    ? { from: '#faad14', to: '#ffc53d' }
+                                    : { from: '#52c41a', to: '#73d13d' }
+                                }
+                                showInfo={false}
+                                className="mb-0"
+                              />
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500 dark:text-slate-400">
+                                  {f.orders.length} commande{f.orders.length > 1 ? 's' : ''}
+                                </span>
+                                {f.delayedOrdersCount > 0 && (
+                                  <span className="text-red-500 font-medium flex items-center gap-1">
+                                    <ClockCircleOutlined />
+                                    {f.delayedOrdersCount} en retard
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <Badge count={f.orders.length} size="small" />
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      <Tag color={f.isOnline ? 'green' : f.isStale ? 'orange' : 'default'} className="text-xs">
-                        {f.lastSeenMinutes != null ? `${f.lastSeenMinutes} min` : '—'}
-                      </Tag>
-                      {f.isOverloaded && <Tag color="orange">Surchargé</Tag>}
-                      {f.delayedOrdersCount > 0 && (
-                        <Tag color="red">SLA {f.delayedOrdersCount}</Tag>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
             )}
 
             <div className="space-y-3">
-              <Card>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <Space wrap>
+              <Card className="ops-card-surface" variant="borderless">
+                {/* Barre de sélection - Ops Center Style */}
+                <div className="ops-selection-bar flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <Space wrap size="small">
                     {!sidebarVisible && (
                       <Button
                         type="text"
@@ -416,25 +498,39 @@ export default function DeliveryTrackingPage() {
                         title="Afficher la liste des livreurs"
                       />
                     )}
-                    <Tag color="blue" icon={<EnvironmentOutlined />}>
-                      {selectedDriverState ? mapName(selectedDriverState.driver) : '—'}
-                    </Tag>
-                    {selectedOrder && (
-                      <Tag color="purple">{selectedOrder.displayNum}</Tag>
+                    {selectedDriverState && (
+                      <span className="ops-tag">
+                        <UserOutlined />
+                        {mapName(selectedDriverState.driver)}
+                      </span>
                     )}
-                    {clientLoc && <Tag color="green">Client localisé</Tag>}
+                    {selectedOrder && (
+                      <span className="ops-tag purple">
+                        <ShoppingCartOutlined />
+                        {selectedOrder.displayNum}
+                      </span>
+                    )}
+                    {clientLoc && (
+                      <span className="ops-tag success">
+                        <EnvironmentOutlined />
+                        Client localisé
+                      </span>
+                    )}
                   </Space>
                   <Button
                     icon={isMapFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-                    size="small"
+                    size="middle"
                     onClick={() => setIsMapFullscreen(!isMapFullscreen)}
+                    type="text"
                   >
                     {isMapFullscreen ? 'Réduire' : 'Plein écran'}
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+                {/* Panel Info Livreur - Ops Center Style */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                   <Select
+                    className="ops-select"
                     value={selectedDriverId || undefined}
                     placeholder="Livreur"
                     style={{ width: '100%' }}
@@ -444,6 +540,7 @@ export default function DeliveryTrackingPage() {
                     optionFilterProp="label"
                   />
                   <Select
+                    className="ops-select"
                     value={selectedOrderId || undefined}
                     placeholder="Commande"
                     style={{ width: '100%' }}
@@ -455,14 +552,14 @@ export default function DeliveryTrackingPage() {
                   />
                   {selectedOrderId && (
                     <Link href={`/orders?open=${encodeURIComponent(selectedOrderId)}`}>
-                      <Button type="primary" icon={<EyeOutlined />} block>
+                      <Button className="ops-btn-primary" icon={<EyeOutlined />} block>
                         Voir commande
                       </Button>
                     </Link>
                   )}
                   {selectedDriverState?.driver.phone && (
                     <a href={`tel:${selectedDriverState.driver.phone}`}>
-                      <Button icon={<PhoneOutlined />} block>
+                      <Button className="ops-btn-secondary" icon={<PhoneOutlined />} block>
                         Appeler
                       </Button>
                     </a>
@@ -519,7 +616,7 @@ export default function DeliveryTrackingPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="delivery-map-container" style={{ height: 480 }}>
+                  <div className="ops-map-wrapper" style={{ height: 480 }}>
                     {driverLoc?.latitude != null ? (
                       <ClientOnly>
                         <DeliveryTrackingMap
@@ -534,7 +631,7 @@ export default function DeliveryTrackingPage() {
                         />
                       </ClientOnly>
                     ) : (
-                      <div className="flex h-full items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                      <div className="flex h-full items-center justify-center bg-gray-50 dark:bg-gray-900/50">
                         <div className="text-center p-6">
                           <EnvironmentOutlined className="text-4xl text-gray-400 mb-2" />
                           <div className="font-semibold text-gray-500">Aucune position reçue</div>

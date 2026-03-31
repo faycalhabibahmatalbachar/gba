@@ -125,14 +125,14 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
         overflow: 'auto',
       }}
     >
-      <div className="h-14 px-4 flex items-center gap-3 border-b border-white/10">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
+      <div className="h-16 px-4 flex items-center gap-3 border-b" style={{ borderColor: 'var(--sidebar-border)' }}>
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white font-bold text-lg shadow-lg transition-transform duration-300 hover:scale-105 hover:rotate-3">
           G
         </div>
         {!collapsed && (
-          <div className="leading-tight">
-            <div className="text-white font-semibold">GBA Admin</div>
-            <div className="text-xs text-white/60">Panneau de gestion</div>
+          <div className="leading-tight animate-fade-in">
+            <div className="font-bold text-base" style={{ color: 'var(--sidebar-text)', fontFamily: 'var(--font-heading)' }}>GBA Admin</div>
+            <div className="text-xs" style={{ color: 'var(--sidebar-text-muted)' }}>Panneau de gestion</div>
           </div>
         )}
       </div>
@@ -144,8 +144,24 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
         selectedKeys={selectedKeys}
         openKeys={collapsed ? [] : openKeys}
         onOpenChange={(keys) => setOpenKeys(keys as string[])}
-        style={{ borderInlineEnd: 'none' }}
+        style={{ borderInlineEnd: 'none', paddingTop: '8px', paddingBottom: '8px' }}
       />
+
+      {/* User section at bottom */}
+      {!collapsed && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t animate-fade-in" style={{ borderColor: 'var(--sidebar-border)' }}>
+          <div className="flex items-center gap-3 p-3 rounded-xl transition-all duration-200 hover:bg-white/5 cursor-pointer">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm shadow-md relative">
+              <span>AD</span>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2" style={{ borderColor: 'var(--sidebar-bg)' }}></div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold truncate" style={{ color: 'var(--sidebar-text)' }}>Admin</div>
+              <div className="text-xs truncate" style={{ color: 'var(--sidebar-text-muted)' }}>En ligne</div>
+            </div>
+          </div>
+        </div>
+      )}
     </Sider>
   );
 }

@@ -68,29 +68,67 @@ export default function AdminHeader({ collapsed, onToggleCollapse }: Props) {
   ];
 
   return (
-    <Header className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-4 h-14 flex items-center justify-between">
-      <Space size={12} className="min-w-0">
+    <Header className="flex items-center justify-between px-6 h-16 animate-fade-in" style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--header-border)' }}>
+      {/* Left section */}
+      <Space size={16} className="min-w-0 flex-1">
         <Button
           type="text"
           onClick={onToggleCollapse}
           icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          className="hover:bg-opacity-10 transition-all duration-200"
+          style={{ color: 'var(--text-primary)' }}
         />
-        <Breadcrumb
-          items={breadcrumb.map((c) => ({ title: c.title }))}
-        />
+        
+        {/* Breadcrumb with modern separators */}
+        <div className="hidden md:flex items-center gap-2">
+          {breadcrumb.map((c, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && (
+                <span style={{ color: 'var(--text-muted)' }} className="text-sm">/</span>
+              )}
+              <span 
+                className="text-sm font-medium transition-colors duration-200 hover:text-opacity-80"
+                style={{ 
+                  color: i === breadcrumb.length - 1 ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontFamily: i === breadcrumb.length - 1 ? 'var(--font-heading)' : 'var(--font-body)'
+                }}
+              >
+                {c.title}
+              </span>
+            </React.Fragment>
+          ))}
+        </div>
       </Space>
 
-      <Space size={8}>
+      {/* Right section */}
+      <Space size={12}>
+        {/* Theme toggle with smooth transition */}
         <Button
           type="text"
           onClick={toggle}
           icon={!ready ? <MoonOutlined /> : (dark ? <SunOutlined /> : <MoonOutlined />)}
           title={!ready ? 'Thème' : (dark ? 'Mode clair' : 'Mode sombre')}
+          className="w-10 h-10 rounded-lg hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center"
+          style={{ color: 'var(--text-primary)' }}
         />
-        <Dropdown menu={{ items: menuItems }} trigger={['click']}>
-          <Button type="default" size="small" icon={<UserOutlined />}
-            className="max-w-[220px] overflow-hidden">
-            <span className="hidden sm:inline truncate">{user?.email || 'Admin'}</span>
+        
+        {/* User dropdown with avatar */}
+        <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+          <Button 
+            type="default" 
+            className="h-10 px-3 rounded-lg border transition-all duration-200 hover:shadow-md flex items-center gap-2"
+            style={{ 
+              borderColor: 'var(--border-color)',
+              background: 'var(--card-bg)',
+              color: 'var(--text-primary)'
+            }}
+          >
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
+              {user?.email?.[0]?.toUpperCase() || 'A'}
+            </div>
+            <span className="hidden sm:inline text-sm font-medium truncate max-w-[150px]">
+              {user?.email?.split('@')[0] || 'Admin'}
+            </span>
           </Button>
         </Dropdown>
       </Space>

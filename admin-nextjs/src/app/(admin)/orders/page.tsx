@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import {
   App,
@@ -46,6 +47,7 @@ import type { OrdersKpis } from '@/lib/services/orders';
 import PageHeader from '@/components/ui/PageHeader';
 import { OrderStatusBadge, ORDER_STATUS_OPTIONS } from '@/components/orders/OrderStatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
+import { translatePaymentMethod } from '@/lib/i18n/translations';
 
 const { RangePicker } = DatePicker;
 
@@ -75,14 +77,18 @@ function KpiCard({
   className?: string;
 }) {
   const content = (
-    <Card size="small" className={`transition-all duration-200 hover:shadow-md ${className}`} styles={{ body: { padding: 16 } }}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{title}</div>
-          <div className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-0.5 truncate">{value}</div>
-          {sub != null && <div className="text-xs text-slate-400 mt-1">{sub}</div>}
+    <Card 
+      className={`glass-card transition-all duration-200 hover:shadow-lg border ${className}`} 
+      styles={{ body: { padding: 20 } }}
+      style={{ borderColor: 'var(--card-border)' }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>{title}</div>
+          <div className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>{value}</div>
+          {sub != null && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub}</div>}
         </div>
-        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 text-slate-600 dark:text-slate-300">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
           {icon}
         </div>
       </div>
@@ -92,11 +98,7 @@ function KpiCard({
 }
 
 function formatPaymentMethod(method: string | null | undefined): string {
-  if (!method) return '—';
-  if (method === 'cash_on_delivery' || method === 'manual') return 'Cash';
-  if (method === 'stripe_card') return 'Carte bancaire';
-  if (method === 'flutterwave_card') return 'Carte bancaire';
-  return method.replace(/_/g, ' ');
+  return translatePaymentMethod(method);
 }
 
 function copyToClipboard(text: string): Promise<boolean> {
@@ -575,6 +577,21 @@ export default function OrdersPage() {
             />
           </Col>
           <Col xs={12} sm={6} md={4}>
+            <Select 
+              value="normal" 
+              onChange={(v) => {
+                if (v === 'special') {
+                  message.info('Les commandes spéciales sont dans une table séparée. Fonctionnalité à venir.');
+                }
+              }} 
+              options={[
+                { value: 'normal', label: 'Normales' },
+                { value: 'special', label: 'Spéciales' }
+              ]} 
+              className="w-full" 
+            />
+          </Col>
+          <Col xs={12} sm={6} md={4}>
             <Select value={status} onChange={setStatus} options={[{ value: 'all', label: 'Tous statuts' }, ...ORDER_STATUS_OPTIONS]} className="w-full" />
           </Col>
           <Col xs={12} sm={6} md={4}>
@@ -655,7 +672,17 @@ export default function OrdersPage() {
       {/* Detail Drawer 80% */}
       <Drawer
         open={detailsOpen}
-        onClose={() => { setDetailsOpen(false); setSelected(null); setOrderDetails(null); }}
+        onClose={() => {
+          setDetailsOpen(false);
+          setSelected(null);
+          setOrderDetails(null);
+          // Clear URL parameter if present
+          if (typeof window !== 'undefined' && window.location.search.includes('open=')) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('open');
+            window.history.replaceState({}, '', url.pathname);
+          }
+        }}
         title={selected ? `Commande ${selected.order_number || selected.id.slice(0, 8)}` : 'Détails'}
         size="large"
         styles={{ body: { paddingBottom: 80 } }}

@@ -8,6 +8,7 @@ import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import PageHeader from '@/components/ui/PageHeader';
+import { translateOrderStatus } from '@/lib/i18n/translations';
 
 type DriverRow = {
   id: string;
@@ -285,42 +286,69 @@ export default function DriversPage() {
               return;
             }
 
-            // Create auth user with admin API
-            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            if (form.password.length < 6) {
+              message.error('Le mot de passe doit contenir au moins 6 caractères');
+              setCreating(false);
+              return;
+            }
+
+            // Save admin session before signUp (signUp switches active session)
+            const { data: { session: adminSession } } = await supabase.auth.getSession();
+
+            // Create auth user with signUp
+            const { data: authData, error: authError } = await supabase.auth.signUp({
               email: form.email,
               password: form.password,
-              email_confirm: true,
-              user_metadata: {
-                first_name: form.firstName,
-                last_name: form.lastName,
-                phone: form.phone,
-                city: form.city,
-                role: 'driver',
+              options: {
+                data: {
+                  first_name: form.firstName,
+                  last_name: form.lastName,
+                  role: 'driver',
+                },
               },
             });
 
             if (authError) throw authError;
 
-            // Create profile record
-            const { error: profileError } = await supabase.from('profiles').insert({
-              id: authData.user.id,
-              email: form.email,
-              first_name: form.firstName,
-              last_name: form.lastName,
-              phone: form.phone,
-              city: form.city,
-              role: 'driver',
-              is_available: true,
-            });
+            const userId = authData?.user?.id;
 
-            if (profileError) throw profileError;
+            // Upsert profile BEFORE restoring admin session
+            // The driver's freshly created JWT is active — they can write their own profile row
+            if (userId) {
+              await new Promise(r => setTimeout(r, 200)); // let Supabase process the new user
+              const { error: upsertError } = await supabase.from('profiles').upsert({
+                id: userId,
+                email: form.email,
+                first_name: form.firstName,
+                last_name: form.lastName,
+                phone: form.phone,
+                city: form.city,
+                role: 'driver',
+                is_available: true,
+              });
+              if (upsertError) console.warn('Profile upsert warning:', upsertError.message);
+            }
+
+            // Restore admin session AFTER profile upsert
+            if (adminSession) {
+              await supabase.auth.setSession({
+                access_token: adminSession.access_token,
+                refresh_token: adminSession.refresh_token,
+              });
+            }
 
             message.success('Livreur créé avec succès');
             setCreateOpen(false);
             setForm({ email: '', password: '', firstName: '', lastName: '', phone: '', city: '' });
             void load();
           } catch (e: any) {
+            console.error('Create driver error:', e);
             message.error(e?.message || 'Erreur lors de la création');
+            // Try to restore admin session on error too
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) window.location.reload();
+            } catch (_) {}
           } finally {
             setCreating(false);
           }
@@ -411,7 +439,7 @@ export default function DriversPage() {
                       </div>
                       <Space>
                         <Tag color={order.status === 'shipped' ? 'blue' : order.status === 'confirmed' ? 'green' : 'orange'}>
-                          {order.status}
+                          {translateOrderStatus(order.status)}
                         </Tag>
                         <Link href={`/orders?open=${order.id}`}>
                           <Button size="small" icon={<EyeOutlined />}>Voir</Button>

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import { supabase } from '@/lib/supabase/client';
 import EmptyState from '@/components/ui/EmptyState';
+import { translateOrderStatus, translatePaymentMethod } from '@/lib/i18n/translations';
 
 const Line = dynamic(() => import('@ant-design/charts').then((m) => m.Line), { ssr: false });
 const Bar = dynamic(() => import('@ant-design/charts').then((m) => m.Bar), { ssr: false });
@@ -555,13 +556,14 @@ export default function DashboardPage() {
   }, [ordersSeries]);
 
   const funnelChartConfig = useMemo(() => {
+    const chartData = funnel.length ? funnel.map(f => ({ type: f.step, value: f.sessions })) : [{ type: '—', value: 0 }];
     return {
-      data: funnel.length ? funnel : [{ step: '—', sessions: 0 }],
-      xField: 'step',
-      yField: 'sessions',
+      data: chartData,
+      xField: 'type',
+      yField: 'value',
       height: 260,
       legend: false,
-      colorField: 'step',
+      colorField: 'type',
       style: { radius: [6, 6, 0, 0] },
       axis: { x: { labelAutoRotate: true }, y: { title: 'Sessions' } },
       tooltip: { channel: 'y', valueFormatter: (v: number) => `${v} sessions` },
@@ -838,8 +840,7 @@ export default function DashboardPage() {
 
   const paymentLabel = useMemo(() => {
     const p = drawerOrderDetails?.payment_provider || drawerOrderDetails?.payment_method || null;
-    if (!p) return '—';
-    return String(p);
+    return translatePaymentMethod(p);
   }, [drawerOrderDetails?.payment_provider, drawerOrderDetails?.payment_method]);
 
   const exportCsv = (filename: string, headers: string[], rows: Array<Array<string | number>>) => {

@@ -36,7 +36,7 @@ export type UsersKpis = {
 export async function fetchUsersKpis(): Promise<UsersKpis> {
   const [totalRes, clientsRes, driversRes, adminsRes] = await Promise.all([
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'user'),
+    supabase.from('profiles').select('*', { count: 'exact', head: true }).or('role.is.null,role.eq.client,role.eq.user'),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'driver'),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'admin'),
   ]);
@@ -59,7 +59,14 @@ export async function fetchUsers(params: FetchUsersParams) {
     .order('created_at', { ascending: false })
     .range(from, to);
 
-  if (role && role !== 'all') q = q.eq('role', role);
+  if (role && role !== 'all') {
+    if (role === 'client' || role === 'user') {
+      // Clients can have role null, 'client', or 'user'
+      q = q.or('role.is.null,role.eq.client,role.eq.user');
+    } else {
+      q = q.eq('role', role);
+    }
+  }
   if (search && search.trim()) {
     const s = search.trim();
     q = q.or(`email.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%,phone.ilike.%${s}%`);
