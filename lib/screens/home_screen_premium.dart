@@ -890,6 +890,12 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                     ),
                     child: TextField(
                       readOnly: true,
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.grey.shade800,
+                        fontSize: 15,
+                      ),
                       onTap: () {
                         HapticFeedback.selectionClick();
                         context.push('/search');
@@ -897,7 +903,9 @@ class _HomeScreenPremiumState extends State<HomeScreenPremium> with TickerProvid
                       decoration: InputDecoration(
                         hintText: localizations.translate('search_products_hint'),
                         hintStyle: TextStyle(
-                          color: Colors.grey.shade500,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade500,
                           fontSize: 15,
                         ),
                         prefixIcon: Container(

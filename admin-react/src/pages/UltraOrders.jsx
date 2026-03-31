@@ -3,7 +3,7 @@ import { ShoppingBag, TrendingUp, Clock, Truck, CheckCircle, X, MoreVertical, Se
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../config/supabase';
 import toast from 'react-hot-toast';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useDark } from '../components/Layout';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -42,8 +42,8 @@ function OrderDetailsDialog({ open, order, onClose, loading, dark }) {
   const subtotal = totalAmount - shippingFee;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} onClick={e => e.stopPropagation()}
         className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col ${dark ? 'bg-slate-800 border border-slate-700' : 'bg-white'}`}>
         <div className={`flex items-center justify-between px-5 py-4 border-b shrink-0 ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
           <div>
@@ -138,7 +138,15 @@ function UltraOrders() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [driverProfiles, setDriverProfiles] = useState([]);
   const location = useLocation();
+  const navigate = useNavigate();
   const deepLinkHandledRef = useRef(false);
+
+  const handleCloseDetails = () => {
+    setDetailsOpen(false);
+    if (location.search) {
+      navigate(location.pathname, { replace: true });
+    }
+  };
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -405,7 +413,7 @@ function UltraOrders() {
           { label:'Revenus', value:`${Number(stats.revenue).toFixed(0)} F`, Icon:TrendingUp, bg:'bg-purple-50 dark:bg-purple-900/30', c:'text-purple-600 dark:text-purple-400' },
         ].map(({label, value, Icon, bg, c}, i) => (
           <motion.div key={i} initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }} transition={{ delay:i*0.08 }}>
-            <Card>
+            <Card className={`border shadow-sm ${dark ? 'border-slate-700' : 'border-indigo-100/70'}`}>
               <CardContent className="p-4 flex items-start justify-between">
                 <div>
                   <p className={`text-xs mb-1 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{label}</p>
@@ -518,7 +526,7 @@ function UltraOrders() {
         </Card>
       )}
 
-      <OrderDetailsDialog open={detailsOpen} order={selectedOrder} onClose={() => setDetailsOpen(false)} loading={detailsLoading} dark={dark} />
+      <OrderDetailsDialog open={detailsOpen} order={selectedOrder} onClose={handleCloseDetails} loading={detailsLoading} dark={dark} />
 
       {assignDialogOpen && assignTargetOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

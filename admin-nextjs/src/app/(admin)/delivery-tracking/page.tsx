@@ -266,7 +266,7 @@ export default function DeliveryTrackingPage() {
     <div className="delivery-command-center space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <PageHeader
-          title="Delivery Operations Command Center"
+          title="Centre d'opérations de livraison"
           subtitle="Centre de pilotage logistique temps réel"
         />
         <Button
@@ -317,83 +317,6 @@ export default function DeliveryTrackingPage() {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Card className="delivery-kpi-card dashboard-card-glass">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400">
-                  <TeamOutlined style={{ fontSize: 20 }} />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Flotte</div>
-                  <div className="text-xl font-bold">{kpis.total}</div>
-                  <div className="text-xs text-gray-500">livreurs</div>
-                </div>
-              </div>
-            </Card>
-            <Card className="delivery-kpi-card dashboard-card-glass">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400">
-                  <CheckCircleOutlined style={{ fontSize: 20 }} />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">En ligne</div>
-                  <div className="text-xl font-bold text-emerald-600">{kpis.online}</div>
-                  <div className="text-xs text-gray-500">actifs</div>
-                </div>
-              </div>
-            </Card>
-            <Card className="delivery-kpi-card dashboard-card-glass">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
-                  <ClockCircleOutlined style={{ fontSize: 20 }} />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Hors ligne</div>
-                  <div className="text-xl font-bold text-amber-600">{kpis.offline}</div>
-                  <div className="text-xs text-gray-500">&gt; {STALE_MINUTES} min</div>
-                </div>
-              </div>
-            </Card>
-            <Card className="delivery-kpi-card dashboard-card-glass">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">
-                  <ThunderboltOutlined style={{ fontSize: 20 }} />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Surchargés</div>
-                  <div className="text-xl font-bold text-orange-600">{kpis.overloaded}</div>
-                  <div className="text-xs text-gray-500">≥ {OVERLOAD_THRESHOLD} liv.</div>
-                </div>
-              </div>
-            </Card>
-            <Tooltip title="Livraisons en cours depuis plus de 2h (dépassement SLA)">
-              <Card className="delivery-kpi-card dashboard-card-glass cursor-help">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400">
-                    <ExclamationCircleOutlined style={{ fontSize: 20 }} />
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">En retard (SLA)</div>
-                    <div className="text-xl font-bold text-red-600">{kpis.delayed}</div>
-                    <div className="text-xs text-gray-500">&gt; 2h</div>
-                  </div>
-                </div>
-              </Card>
-            </Tooltip>
-            <Card className="delivery-kpi-card dashboard-card-glass">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
-                  <CarOutlined style={{ fontSize: 20 }} />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Livraisons</div>
-                  <div className="text-xl font-bold">{kpis.totalOrders}</div>
-                  <div className="text-xs text-gray-500">en cours</div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
           {alerts.length > 0 && (
             <div className="delivery-alert-strip flex flex-wrap gap-2">
               {alerts.slice(0, 5).map((a, i) => (

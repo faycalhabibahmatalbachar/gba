@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, MapPin, Clock } from 'lucide-react';
+import { RefreshCw, MapPin, Clock, Eye, X, ShoppingBag, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -8,6 +8,8 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '../config/supabase';
 import { useDark } from '../components/Layout';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import FleetMetrics from '../components/delivery/FleetMetrics';
 import AlertsPanel from '../components/delivery/AlertsPanel';
 
@@ -58,6 +60,88 @@ function MapFitter({ positions }) {
 
 const TRAIL_MAX = 10;
 
+function LocalOrderModal({ open, order, onClose, dark }) {
+  if (!open || !order) return null;
+  const items = Array.isArray(order.items) ? order.items : [];
+  const total = Number(order.total_amount ?? 0);
+  const shipping = Number(order.shipping_fee ?? order.shipping_cost ?? 0);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+        className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col ${dark ? 'bg-slate-800 border border-slate-700' : 'bg-white'}`}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`flex items-center justify-between px-5 py-3 border-b shrink-0 ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
+          <div>
+            <p className={`font-bold text-sm ${dark ? 'text-white' : 'text-gray-800'}`}>{order.order_number || `#${order.id?.slice(0,8)}`}</p>
+            <p className={`text-xs ${dark ? 'text-slate-400' : 'text-gray-400'}`}>{order.created_at ? new Date(order.created_at).toLocaleString('fr-FR') : ''}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {order.status && <Badge variant={order.status}>{order.status}</Badge>}
+            <button onClick={onClose} className={`p-1 rounded-lg ${dark ? 'text-slate-400 hover:bg-slate-700' : 'text-gray-400 hover:bg-gray-100'}`}><X size={16} /></button>
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {(order.customer_name || order.customer_phone) && (
+            <div className={`rounded-xl border p-3 ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
+              <p className={`text-xs font-bold uppercase mb-2 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Client</p>
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8"><AvatarFallback>{(order.customer_name||'?')[0]?.toUpperCase()}</AvatarFallback></Avatar>
+                <div>
+                  {order.customer_name && <p className={`font-semibold text-sm ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{order.customer_name}</p>}
+                  {order.customer_phone && (
+                    <a href={`tel:${order.customer_phone}`} className="flex items-center gap-1 text-xs text-indigo-500 hover:underline">
+                      <Phone size={11} />{order.customer_phone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {(order.shipping_city || order.shipping_address) && (
+            <div className={`rounded-xl border p-3 ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
+              <p className={`text-xs font-bold uppercase mb-1 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Adresse</p>
+              <p className={`text-sm ${dark ? 'text-slate-300' : 'text-gray-700'}`}>
+                {[order.shipping_country, order.shipping_city, order.shipping_district].filter(Boolean).join(', ')}
+              </p>
+              {order.shipping_address && <p className={`text-xs mt-0.5 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{order.shipping_address}</p>}
+            </div>
+          )}
+          {items.length > 0 && (
+            <div className={`rounded-xl border p-3 ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
+              <p className={`text-xs font-bold uppercase mb-2 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Articles ({items.length})</p>
+              <div className="space-y-2">
+                {items.slice(0, 4).map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${dark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                      {item.product_image
+                        ? <img src={item.product_image} alt="" className="w-full h-full object-cover rounded-lg" />
+                        : <ShoppingBag size={12} className={dark ? 'text-slate-400' : 'text-gray-400'} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium truncate ${dark ? 'text-slate-200' : 'text-gray-800'}`}>{item.product_name||'Produit'}</p>
+                      <p className={`text-[11px] ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{item.quantity} × {Number(item.unit_price||0).toFixed(0)} FCFA</p>
+                    </div>
+                  </div>
+                ))}
+                {items.length > 4 && <p className={`text-xs ${dark ? 'text-slate-500' : 'text-gray-400'}`}>+{items.length - 4} autres articles</p>}
+              </div>
+            </div>
+          )}
+          <div className={`rounded-xl border p-3 flex justify-between items-center ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
+            <span className={`text-sm font-semibold ${dark ? 'text-slate-300' : 'text-gray-600'}`}>Total</span>
+            <span className="font-extrabold text-indigo-500">{total.toFixed(0)} FCFA</span>
+          </div>
+        </div>
+        <div className={`px-4 py-3 border-t shrink-0 flex justify-end ${dark ? 'border-slate-700' : 'border-gray-100'}`}>
+          <Button variant="outline" size="sm" onClick={onClose}>Fermer</Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function DeliveryTracking() {
   const { dark } = useDark();
   const enqueueSnackbar = (msg, { variant } = {}) => { variant === 'error' ? toast.error(msg) : toast.success(msg); };
@@ -71,10 +155,31 @@ export default function DeliveryTracking() {
   const [orders, setOrders]              = useState([]);
   const [selectedOrderId, setSelOrder]   = useState('');
   const [allDriverLocations, setAllDriverLocations] = useState([]);
+  const [localOrderOpen, setLocalOrderOpen] = useState(false);
+  const [localOrderData, setLocalOrderData] = useState(null);
+  const [localOrderLoading, setLocalOrderLoading] = useState(false);
   const driverChRef = useRef(null);
   const clientChRef = useRef(null);
 
   const mapName = d => `${d.first_name||''} ${d.last_name||''}`.trim() || d.email || d.phone || `Livreur ${d.id.slice(0,8)}`;
+
+  const openLocalOrderDetail = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setLocalOrderLoading(true);
+    setLocalOrderOpen(true);
+    setLocalOrderData(null);
+    try {
+      const { data: orderRow } = await supabase.from('orders').select('*').eq('id', orderId).single();
+      const { data: itemsRaw } = await supabase.from('order_items').select('*, products(main_image)').eq('order_id', orderId);
+      const items = (itemsRaw || []).map(i => ({ ...i, product_image: i.product_image || i.products?.main_image || null }));
+      setLocalOrderData({ ...orderRow, items });
+    } catch (e) {
+      toast.error('Erreur chargement commande');
+      setLocalOrderOpen(false);
+    } finally {
+      setLocalOrderLoading(false);
+    }
+  }, []);
 
   const fetchDrivers = useCallback(async () => {
     setLoading(true);
@@ -220,8 +325,7 @@ export default function DeliveryTracking() {
       <motion.div initial={{ opacity:0, y:-12 }} animate={{ opacity:1, y:0 }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent'}`}>Suivi livraisons</h1>
-            <p className={`text-sm mt-0.5 ${dark ? 'text-slate-400' : 'text-gray-500'}`}>Delivery Operations Command Center</p>
+            <h1 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent'}`}>Delivery Operations Command Center</h1>
             <p className={`text-xs mt-0.5 ${dark ? 'text-slate-500' : 'text-gray-400'}`}>Centre de pilotage logistique temps réel</p>
           </div>
           <Button size="sm" onClick={fetchDrivers}><RefreshCw size={15} /> Actualiser</Button>
@@ -257,6 +361,19 @@ export default function DeliveryTracking() {
                 <option value="" disabled>Choisir...</option>
                 {orders.map(o => <option key={o.id} value={o.id}>{o.displayNum} — {o.displayName}</option>)}
               </select>
+              {selectedOrderId && (
+                <button
+                  onClick={() => openLocalOrderDetail(selectedOrderId)}
+                  disabled={localOrderLoading}
+                  className={`mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                    dark
+                      ? 'bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800'
+                      : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100'
+                  }`}
+                >
+                  <Eye size={13} />{localOrderLoading ? 'Chargement…' : 'Voir détails commande'}
+                </button>
+              )}
             </div>
           )}
 
@@ -338,6 +455,12 @@ export default function DeliveryTracking() {
           )}
         </motion.div>
       </div>
+      <LocalOrderModal
+        open={localOrderOpen}
+        order={localOrderData}
+        onClose={() => setLocalOrderOpen(false)}
+        dark={dark}
+      />
     </div>
   );
 }

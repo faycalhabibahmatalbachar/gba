@@ -470,7 +470,7 @@ class PremiumProductCard extends StatelessWidget {
                                 ),
                               ),
                               
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               
                               // Rating (if available)
                               if (product.rating > 0)
@@ -510,7 +510,7 @@ class PremiumProductCard extends StatelessWidget {
                           ),
                         ),
                         
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 8),
 
                         // Price Section
                         Row(

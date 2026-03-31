@@ -85,16 +85,10 @@ export default function Drivers() {
 
       const userId = authData?.user?.id;
 
-      // Restore admin session immediately
-      if (adminSession) {
-        await supabase.auth.setSession({
-          access_token: adminSession.access_token,
-          refresh_token: adminSession.refresh_token,
-        });
-      }
-
-      // Now upsert profile with admin's session
+      // Upsert profile BEFORE restoring admin session:
+      // The driver's freshly created JWT is active — they can write their own profile row.
       if (userId) {
+        await new Promise(r => setTimeout(r, 200)); // let Supabase process the new user
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: userId,
           email: form.email,
@@ -105,6 +99,14 @@ export default function Drivers() {
           role: 'driver',
         });
         if (upsertError) console.warn('Profile upsert warning:', upsertError.message);
+      }
+
+      // Restore admin session AFTER profile upsert
+      if (adminSession) {
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token,
+        });
       }
 
       enqueueSnackbar(`Compte livreur créé: ${form.email}`, { variant: 'success' });

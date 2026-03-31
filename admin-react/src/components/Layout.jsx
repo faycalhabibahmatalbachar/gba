@@ -36,6 +36,7 @@ const menuSections = [
         ],
       },
       { title: 'Livreurs', path: '/drivers', icon: Users },
+      { title: 'Commandes spéciales', path: '/special-orders', icon: ShoppingBag },
     ],
   },
   {
@@ -769,7 +770,7 @@ function Layout() {
             onMarkAllRead={markAllRead}
           />
 
-          <main id="main-scroll" className={`flex-1 p-4 sm:p-6 lg:p-8 overflow-auto`}>
+          <main id="main-scroll" className={`flex-1 p-4 pt-6 sm:p-6 sm:pt-8 lg:p-8 lg:pt-10 overflow-auto`}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}

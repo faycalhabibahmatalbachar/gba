@@ -190,7 +190,8 @@ class AppRoutes {
       }
       
       // If logged in and trying to access auth routes
-      if (isLoggedIn && isAuthRoute) {
+      // Note: /legal/* is treated as public and must remain accessible even when logged in.
+      if (isLoggedIn && isAuthRoute && !loc.startsWith('/legal/')) {
         if (isResetPasswordRoute) {
           return null;
         }
@@ -512,6 +513,25 @@ class AppRoutes {
                 curve: Curves.easeInOut,
               ),
               child: child,
+            );
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/favorites-standalone',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: const FavoritesScreenPremium(),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: FadeTransition(opacity: animation, child: child),
             );
           },
         ),

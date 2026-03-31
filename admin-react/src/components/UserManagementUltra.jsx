@@ -34,6 +34,7 @@ const UserManagementUltra = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('client');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
@@ -61,6 +62,11 @@ const UserManagementUltra = () => {
   const [createForm, setCreateForm] = useState({ first_name: '', last_name: '', email: '', password: '', phone: '' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
+
+  useEffect(() => {
+    setPage(1);
+    fetchUsers(1);
+  }, [roleFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchUsers();
@@ -92,12 +98,19 @@ const UserManagementUltra = () => {
       const from = (p - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      const { data: profiles, error: profileError, count } = await supabase
+      let query = supabase
         .from('profiles')
         .select('*', { count: 'exact' })
-        .or('role.is.null,role.eq.client')
         .order('created_at', { ascending: false })
         .range(from, to);
+
+      if (roleFilter === 'client') {
+        query = query.or('role.is.null,role.eq.client');
+      } else if (roleFilter !== 'all') {
+        query = query.eq('role', roleFilter);
+      }
+
+      const { data: profiles, error: profileError, count } = await query;
 
       if (profileError) { setUsers([]); setLoading(false); return; }
 
@@ -153,7 +166,7 @@ const UserManagementUltra = () => {
       setUsers([]);
       setLoading(false);
     }
-  }, [page]);
+  }, [page, roleFilter]);
 
   const fetchRealTimeStats = async () => {
     try {
@@ -435,11 +448,17 @@ const UserManagementUltra = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="umu-filter">
+          <option value="all">Tous les rôles</option>
+          <option value="client">Clients</option>
+          <option value="driver">Livreurs</option>
+          <option value="admin">Admins</option>
+        </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="umu-filter">
-          <option value="all">Tous</option>
+          <option value="all">Tous statuts</option>
           <option value="active">Actif</option>
           <option value="inactive">Inactif</option>
-          <option value="blocked">Bloque</option>
+          <option value="blocked">Bloqué</option>
         </select>
         <button className="umu-btn" onClick={fetchUsers}><RefreshCw size={14} /> Actualiser</button>
         <button className="umu-btn umu-btn-green" onClick={exportAllData}><Download size={14} /> Export CSV</button>

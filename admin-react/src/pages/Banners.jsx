@@ -340,7 +340,7 @@ function Banners() {
       try { const r = await supabase.rpc('is_admin'); isAdm = r.data; } catch (_) {}
       console.log('[BANNERS SAVE]', { userId: session?.user?.id, isAdmin: isAdm, hasImage: !!imageFile });
 
-      if (!isAdm) {
+      if (isAdm === false) {
         toast.error('Accès refusé : droits administrateur requis');
         return;
       }

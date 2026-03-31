@@ -51,15 +51,41 @@ class UserLocationService {
       if (now.difference(lastSent).inSeconds < _intervalSeconds) return;
       lastSent = now;
       try {
-        await _supabase.from('user_locations').upsert({
-          'user_id': userId,
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-          'speed': pos.speed < 0 ? 0 : pos.speed,
-          'heading': pos.heading,
-          'accuracy': pos.accuracy,
-          'captured_at': DateTime.now().toUtc().toIso8601String(),
-        }, onConflict: 'user_id');
+        final capturedAt = DateTime.now().toUtc().toIso8601String();
+
+        await Future.wait([
+          // New schema used by admin delivery-tracking
+          _supabase.from('user_current_location').upsert({
+            'user_id': userId,
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+            'accuracy': pos.accuracy,
+            'speed': pos.speed < 0 ? 0 : pos.speed,
+            'heading': pos.heading,
+            'updated_at': capturedAt,
+          }, onConflict: 'user_id'),
+
+          _supabase.from('user_location_history').insert({
+            'user_id': userId,
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+            'accuracy': pos.accuracy,
+            'speed': pos.speed < 0 ? 0 : pos.speed,
+            'heading': pos.heading,
+            'captured_at': capturedAt,
+          }),
+
+          // Legacy table kept for driver app screens (compat)
+          _supabase.from('user_locations').upsert({
+            'user_id': userId,
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+            'speed': pos.speed < 0 ? 0 : pos.speed,
+            'heading': pos.heading,
+            'accuracy': pos.accuracy,
+            'updated_at': capturedAt,
+          }, onConflict: 'user_id'),
+        ]);
       } catch (e) {
         debugPrint('[UserGPS] upsert error: $e');
       }

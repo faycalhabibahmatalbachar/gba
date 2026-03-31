@@ -81,7 +81,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     super.initState();
     _profileService = ProfileService();
     _loadProfile();
-    _loadStats();
+    _loadStats(forceRefresh: true);
     
     // Initialisation des animations
     _fadeController = AnimationController(
@@ -262,11 +262,11 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     }
   }
   
-  Future<void> _loadStats() async {
+  Future<void> _loadStats({bool forceRefresh = false}) async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return;
 
-    final stats = await _profileService.getProfileStats(userId);
+    final stats = await _profileService.getProfileStats(userId, forceRefresh: forceRefresh);
     final points = _profile?.loyaltyPoints ?? 0;
     if (!mounted) return;
     setState(() {
@@ -770,7 +770,6 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
     final profile = _profile;
     final isLoading = _isLoadingProfile;
     final stats = _stats;
-    final favoritesCount = 0; // TODO: Get from FavoritesProvider
     final isDarkMode = theme.brightness == Brightness.dark;
     
     if (isLoading) {
@@ -1231,7 +1230,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
             _buildStatCard(
               icon: FontAwesomeIcons.heart,
               label: localizations.translate('favorites'),
-              value: stats['favorites'].toString(),
+              value: Provider.of<FavoritesProvider>(context, listen: false).favoriteIds.length.toString(),
               color: Colors.red,
               delay: 100,
             ),
@@ -1770,7 +1769,7 @@ class _ProfileScreenUltraState extends State<ProfileScreenUltra>
                 icon: FontAwesomeIcons.heart,
                 label: localizations.translate('favorites'),
                 color: Colors.red,
-                onTap: () => context.push('/favorites'),
+                onTap: () => context.push('/favorites-standalone'),
               ),
             ),
             const SizedBox(width: 12),
