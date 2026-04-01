@@ -48,39 +48,37 @@ export default function EmptyState({
     <div
       className={`flex flex-col items-center justify-center py-20 px-4 text-center animate-fade-in ${className}`}
     >
-      {/* Icon with gradient background */}
-      <div className="mb-6 p-6 rounded-2xl" style={{ background: 'var(--hover-bg)' }}>
+      <div className="mb-6 p-6 rounded-2xl" style={{ background: 'var(--bg-elevated)' }}>
         {iconNode}
       </div>
-      
-      {/* Title with modern typography */}
-      <h3 
-        className="text-xl font-bold mb-2"
-        style={{ 
-          color: 'var(--text-primary)',
-          fontFamily: 'var(--font-heading)'
+
+      <h3
+        style={{
+          color: 'var(--text-1)',
+          fontFamily: 'var(--font-heading)',
+          fontSize: 18,
+          fontWeight: 600,
+          margin: '0 0 6px',
         }}
       >
         {title}
       </h3>
-      
-      {/* Description */}
+
       {description && (
-        <p 
-          className="text-sm max-w-md mb-6 leading-relaxed"
-          style={{ color: 'var(--text-secondary)' }}
+        <p
+          className="max-w-md mb-6 leading-relaxed"
+          style={{ color: 'var(--text-2)', fontSize: 13 }}
         >
           {description}
         </p>
       )}
-      
-      {/* CTA Button */}
+
       {actionLabel && onAction && (
-        <Button 
-          type="primary" 
-          onClick={onAction} 
+        <Button
+          type="primary"
+          onClick={onAction}
           size="large"
-          className="font-semibold px-6 h-11 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+          style={{ height: 40, borderRadius: 8, fontWeight: 600, padding: '0 24px' }}
         >
           {actionLabel}
         </Button>

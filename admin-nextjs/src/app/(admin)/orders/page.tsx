@@ -78,17 +78,16 @@ function KpiCard({
 }) {
   const content = (
     <Card 
-      className={`glass-card transition-all duration-200 hover:shadow-lg border ${className}`} 
-      styles={{ body: { padding: 20 } }}
-      style={{ borderColor: 'var(--card-border)' }}
+      className={`transition-all duration-200 ${className}`} 
+      styles={{ body: { padding: 16 } }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>{title}</div>
-          <div className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>{value}</div>
-          {sub != null && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub}</div>}
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, color: 'var(--text-3)' }}>{title}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 2, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{value}</div>
+          {sub != null && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{sub}</div>}
         </div>
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(99,102,241,0.10)', color: '#6366F1' }}>
           {icon}
         </div>
       </div>
@@ -418,8 +417,8 @@ export default function OrdersPage() {
         width: 120,
         render: (v, r) => (
           <div>
-            <span className="font-semibold">{v || r.id.slice(0, 8)}</span>
-            <div className="text-xs text-slate-500">{dayjs(r.created_at).format('DD/MM/YYYY HH:mm')}</div>
+            <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{v || r.id.slice(0, 8)}</span>
+            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayjs(r.created_at).format('DD/MM/YYYY HH:mm')}</div>
           </div>
         ),
       },
@@ -429,8 +428,8 @@ export default function OrdersPage() {
         width: 180,
         render: (_, r) => (
           <div className="truncate">
-            <div className="font-medium truncate">{r.customer_name || '—'}</div>
-            <div className="text-xs text-slate-500 truncate">{r.customer_phone_profile || r.customer_phone || '—'}</div>
+            <div className="truncate" style={{ fontWeight: 500, color: 'var(--text-1)' }}>{r.customer_name || '—'}</div>
+            <div className="truncate" style={{ fontSize: 11, color: 'var(--text-3)' }}>{r.customer_phone_profile || r.customer_phone || '—'}</div>
           </div>
         ),
       },
@@ -439,13 +438,13 @@ export default function OrdersPage() {
         dataIndex: 'total_amount',
         width: 120,
         align: 'right',
-        render: (v) => <span className="font-semibold text-indigo-600 dark:text-indigo-400">{Number(v || 0).toLocaleString('fr-FR')} FCFA</span>,
+        render: (v) => <span style={{ fontWeight: 600, color: '#6366F1' }}>{Number(v || 0).toLocaleString('fr-FR')} FCFA</span>,
       },
       {
         title: 'Paiement',
         dataIndex: 'payment_method',
         width: 150,
-        render: (v) => <span className="text-xs">{formatPaymentMethod(v)}</span>,
+        render: (v) => <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{formatPaymentMethod(v)}</span>,
       },
       {
         title: 'Statut',
@@ -466,7 +465,7 @@ export default function OrdersPage() {
         title: 'Livreur',
         dataIndex: 'driver_name',
         width: 140,
-        render: (v, r) => (v ? <span className="text-sm">{v}</span> : r.driver_id ? <span className="text-slate-500">Assigné</span> : '—'),
+        render: (v, r) => (v ? <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{v}</span> : r.driver_id ? <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Assigné</span> : '—'),
       },
       {
         title: 'Date',
@@ -544,7 +543,7 @@ export default function OrdersPage() {
       />
 
       {/* Sticky KPI Header */}
-      <div className="sticky top-0 z-10 -mx-2 px-2 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-100 dark:border-slate-800 mb-4">
+      <div className="sticky top-0 z-10 -mx-2 px-2 py-2 backdrop-blur mb-4" style={{ background: 'var(--bg-base)', borderBottom: '1px solid var(--border)' }}>
         <Row gutter={[12, 12]}>
           <Col xs={12} sm={8} md={4}>
             {kpisLoading ? <Skeleton.Input active size="small" className="w-full" /> : <KpiCard title="Total commandes" value={kpis.totalOrders} icon={<span className="text-lg">📋</span>} tooltip="Nombre total (filtres appliqués)" />}
@@ -614,9 +613,9 @@ export default function OrdersPage() {
 
       {/* Bulk actions */}
       {selectedRowKeys.length > 0 && (
-        <Card size="small" className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
+        <Card size="small" style={{ background: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.20)' }}>
           <Space wrap>
-            <Typography.Text strong>{selectedRowKeys.length} sélectionnée(s)</Typography.Text>
+            <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{selectedRowKeys.length} sélectionnée(s)</span>
             <Button size="small" icon={<TeamOutlined />} onClick={() => setAssignOpen(true)}>Assigner livreur</Button>
             <Button size="small" icon={<DeleteOutlined />} onClick={() => { setBulkStatusOpen(true); setBulkStatusValue('cancelled'); }}>Changer statut</Button>
             <Button size="small" onClick={() => setSelectedRowKeys([])}>Annuler</Button>
@@ -706,15 +705,15 @@ export default function OrdersPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <OrderStatusBadge status={orderDetails.status} className="text-sm px-3 py-1" />
-                <div className="text-slate-500 text-sm mt-1">Créée le {dayjs(orderDetails.created_at).format('DD/MM/YYYY HH:mm')}</div>
+                <div style={{ color: 'var(--text-3)', fontSize: 13, marginTop: 4 }}>Créée le {dayjs(orderDetails.created_at).format('DD/MM/YYYY HH:mm')}</div>
               </div>
               <Button icon={<CopyOutlined />} onClick={async () => { const ok = await copyToClipboard(orderDetails.id); message[ok ? 'success' : 'error'](ok ? 'ID copié' : 'Copie impossible'); }}>Copier ID</Button>
             </div>
 
-            <Card size="small" title="Client & contact">
-              <div className="font-semibold">{orderDetails.customer_name || '—'}</div>
-              <div className="mt-1">{(orderDetails.customer_phone_profile || orderDetails.customer_phone) && <a href={`tel:${orderDetails.customer_phone_profile || orderDetails.customer_phone}`} className="text-indigo-600">{orderDetails.customer_phone_profile || orderDetails.customer_phone}</a>}</div>
-              <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            <Card size="small" title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Client & contact</span>}>
+              <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>{orderDetails.customer_name || '—'}</div>
+              <div className="mt-1">{(orderDetails.customer_phone_profile || orderDetails.customer_phone) && <a href={`tel:${orderDetails.customer_phone_profile || orderDetails.customer_phone}`} style={{ color: '#6366F1' }}>{orderDetails.customer_phone_profile || orderDetails.customer_phone}</a>}</div>
+              <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-2)' }}>
                 {(() => {
                   const a = orderDetails.shipping_address;
                   if (typeof a === 'string') return a;
@@ -726,54 +725,54 @@ export default function OrdersPage() {
               </div>
             </Card>
 
-            <Card size="small" title="Paiement">
+            <Card size="small" title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Paiement</span>}>
               <Row gutter={[16, 8]}>
-                <Col span={12}><span className="text-slate-500">Total</span><div className="font-bold text-lg">{Math.round(orderDetails.total_amount || 0).toLocaleString('fr-FR')} FCFA</div></Col>
-                <Col span={12}><span className="text-slate-500">Méthode</span><div>{formatPaymentMethod((orderDetails as any).payment_method)}</div></Col>
-                <Col span={12}><span className="text-slate-500">Statut paiement</span><div>{orderDetails.paid_at ? 'Payé' : 'En attente'}</div></Col>
+                <Col span={12}><span style={{ fontSize: 12, color: 'var(--text-3)' }}>Total</span><div style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-1)' }}>{Math.round(orderDetails.total_amount || 0).toLocaleString('fr-FR')} FCFA</div></Col>
+                <Col span={12}><span style={{ fontSize: 12, color: 'var(--text-3)' }}>Méthode</span><div style={{ fontSize: 14, color: 'var(--text-1)' }}>{formatPaymentMethod((orderDetails as any).payment_method)}</div></Col>
+                <Col span={12}><span style={{ fontSize: 12, color: 'var(--text-3)' }}>Statut paiement</span><div style={{ fontSize: 14, color: 'var(--text-1)' }}>{orderDetails.paid_at ? 'Payé' : 'En attente'}</div></Col>
               </Row>
             </Card>
 
-            <Card size="small" title="Articles">
+            <Card size="small" title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Articles</span>}>
               {(() => {
                 const items = orderDetails.order_items || (Array.isArray(orderDetails.items) ? orderDetails.items : []);
-                if (!items.length) return <Typography.Text type="secondary">Aucun article</Typography.Text>;
+                if (!items.length) return <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Aucun article</div>;
                 return (
                   <div className="space-y-3">
                     {items.map((item: any, idx: number) => (
-                      <div key={item.id || idx} className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
-                        <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden shrink-0">
+                      <div key={item.id || idx} className="flex items-center gap-3 py-2 last:border-0" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0" style={{ background: 'var(--bg-elevated)' }}>
                           {item.product_image ? <Image src={item.product_image} alt="" width={56} height={56} className="object-cover w-full h-full" /> : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">{item.product_name || `Article ${idx + 1}`}</div>
-                          <div className="text-sm text-slate-500">× {item.quantity || 1} — {Math.round(Number(item.unit_price || 0)).toLocaleString('fr-FR')} FCFA/u</div>
+                          <div className="truncate" style={{ fontWeight: 500, color: 'var(--text-1)' }}>{item.product_name || `Article ${idx + 1}`}</div>
+                          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>× {item.quantity || 1} — {Math.round(Number(item.unit_price || 0)).toLocaleString('fr-FR')} FCFA/u</div>
                         </div>
-                        <div className="font-semibold text-indigo-600">{Math.round(Number(item.total_price || (item.quantity || 1) * (item.unit_price || 0))).toLocaleString('fr-FR')} FCFA</div>
+                        <div style={{ fontWeight: 600, color: '#6366F1' }}>{Math.round(Number(item.total_price || (item.quantity || 1) * (item.unit_price || 0))).toLocaleString('fr-FR')} FCFA</div>
                       </div>
                     ))}
-                    <div className="pt-2 text-right font-bold">Total: {Math.round(orderDetails.total_amount || 0).toLocaleString('fr-FR')} FCFA</div>
+                    <div className="pt-2 text-right" style={{ fontWeight: 700, color: 'var(--text-1)' }}>Total: {Math.round(orderDetails.total_amount || 0).toLocaleString('fr-FR')} FCFA</div>
                   </div>
                 );
               })()}
             </Card>
 
-            <Card size="small" title="Livraison">
-              <div>{orderDetails.driver_name || orderDetails.driver_id ? `Livreur: ${orderDetails.driver_name || orderDetails.driver_id}` : 'Aucun livreur assigné'}</div>
-              <div className="mt-2 text-sm text-slate-500">
+            <Card size="small" title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Livraison</span>}>
+              <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{orderDetails.driver_name || orderDetails.driver_id ? `Livreur: ${orderDetails.driver_name || orderDetails.driver_id}` : 'Aucun livreur assigné'}</div>
+              <div className="mt-2" style={{ fontSize: 13, color: 'var(--text-3)' }}>
                 {orderDetails.paid_at && <div>Payé: {dayjs(orderDetails.paid_at).format('DD/MM HH:mm')}</div>}
                 {(orderDetails as any).delivered_at && <div>Livrée: {dayjs((orderDetails as any).delivered_at).format('DD/MM HH:mm')}</div>}
-                {(orderDetails as any).cancelled_at && <div className="text-red-600">Annulée: {dayjs((orderDetails as any).cancelled_at).format('DD/MM HH:mm')}</div>}
+                {(orderDetails as any).cancelled_at && <div style={{ color: '#EF4444' }}>Annulée: {dayjs((orderDetails as any).cancelled_at).format('DD/MM HH:mm')}</div>}
               </div>
             </Card>
 
-            <Card size="small" title="Historique">
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between"><span>Créée</span><span className="text-slate-500">{dayjs(orderDetails.created_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>
-                {orderDetails.updated_at && <div className="flex justify-between"><span>Modifiée</span><span className="text-slate-500">{dayjs(orderDetails.updated_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
-                {orderDetails.paid_at && <div className="flex justify-between"><span>Payée</span><span className="text-green-600">{dayjs(orderDetails.paid_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
-                {(orderDetails as any).delivered_at && <div className="flex justify-between"><span>Livrée</span><span className="text-green-600">{dayjs((orderDetails as any).delivered_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
-                {(orderDetails as any).cancelled_at && <div className="flex justify-between"><span>Annulée</span><span className="text-red-600">{dayjs((orderDetails as any).cancelled_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
+            <Card size="small" title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Historique</span>}>
+              <div className="space-y-1" style={{ fontSize: 13 }}>
+                <div className="flex justify-between"><span style={{ color: 'var(--text-2)' }}>Créée</span><span style={{ color: 'var(--text-3)' }}>{dayjs(orderDetails.created_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>
+                {orderDetails.updated_at && <div className="flex justify-between"><span style={{ color: 'var(--text-2)' }}>Modifiée</span><span style={{ color: 'var(--text-3)' }}>{dayjs(orderDetails.updated_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
+                {orderDetails.paid_at && <div className="flex justify-between"><span style={{ color: 'var(--text-2)' }}>Payée</span><span style={{ color: '#10B981' }}>{dayjs(orderDetails.paid_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
+                {(orderDetails as any).delivered_at && <div className="flex justify-between"><span style={{ color: 'var(--text-2)' }}>Livrée</span><span style={{ color: '#10B981' }}>{dayjs((orderDetails as any).delivered_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
+                {(orderDetails as any).cancelled_at && <div className="flex justify-between"><span style={{ color: 'var(--text-2)' }}>Annulée</span><span style={{ color: '#EF4444' }}>{dayjs((orderDetails as any).cancelled_at).format('DD/MM/YYYY HH:mm:ss')}</span></div>}
               </div>
             </Card>
           </div>

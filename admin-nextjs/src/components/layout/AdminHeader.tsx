@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Breadcrumb, Button, Dropdown, Layout, Space } from 'antd';
+import { Button, Dropdown, Layout, Space } from 'antd';
 import type { MenuProps } from 'antd';
-import { MenuFoldOutlined, MenuUnfoldOutlined, MoonOutlined, SunOutlined, UserOutlined } from '@ant-design/icons';
+import { MenuFoldOutlined, MenuUnfoldOutlined, MoonOutlined, SunOutlined, UserOutlined, DownOutlined, LogoutOutlined } from '@ant-design/icons';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeMode } from '@/components/layout/ThemeProvider';
@@ -15,32 +15,31 @@ type Props = {
   onToggleCollapse: () => void;
 };
 
+const ROUTE_LABELS: Record<string, string> = {
+  dashboard: 'Tableau de bord',
+  orders: 'Commandes',
+  monitoring: 'Surveillance',
+  products: 'Produits',
+  categories: 'Catégories',
+  tags: 'Étiquettes',
+  deliveries: 'Livraisons',
+  'delivery-tracking': 'Suivi livraisons',
+  drivers: 'Livreurs',
+  users: 'Utilisateurs',
+  messages: 'Messages',
+  banners: 'Bannières',
+  settings: 'Paramètres',
+};
+
 function buildBreadcrumb(pathname: string | null): { title: string; href?: string }[] {
   if (!pathname) return [{ title: 'Tableau de bord' }];
   const parts = pathname.split('/').filter(Boolean);
   if (parts.length === 0) return [{ title: 'Tableau de bord' }];
-
-  const map: Record<string, string> = {
-    dashboard: 'Tableau de bord',
-    orders: 'Commandes',
-    monitoring: 'Surveillance',
-    products: 'Produits',
-    categories: 'Catégories',
-    tags: 'Étiquettes',
-    deliveries: 'Livraisons',
-    'delivery-tracking': 'Suivi livraisons',
-    drivers: 'Livreurs',
-    users: 'Utilisateurs',
-    messages: 'Messages',
-    banners: 'Bannières',
-    settings: 'Paramètres',
-  };
-
   const crumbs: { title: string; href?: string }[] = [];
   let current = '';
   for (const p of parts) {
     current += `/${p}`;
-    crumbs.push({ title: map[p] || p, href: current });
+    crumbs.push({ title: ROUTE_LABELS[p] || p, href: current });
   }
   return crumbs;
 }
@@ -60,37 +59,48 @@ export default function AdminHeader({ collapsed, onToggleCollapse }: Props) {
       icon: <UserOutlined />,
       onClick: () => router.push('/settings'),
     },
+    { type: 'divider' },
     {
       key: 'logout',
       label: 'Déconnexion',
+      icon: <LogoutOutlined />,
+      danger: true,
       onClick: () => void signOut(),
     },
   ];
 
   return (
-    <Header className="flex items-center justify-between px-6 h-16 animate-fade-in" style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--header-border)' }}>
-      {/* Left section */}
-      <Space size={16} className="min-w-0 flex-1">
+    <Header
+      className="flex items-center justify-between animate-fade-in"
+      style={{
+        height: 60,
+        lineHeight: '60px',
+        padding: '0 20px',
+        background: 'var(--header-bg)',
+        borderBottom: '1px solid var(--header-border)',
+      }}
+    >
+      {/* Left: toggle + breadcrumb */}
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         <Button
           type="text"
           onClick={onToggleCollapse}
           icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          className="hover:bg-opacity-10 transition-all duration-200"
-          style={{ color: 'var(--text-primary)' }}
+          style={{ width: 36, height: 36, color: 'var(--text-2)', borderRadius: 8 }}
         />
-        
-        {/* Breadcrumb with modern separators */}
-        <div className="hidden md:flex items-center gap-2">
+
+        <div className="hidden md:flex items-center gap-1.5">
           {breadcrumb.map((c, i) => (
             <React.Fragment key={i}>
               {i > 0 && (
-                <span style={{ color: 'var(--text-muted)' }} className="text-sm">/</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 13 }}>/</span>
               )}
-              <span 
-                className="text-sm font-medium transition-colors duration-200 hover:text-opacity-80"
-                style={{ 
-                  color: i === breadcrumb.length - 1 ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontFamily: i === breadcrumb.length - 1 ? 'var(--font-heading)' : 'var(--font-body)'
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: i === breadcrumb.length - 1 ? 600 : 400,
+                  color: i === breadcrumb.length - 1 ? 'var(--text-1)' : 'var(--text-2)',
+                  fontFamily: i === breadcrumb.length - 1 ? 'var(--font-heading)' : 'var(--font-body)',
                 }}
               >
                 {c.title}
@@ -98,38 +108,61 @@ export default function AdminHeader({ collapsed, onToggleCollapse }: Props) {
             </React.Fragment>
           ))}
         </div>
-      </Space>
+      </div>
 
-      {/* Right section */}
-      <Space size={12}>
-        {/* Theme toggle with smooth transition */}
+      {/* Right: theme toggle + user */}
+      <Space size={8}>
         <Button
           type="text"
           onClick={toggle}
           icon={!ready ? <MoonOutlined /> : (dark ? <SunOutlined /> : <MoonOutlined />)}
           title={!ready ? 'Thème' : (dark ? 'Mode clair' : 'Mode sombre')}
-          className="w-10 h-10 rounded-lg hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center"
-          style={{ color: 'var(--text-primary)' }}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            color: 'var(--text-2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         />
-        
-        {/* User dropdown with avatar */}
+
         <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-          <Button 
-            type="default" 
-            className="h-10 px-3 rounded-lg border transition-all duration-200 hover:shadow-md flex items-center gap-2"
-            style={{ 
-              borderColor: 'var(--border-color)',
-              background: 'var(--card-bg)',
-              color: 'var(--text-primary)'
+          <button
+            className="flex items-center gap-2 cursor-pointer"
+            style={{
+              height: 36,
+              padding: '0 10px 0 6px',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              background: 'var(--bg-elevated)',
+              transition: 'all 150ms ease',
+              outline: 'none',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--border-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
           >
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
+            >
               {user?.email?.[0]?.toUpperCase() || 'A'}
             </div>
-            <span className="hidden sm:inline text-sm font-medium truncate max-w-[150px]">
+            <span
+              className="hidden sm:inline truncate"
+              style={{
+                maxWidth: 120,
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'var(--text-1)',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
               {user?.email?.split('@')[0] || 'Admin'}
             </span>
-          </Button>
+            <DownOutlined style={{ fontSize: 10, color: 'var(--text-3)' }} />
+          </button>
         </Dropdown>
       </Space>
     </Header>

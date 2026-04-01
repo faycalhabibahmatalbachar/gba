@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   AppstoreOutlined,
@@ -53,6 +53,7 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
         icon: <AppstoreOutlined />,
         label: <Link href="/dashboard">Tableau de bord</Link>,
       },
+      { type: 'divider', key: 'd1' },
       {
         key: 'orders',
         icon: <ShoppingOutlined />,
@@ -63,6 +64,7 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
         icon: <RadarChartOutlined />,
         label: <Link href="/monitoring">Surveillance</Link>,
       },
+      { type: 'divider', key: 'd2' },
       {
         key: 'products',
         icon: <DeploymentUnitOutlined />,
@@ -72,6 +74,7 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
           { key: 'products-categories', icon: <TagsOutlined />,           label: <Link href="/products/categories">Catégories</Link> },
         ],
       },
+      { type: 'divider', key: 'd3' },
       {
         key: 'deliveries',
         icon: <CarOutlined />,
@@ -84,9 +87,10 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
       },
       {
         key: 'drivers',
-        icon: <ShoppingOutlined />,
+        icon: <CarOutlined />,
         label: <Link href="/drivers">Livreurs</Link>,
       },
+      { type: 'divider', key: 'd4' },
       {
         key: 'users',
         icon: <TeamOutlined />,
@@ -102,6 +106,7 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
         icon: <PictureOutlined />,
         label: <Link href="/banners">Bannières</Link>,
       },
+      { type: 'divider', key: 'd5' },
       {
         key: 'settings',
         icon: <SettingOutlined />,
@@ -123,20 +128,33 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
         top: 0,
         left: 0,
         overflow: 'auto',
+        borderRight: '1px solid var(--sidebar-border)',
       }}
     >
-      <div className="h-16 px-4 flex items-center gap-3 border-b" style={{ borderColor: 'var(--sidebar-border)' }}>
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white font-bold text-lg shadow-lg transition-transform duration-300 hover:scale-105 hover:rotate-3">
+      {/* Logo */}
+      <div
+        className="flex items-center gap-3 px-4"
+        style={{ height: 60, borderBottom: '1px solid var(--sidebar-border)' }}
+      >
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-base shadow-lg"
+          style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', fontFamily: 'var(--font-heading)' }}
+        >
           G
         </div>
         {!collapsed && (
           <div className="leading-tight animate-fade-in">
-            <div className="font-bold text-base" style={{ color: 'var(--sidebar-text)', fontFamily: 'var(--font-heading)' }}>GBA Admin</div>
-            <div className="text-xs" style={{ color: 'var(--sidebar-text-muted)' }}>Panneau de gestion</div>
+            <div className="font-semibold" style={{ fontSize: 15, color: 'var(--sidebar-text)', fontFamily: 'var(--font-heading)' }}>
+              GBA Admin
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--sidebar-text-muted)' }}>
+              Panneau de gestion
+            </div>
           </div>
         )}
       </div>
 
+      {/* Navigation */}
       <Menu
         theme="dark"
         mode="inline"
@@ -144,20 +162,40 @@ export default function AdminSidebar({ collapsed, onCollapse }: Props) {
         selectedKeys={selectedKeys}
         openKeys={collapsed ? [] : openKeys}
         onOpenChange={(keys) => setOpenKeys(keys as string[])}
-        style={{ borderInlineEnd: 'none', paddingTop: '8px', paddingBottom: '8px' }}
+        style={{ borderInlineEnd: 'none', padding: '8px 0' }}
       />
 
-      {/* User section at bottom */}
+      {/* Footer — user section */}
       {!collapsed && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t animate-fade-in" style={{ borderColor: 'var(--sidebar-border)' }}>
-          <div className="flex items-center gap-3 p-3 rounded-xl transition-all duration-200 hover:bg-white/5 cursor-pointer">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm shadow-md relative">
-              <span>AD</span>
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2" style={{ borderColor: 'var(--sidebar-bg)' }}></div>
+        <div
+          className="absolute bottom-0 left-0 right-0 animate-fade-in"
+          style={{ padding: '12px 12px 16px', borderTop: '1px solid var(--sidebar-border)' }}
+        >
+          <div
+            className="flex items-center gap-3 rounded-lg cursor-pointer"
+            style={{ padding: '10px 12px', transition: 'background 150ms ease' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <div className="relative flex-shrink-0">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-semibold"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
+              >
+                AD
+              </div>
+              <div
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full animate-pulse-dot"
+                style={{ background: '#10B981', border: '2px solid var(--sidebar-bg)' }}
+              />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold truncate" style={{ color: 'var(--sidebar-text)' }}>Admin</div>
-              <div className="text-xs truncate" style={{ color: 'var(--sidebar-text-muted)' }}>En ligne</div>
+              <div className="text-sm font-medium truncate" style={{ color: 'var(--sidebar-text)' }}>
+                Admin
+              </div>
+              <div className="truncate" style={{ fontSize: 11, color: '#10B981' }}>
+                En ligne
+              </div>
             </div>
           </div>
         </div>

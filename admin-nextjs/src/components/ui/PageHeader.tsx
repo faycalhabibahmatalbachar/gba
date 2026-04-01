@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Typography } from 'antd';
 
 type Props = {
   title: string;
@@ -11,19 +10,34 @@ type Props = {
 
 export default function PageHeader({ title, subtitle, extra }: Props) {
   return (
-    <div className="mb-8 pb-6 border-b animate-fade-in" style={{ borderColor: 'var(--divider-color)' }}>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+    <div className="mb-6 pb-5 animate-fade-in" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h1 
-            className="page-header-title text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent"
-            style={{ fontFamily: 'var(--font-heading)' }}
+          <h1
+            className="page-header-title"
+            style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: 24,
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
+              margin: 0,
+              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
           >
             {title}
           </h1>
           {subtitle && (
-            <p 
-              className="page-header-subtitle text-sm leading-relaxed"
-              style={{ color: 'var(--text-secondary)' }}
+            <p
+              className="page-header-subtitle"
+              style={{
+                color: 'var(--text-2)',
+                fontSize: 13,
+                margin: '4px 0 0',
+                lineHeight: 1.5,
+              }}
             >
               {subtitle}
             </p>

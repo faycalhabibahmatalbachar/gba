@@ -232,30 +232,30 @@ export default function DriversPage() {
         }
       />
       <div className="grid grid-cols-3 gap-3">
-        <Card>
+        <Card styles={{ body: { padding: 16 } }}>
           <div className="flex items-center gap-2">
-            <TeamOutlined style={{ fontSize: 24, color: '#4f46e5' }} />
+            <TeamOutlined style={{ fontSize: 24, color: '#6366F1' }} />
             <div>
-              <div className="text-xs text-gray-500">Total livreurs</div>
-              <div className="text-2xl font-bold">{rows.length}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Total livreurs</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{rows.length}</div>
             </div>
           </div>
         </Card>
-        <Card>
+        <Card styles={{ body: { padding: 16 } }}>
           <div className="flex items-center gap-2">
-            <CheckCircleOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+            <CheckCircleOutlined style={{ fontSize: 24, color: '#10B981' }} />
             <div>
-              <div className="text-xs text-gray-500">Disponibles</div>
-              <div className="text-2xl font-bold text-green-600">{rows.filter(r => r.is_available).length}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Disponibles</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#10B981', fontFamily: 'var(--font-heading)' }}>{rows.filter(r => r.is_available).length}</div>
             </div>
           </div>
         </Card>
-        <Card>
+        <Card styles={{ body: { padding: 16 } }}>
           <div className="flex items-center gap-2">
-            <CloseCircleOutlined style={{ fontSize: 24, color: '#ff4d4f' }} />
+            <CloseCircleOutlined style={{ fontSize: 24, color: '#EF4444' }} />
             <div>
-              <div className="text-xs text-gray-500">Indisponibles</div>
-              <div className="text-2xl font-bold text-red-500">{rows.filter(r => !r.is_available).length}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>Indisponibles</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#EF4444', fontFamily: 'var(--font-heading)' }}>{rows.filter(r => !r.is_available).length}</div>
             </div>
           </div>
         </Card>
@@ -412,11 +412,11 @@ export default function DriversPage() {
           <div className="space-y-4">
             <Card>
               <div className="space-y-2">
-                <div><strong>Email:</strong> {selectedDriver.email || '—'}</div>
-                <div><strong>Téléphone:</strong> {selectedDriver.phone || '—'}</div>
-                <div><strong>Ville:</strong> {selectedDriver.city || '—'}</div>
-                <div>
-                  <strong>Disponibilité:</strong>{' '}
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}><span style={{ fontWeight: 600 }}>Email:</span> {selectedDriver.email || '—'}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}><span style={{ fontWeight: 600 }}>Téléphone:</span> {selectedDriver.phone || '—'}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}><span style={{ fontWeight: 600 }}>Ville:</span> {selectedDriver.city || '—'}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}>
+                  <span style={{ fontWeight: 600 }}>Disponibilité:</span>{' '}
                   {selectedDriver.is_available ? (
                     <Tag color="green">Disponible</Tag>
                   ) : (
@@ -426,16 +426,16 @@ export default function DriversPage() {
               </div>
             </Card>
 
-            <Card title="Commandes actives" loading={loadingOrders}>
+            <Card title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Commandes actives</span>} loading={loadingOrders}>
               {driverOrders.length === 0 ? (
-                <Typography.Text type="secondary">Aucune commande active</Typography.Text>
+                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Aucune commande active</div>
               ) : (
                 <div className="space-y-2">
                   {driverOrders.map((order: any) => (
-                    <div key={order.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div key={order.id} className="flex justify-between items-center p-2 rounded" style={{ background: 'var(--bg-elevated)' }}>
                       <div>
-                        <div className="font-medium">{order.order_number || order.id.slice(0, 8)}</div>
-                        <div className="text-xs text-gray-500">{order.customer_name || '—'}</div>
+                        <div style={{ fontWeight: 500, color: 'var(--text-1)' }}>{order.order_number || order.id.slice(0, 8)}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{order.customer_name || '—'}</div>
                       </div>
                       <Space>
                         <Tag color={order.status === 'shipped' ? 'blue' : order.status === 'confirmed' ? 'green' : 'orange'}>

@@ -341,51 +341,51 @@ export default function DeliveriesPage() {
 
       <Row gutter={[12, 12]}>
         <Col xs={12} lg={5}>
-          <Card>
+          <Card styles={{ body: { padding: 16 } }}>
             {kpiLoading ? <Skeleton active paragraph={false} /> : (
               <>
-                <div className="text-xs text-gray-500">Livraisons aujourd’hui</div>
-                <div className="text-2xl font-extrabold">{kpis.today}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Livraisons aujourd'hui</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.today}</div>
               </>
             )}
           </Card>
         </Col>
         <Col xs={12} lg={5}>
-          <Card>
+          <Card styles={{ body: { padding: 16 } }}>
             {kpiLoading ? <Skeleton active paragraph={false} /> : (
               <>
-                <div className="text-xs text-gray-500">En cours</div>
-                <div className="text-2xl font-extrabold">{kpis.inProgress}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>En cours</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.inProgress}</div>
               </>
             )}
           </Card>
         </Col>
         <Col xs={12} lg={5}>
-          <Card>
+          <Card styles={{ body: { padding: 16 } }}>
             {kpiLoading ? <Skeleton active paragraph={false} /> : (
               <>
-                <div className="text-xs text-gray-500">Retards</div>
-                <div className="text-2xl font-extrabold">{kpis.late}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Retards</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.late}</div>
               </>
             )}
           </Card>
         </Col>
         <Col xs={12} lg={5}>
-          <Card>
+          <Card styles={{ body: { padding: 16 } }}>
             {kpiLoading ? <Skeleton active paragraph={false} /> : (
               <>
-                <div className="text-xs text-gray-500">Livrées</div>
-                <div className="text-2xl font-extrabold">{kpis.delivered}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Livrées</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.delivered}</div>
               </>
             )}
           </Card>
         </Col>
         <Col xs={12} lg={4}>
-          <Card>
+          <Card styles={{ body: { padding: 16 } }}>
             {kpiLoading ? <Skeleton active paragraph={false} /> : (
               <>
-                <div className="text-xs text-gray-500">Annulées</div>
-                <div className="text-2xl font-extrabold">{kpis.cancelled}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Annulées</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.cancelled}</div>
               </>
             )}
           </Card>
@@ -569,11 +569,12 @@ export default function DeliveriesPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-semibold text-base">{active.customer_name || '—'}</div>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-1)' }}>{active.customer_name || '—'}</div>
                     {(active.customer_phone_profile || active.customer_phone) && (
                       <a
                         href={`tel:${active.customer_phone_profile || active.customer_phone}`}
-                        className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 mt-1 text-sm"
+                        className="flex items-center gap-1.5 mt-1"
+                        style={{ color: '#6366F1', fontSize: 13 }}
                       >
                         <PhoneOutlined /> {active.customer_phone_profile || active.customer_phone}
                       </a>
@@ -581,8 +582,8 @@ export default function DeliveriesPage() {
                   </div>
                 </div>
                 {buildDestinationAddress(active) && (
-                  <div className="mt-3 flex items-start gap-2 text-sm text-slate-500">
-                    <EnvironmentOutlined className="mt-0.5 text-slate-400" />
+                  <div className="mt-3 flex items-start gap-2" style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                    <EnvironmentOutlined className="mt-0.5" style={{ color: 'var(--text-3)' }} />
                     <span>{buildDestinationAddress(active)}</span>
                   </div>
                 )}
@@ -597,11 +598,12 @@ export default function DeliveriesPage() {
                 {active.driver_name ? (
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-semibold">{active.driver_name}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>{active.driver_name}</div>
                       {active.driver_phone && (
                         <a
                           href={`tel:${active.driver_phone}`}
-                          className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 mt-1 text-sm"
+                          className="flex items-center gap-1.5 mt-1"
+                          style={{ color: '#6366F1', fontSize: 13 }}
                         >
                           <PhoneOutlined /> {active.driver_phone}
                         </a>
@@ -610,7 +612,7 @@ export default function DeliveriesPage() {
                     <Tag color="blue">Assigné</Tag>
                   </div>
                 ) : (
-                  <div className="text-slate-400 italic">Aucun livreur assigné</div>
+                  <div style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Aucun livreur assigné</div>
                 )}
               </Card>
 
@@ -622,21 +624,21 @@ export default function DeliveriesPage() {
               >
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-slate-500">Total</div>
-                    <div className="font-bold text-lg">{Number(active.total_amount || 0).toLocaleString('fr-FR')} FCFA</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Total</div>
+                    <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-1)' }}>{Number(active.total_amount || 0).toLocaleString('fr-FR')} FCFA</div>
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500">Méthode</div>
-                    <div className="font-medium">{active.payment_provider || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Méthode</div>
+                    <div style={{ fontWeight: 500, color: 'var(--text-1)' }}>{active.payment_provider || '—'}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500">Statut</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Statut</div>
                     <div>{active.paid_at ? <Tag color="green">Payé</Tag> : <Tag color="orange">Non payé</Tag>}</div>
                   </div>
                   {active.paid_at && (
                     <div>
-                      <div className="text-xs text-slate-500">Payé le</div>
-                      <div className="text-sm">{dayjs(active.paid_at).format('DD/MM/YYYY HH:mm')}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Payé le</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{dayjs(active.paid_at).format('DD/MM/YYYY HH:mm')}</div>
                     </div>
                   )}
                 </div>
@@ -650,12 +652,12 @@ export default function DeliveriesPage() {
               >
                 {(() => {
                   const items = Array.isArray(active.items) ? active.items : [];
-                  if (!items.length) return <Typography.Text type="secondary">Aucun article</Typography.Text>;
+                  if (!items.length) return <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Aucun article</div>;
                   return (
                     <div className="space-y-3">
                       {items.map((item: any, idx: number) => (
-                        <div key={item.id || idx} className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
-                          <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-700 overflow-hidden shrink-0">
+                        <div key={item.id || idx} className="flex items-center gap-3 py-2 last:border-0" style={{ borderBottom: '1px solid var(--border)' }}>
+                          <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0" style={{ background: 'var(--bg-elevated)' }}>
                             {item.product_image ? (
                               <Image src={item.product_image} alt="" width={56} height={56} className="object-cover w-full h-full" />
                             ) : (
@@ -663,18 +665,18 @@ export default function DeliveriesPage() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{item.product_name || `Article ${idx + 1}`}</div>
-                            <div className="text-sm text-slate-500">× {item.quantity || 1} — {Math.round(Number(item.unit_price || 0)).toLocaleString('fr-FR')} FCFA/u</div>
+                            <div className="truncate" style={{ fontWeight: 500, color: 'var(--text-1)' }}>{item.product_name || `Article ${idx + 1}`}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-3)' }}>× {item.quantity || 1} — {Math.round(Number(item.unit_price || 0)).toLocaleString('fr-FR')} FCFA/u</div>
                           </div>
-                          <div className="font-semibold text-indigo-600 whitespace-nowrap">
+                          <div className="whitespace-nowrap" style={{ fontWeight: 600, color: '#6366F1' }}>
                             {Math.round(Number(item.total_price || (item.quantity || 1) * (item.unit_price || 0))).toLocaleString('fr-FR')} FCFA
                           </div>
                         </div>
                       ))}
                       <Divider style={{ margin: '8px 0' }} />
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-500">{items.reduce((s: number, i: any) => s + Number(i.quantity || 1), 0)} article(s)</span>
-                        <span className="font-bold text-base">{Number(active.total_amount || 0).toLocaleString('fr-FR')} FCFA</span>
+                        <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{items.reduce((s: number, i: any) => s + Number(i.quantity || 1), 0)} article(s)</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)' }}>{Number(active.total_amount || 0).toLocaleString('fr-FR')} FCFA</span>
                       </div>
                     </div>
                   );

@@ -1027,10 +1027,10 @@ export default function ProductsPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card><div className="text-xs text-gray-500">Produits (page)</div><div className="text-2xl font-extrabold">{kpis.totalShown}</div></Card>
-        <Card><div className="text-xs text-gray-500">Ruptures</div><div className="text-2xl font-extrabold">{kpis.out}</div></Card>
-        <Card><div className="text-xs text-gray-500">Stock faible (≤10)</div><div className="text-2xl font-extrabold">{kpis.low}</div></Card>
-        <Card><div className="text-xs text-gray-500">Sans image</div><div className="text-2xl font-extrabold">{kpis.noImg}</div></Card>
+        <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Produits (page)</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.totalShown}</div></Card>
+        <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Ruptures</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.out}</div></Card>
+        <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Stock faible (≤10)</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.low}</div></Card>
+        <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Sans image</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.noImg}</div></Card>
       </div>
 
       <Card>
@@ -1117,7 +1117,7 @@ export default function ProductsPage() {
                       }}
                     />
                   </div>
-                  <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {p.main_image ? (
                       <Image
                         src={p.main_image}
@@ -1164,16 +1164,16 @@ export default function ProductsPage() {
 
                 <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ minWidth: 0 }}>
-                    <div className="font-semibold truncate">{p.name}</div>
-                    <div className="text-xs text-gray-500 truncate">{p.sku || p.id.slice(0, 8)}</div>
+                    <div className="truncate" style={{ fontWeight: 600, color: 'var(--text-1)' }}>{p.name}</div>
+                    <div className="truncate" style={{ fontSize: 11, color: 'var(--text-3)' }}>{p.sku || p.id.slice(0, 8)}</div>
                   </div>
                   <Tag color={Number(p.quantity || 0) > 10 ? 'green' : Number(p.quantity || 0) > 0 ? 'gold' : 'red'}>{Number(p.quantity || 0)}</Tag>
                 </div>
 
-                <div className="text-xs text-gray-500 truncate">{p.category?.name || 'Non catégorisé'}</div>
+                <div className="truncate" style={{ fontSize: 12, color: 'var(--text-3)' }}>{p.category?.name || 'Non catégorisé'}</div>
 
                 <div className="flex items-center justify-between">
-                  <div className="font-extrabold text-indigo-600 text-sm">{Number(p.price || 0).toLocaleString('fr-FR')} FCFA</div>
+                  <div style={{ fontWeight: 700, color: '#6366F1', fontSize: 14 }}>{Number(p.price || 0).toLocaleString('fr-FR')} FCFA</div>
                   <div className="flex gap-1">
                     <Tag color={(p as any).is_active === false ? 'default' : 'blue'}>{(p as any).is_active === false ? 'Inactif' : 'Actif'}</Tag>
                   </div>
@@ -1216,13 +1216,13 @@ export default function ProductsPage() {
           <div className="py-10 flex justify-center"><Skeleton active paragraph={{ rows: 6 }} /></div>
         ) : drawerError ? (
           <Card>
-            <Typography.Text type="danger">{drawerError}</Typography.Text>
+            <div style={{ color: '#EF4444', fontSize: 14 }}>{drawerError}</div>
           </Card>
         ) : drawerProduct ? (
           <div className="space-y-3">
             <Card styles={{ body: { padding: 14 } }}>
               <div className="flex flex-col md:flex-row gap-3">
-                <div style={{ width: 180, height: 180, borderRadius: 16, overflow: 'hidden', background: 'rgba(0,0,0,0.04)' }}>
+                <div style={{ width: 180, height: 180, borderRadius: 16, overflow: 'hidden', background: 'var(--bg-elevated)' }}>
                   {(() => {
                     const imgs = Array.isArray(drawerProduct.images) ? drawerProduct.images : [];
                     const src = drawerProduct.main_image || imgs[0] || null;
@@ -1237,7 +1237,7 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <Typography.Title level={4} style={{ margin: 0 }}>{drawerProduct.name || '—'}</Typography.Title>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-heading)', margin: 0 }}>{drawerProduct.name || '—'}</div>
                   <div style={{ marginTop: 6 }}>
                     <Space wrap size={8}>
                       {drawerProduct.sku ? <Tag>SKU: {drawerProduct.sku}</Tag> : null}
@@ -1252,25 +1252,25 @@ export default function ProductsPage() {
                     {(() => {
                       const c = drawerProduct.categories;
                       const cat = Array.isArray(c) ? (c[0] || null) : (c || null);
-                      return cat?.name ? <Typography.Text type="secondary">Catégorie: {cat.name}</Typography.Text> : <Typography.Text type="secondary">Catégorie: —</Typography.Text>;
+                      return <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Catégorie: {cat?.name || '—'}</div>;
                     })()}
                   </div>
 
                   {drawerProduct.description ? (
                     <div style={{ marginTop: 12 }}>
-                      <Typography.Text type="secondary">Description</Typography.Text>
-                      <div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{drawerProduct.description}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Description</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>{drawerProduct.description}</div>
                     </div>
                   ) : null}
                 </div>
               </div>
             </Card>
 
-            <Card title="Analyse (30 jours)" styles={{ body: { padding: 14 } }}>
+            <Card title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Analyse (30 jours)</span>} styles={{ body: { padding: 14 } }}>
               {analyticsLoading ? (
                 <Skeleton active paragraph={{ rows: 2 }} />
               ) : (analyticsProductId && drawerProduct?.id && analyticsProductId !== drawerProduct.id) ? (
-                <Typography.Text type="secondary">Chargement…</Typography.Text>
+                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Chargement…</div>
               ) : analytics ? (
                 (() => {
                   const pct = (cur: number, prev: number) => {

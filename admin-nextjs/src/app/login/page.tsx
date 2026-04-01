@@ -19,33 +19,74 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+    <div
+      className="min-h-screen flex items-center justify-center p-6"
+      style={{
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.08) 0%, #080C14 60%)',
+        backgroundColor: '#080C14',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 400 }}>
+        {/* Logo + title */}
+        <div className="text-center" style={{ marginBottom: 32 }}>
+          <div
+            className="mx-auto flex items-center justify-center text-white font-bold shadow-lg"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 20,
+              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+              fontSize: 28,
+              fontFamily: 'var(--font-heading)',
+            }}
+          >
             G
           </div>
-          <Typography.Title level={2} style={{ color: 'white', marginTop: 16, marginBottom: 4 }}>
+          <h1
+            style={{
+              fontFamily: 'var(--font-heading)',
+              fontWeight: 700,
+              fontSize: 24,
+              color: '#F1F5F9',
+              marginTop: 20,
+              marginBottom: 6,
+            }}
+          >
             GBA Admin
-          </Typography.Title>
-          <Typography.Text style={{ color: 'rgba(255,255,255,0.65)' }}>
+          </h1>
+          <p style={{ color: '#94A3B8', fontSize: 13 }}>
             Connecte-toi pour accéder au tableau de bord
-          </Typography.Text>
+          </p>
         </div>
 
-        <Card styles={{ body: { padding: 20 } }} className="shadow-2xl">
+        {/* Login card */}
+        <div
+          style={{
+            background: '#0E1623',
+            border: '1px solid #1E2D45',
+            borderRadius: 16,
+            padding: 40,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          }}
+        >
           <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
             <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Email requis' }]}>
-              <Input prefix={<MailOutlined />} placeholder="admin@email.com" autoComplete="email" />
+              <Input prefix={<MailOutlined style={{ color: '#475569' }} />} placeholder="admin@email.com" autoComplete="email" />
             </Form.Item>
             <Form.Item label="Mot de passe" name="password" rules={[{ required: true, message: 'Mot de passe requis' }]}>
-              <Input.Password prefix={<LockOutlined />} placeholder="••••••••" autoComplete="current-password" />
+              <Input.Password prefix={<LockOutlined style={{ color: '#475569' }} />} placeholder="••••••••" autoComplete="current-password" />
             </Form.Item>
-            <Button type="primary" htmlType="submit" block loading={loading || submitting}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              loading={loading || submitting}
+              style={{ height: 42, fontWeight: 600, fontSize: 14, marginTop: 8 }}
+            >
               Se connecter
             </Button>
           </Form>
-        </Card>
+        </div>
       </div>
     </div>
   );

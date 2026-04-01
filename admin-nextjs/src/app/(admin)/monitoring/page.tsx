@@ -450,28 +450,28 @@ export default function MonitoringPage() {
 
       <Row gutter={[12, 12]}>
         <Col xs={12} lg={6}>
-          <Card>
-            <div className="text-xs text-gray-500">Valeur paniers</div>
-            <div className="text-2xl font-extrabold text-indigo-600">{globalStats.cartsValue.toFixed(0)} FCFA</div>
+          <Card styles={{ body: { padding: 16 } }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Valeur paniers</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#6366F1', fontFamily: 'var(--font-heading)' }}>{globalStats.cartsValue.toFixed(0)} FCFA</div>
           </Card>
         </Col>
         <Col xs={12} lg={6}>
-          <Card>
-            <div className="text-xs text-gray-500">Articles en panier</div>
-            <div className="text-2xl font-extrabold">{globalStats.cartItemsTotal}</div>
+          <Card styles={{ body: { padding: 16 } }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Articles en panier</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{globalStats.cartItemsTotal}</div>
           </Card>
         </Col>
         <Col xs={12} lg={6}>
-          <Card>
-            <div className="text-xs text-gray-500">Favoris</div>
-            <div className="text-2xl font-extrabold">{globalStats.favorites}</div>
-            <div className="text-xs text-gray-500 mt-1">Top: {globalStats.topFav}</div>
+          <Card styles={{ body: { padding: 16 } }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Favoris</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{globalStats.favorites}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>Top: {globalStats.topFav}</div>
           </Card>
         </Col>
         <Col xs={12} lg={6}>
-          <Card>
-            <div className="text-xs text-gray-500">Produits</div>
-            <div className="text-2xl font-extrabold">{globalStats.productsTotal}</div>
+          <Card styles={{ body: { padding: 16 } }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Produits</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{globalStats.productsTotal}</div>
           </Card>
         </Col>
       </Row>
@@ -499,7 +499,7 @@ export default function MonitoringPage() {
                 ))}
               </div>
             ) : (
-              <Typography.Text type="secondary">Aucun produit dans les paniers</Typography.Text>
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Aucun produit dans les paniers</div>
             )}
           </Card>
         </Col>
@@ -526,7 +526,7 @@ export default function MonitoringPage() {
                 ))}
               </div>
             ) : (
-              <Typography.Text type="secondary">Aucun favori</Typography.Text>
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Aucun favori</div>
             )}
           </Card>
         </Col>
@@ -544,16 +544,16 @@ export default function MonitoringPage() {
                 <div className="space-y-3">
                   <Row gutter={[12, 12]}>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Total paniers</div><div className="text-2xl font-extrabold">{cartStats.total}</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Total paniers</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{cartStats.total}</div></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Actifs</div><div className="text-2xl font-extrabold">{cartStats.active}</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Actifs</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{cartStats.active}</div></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Abandonnés</div><div className="text-2xl font-extrabold">{cartStats.abandoned}</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Abandonnés</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{cartStats.abandoned}</div></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Panier moyen</div><div className="text-2xl font-extrabold">{cartStats.avgValue.toFixed(0)} FCFA</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Panier moyen</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{cartStats.avgValue.toFixed(0)} FCFA</div></Card>
                     </Col>
                   </Row>
 
@@ -711,16 +711,16 @@ export default function MonitoringPage() {
                 <div className="space-y-3">
                   <Row gutter={[12, 12]}>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Total produits</div><div className="text-2xl font-extrabold">{productsStats.total}</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Total produits</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{productsStats.total}</div></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Stock faible</div><div className="text-2xl font-extrabold">{productsStats.lowStock}</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Stock faible</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{productsStats.lowStock}</div></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Rupture</div><div className="text-2xl font-extrabold">{productsStats.outOfStock}</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Rupture</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{productsStats.outOfStock}</div></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                      <Card><div className="text-xs text-gray-500">Prix moyen</div><div className="text-2xl font-extrabold">{productsStats.avgPrice.toFixed(0)} FCFA</div></Card>
+                      <Card styles={{ body: { padding: 16 } }}><div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Prix moyen</div><div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{productsStats.avgPrice.toFixed(0)} FCFA</div></Card>
                     </Col>
                   </Row>
 

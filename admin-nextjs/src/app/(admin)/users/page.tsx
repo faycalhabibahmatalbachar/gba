@@ -239,8 +239,8 @@ export default function UsersPage() {
               {String(name).slice(0, 1).toUpperCase() || <UserOutlined />}
             </Avatar>
             <div className="min-w-0">
-              <div className="font-semibold truncate">{name}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 truncate">{r.email || EMPTY}</div>
+              <div className="truncate" style={{ fontWeight: 600, color: 'var(--text-1)' }}>{name}</div>
+              <div className="truncate" style={{ fontSize: 13, color: 'var(--text-3)' }}>{r.email || EMPTY}</div>
             </div>
           </div>
         );
@@ -253,7 +253,7 @@ export default function UsersPage() {
       responsive: ['md'],
       render: (_v, r) => (
         <div className="flex items-center gap-2">
-          <span className="text-sm">{r.phone || EMPTY}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{r.phone || EMPTY}</span>
           {r.phone && (
             <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => copyPhone(r.phone!)} title="Copier" />
           )}
@@ -266,7 +266,7 @@ export default function UsersPage() {
       key: 'city',
       width: 140,
       responsive: ['lg'],
-      render: (v) => <span className="text-sm text-gray-600 dark:text-gray-400">{v || EMPTY}</span>,
+      render: (v) => <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{v || EMPTY}</span>,
     },
     {
       title: 'Rôle',
@@ -288,7 +288,7 @@ export default function UsersPage() {
             <Tag color="default">En livraison</Tag>
           )
         ) : (
-          <span className="text-sm text-gray-400">{NA}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{NA}</span>
         ),
     },
     {
@@ -403,47 +403,47 @@ export default function UsersPage() {
 
       {kpis && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card size="small" className="dashboard-card-glass">
+          <Card size="small" styles={{ body: { padding: 14 } }}>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ background: 'rgba(99,102,241,0.10)', color: '#6366F1' }}>
                 <TeamOutlined style={{ fontSize: 20 }} />
               </div>
               <div>
-                <div className="text-xs text-gray-500">Total</div>
-                <div className="text-xl font-bold">{kpis.total}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Total</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.total}</div>
               </div>
             </div>
           </Card>
-          <Card size="small" className="dashboard-card-glass">
+          <Card size="small" styles={{ body: { padding: 14 } }}>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ background: 'var(--bg-elevated)', color: 'var(--text-2)' }}>
                 <UserOutlined style={{ fontSize: 20 }} />
               </div>
               <div>
-                <div className="text-xs text-gray-500">Clients</div>
-                <div className="text-xl font-bold">{kpis.clients}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Clients</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.clients}</div>
               </div>
             </div>
           </Card>
-          <Card size="small" className="dashboard-card-glass">
+          <Card size="small" styles={{ body: { padding: 14 } }}>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ background: 'rgba(59,130,246,0.10)', color: '#3B82F6' }}>
                 <CarOutlined style={{ fontSize: 20 }} />
               </div>
               <div>
-                <div className="text-xs text-gray-500">Livreurs</div>
-                <div className="text-xl font-bold">{kpis.drivers}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Livreurs</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.drivers}</div>
               </div>
             </div>
           </Card>
-          <Card size="small" className="dashboard-card-glass">
+          <Card size="small" styles={{ body: { padding: 14 } }}>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.10)', color: '#8B5CF6' }}>
                 <CrownOutlined style={{ fontSize: 20 }} />
               </div>
               <div>
-                <div className="text-xs text-gray-500">Administrateurs</div>
-                <div className="text-xl font-bold">{kpis.admins}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Administrateurs</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.admins}</div>
               </div>
             </div>
           </Card>
@@ -474,8 +474,8 @@ export default function UsersPage() {
           </div>
 
           {selectedRowKeys.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800">
-              <span className="font-medium">{selectedRowKeys.length} sélectionné(s)</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{selectedRowKeys.length} sélectionné(s)</span>
               <Space wrap>
                 <Select
                   value={bulkRole}

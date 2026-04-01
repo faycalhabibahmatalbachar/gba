@@ -777,39 +777,39 @@ export default function MessagesPage() {
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card size="small" className="dashboard-card-glass">
+        <Card size="small" styles={{ body: { padding: 14 } }}>
           <div className="flex items-center gap-2">
-            <MessageOutlined className="text-indigo-500" />
+            <MessageOutlined style={{ color: '#6366F1' }} />
             <div>
-              <div className="text-xs text-gray-500">Conversations</div>
-              <div className="text-lg font-bold">{kpis.total}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Conversations</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{kpis.total}</div>
             </div>
           </div>
         </Card>
-        <Card size="small" className="dashboard-card-glass">
+        <Card size="small" styles={{ body: { padding: 14 } }}>
           <div className="flex items-center gap-2">
-            <BellFilled className="text-amber-500" />
+            <BellFilled style={{ color: '#F59E0B' }} />
             <div>
-              <div className="text-xs text-gray-500">Non lus</div>
-              <div className="text-lg font-bold text-amber-600">{kpis.unread}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Non lus</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#F59E0B', fontFamily: 'var(--font-heading)' }}>{kpis.unread}</div>
             </div>
           </div>
         </Card>
-        <Card size="small" className="dashboard-card-glass">
+        <Card size="small" styles={{ body: { padding: 14 } }}>
           <div className="flex items-center gap-2">
-            <AlertOutlined className="text-orange-500" />
+            <AlertOutlined style={{ color: '#F97316' }} />
             <div>
-              <div className="text-xs text-gray-500">En attente</div>
-              <div className="text-lg font-bold text-orange-600">{kpis.pending}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>En attente</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#F97316', fontFamily: 'var(--font-heading)' }}>{kpis.pending}</div>
             </div>
           </div>
         </Card>
-        <Card size="small" className="dashboard-card-glass">
+        <Card size="small" styles={{ body: { padding: 14 } }}>
           <div className="flex items-center gap-2">
-            <TeamOutlined className="text-emerald-500" />
+            <TeamOutlined style={{ color: '#10B981' }} />
             <div>
-              <div className="text-xs text-gray-500">Assignés</div>
-              <div className="text-lg font-bold text-emerald-600">{kpis.assigned}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Assignés</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#10B981', fontFamily: 'var(--font-heading)' }}>{kpis.assigned}</div>
             </div>
           </div>
         </Card>

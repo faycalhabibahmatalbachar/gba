@@ -144,10 +144,10 @@ export default function SettingsPage() {
       children: (
         <div className="space-y-6 max-w-lg">
           <div>
-            <Typography.Title level={5} style={{ margin: 0, marginBottom: 4 }}>Mode d'affichage</Typography.Title>
-            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-heading)', margin: 0, marginBottom: 4 }}>Mode d'affichage</div>
+            <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
               Choisissez entre le thème clair et sombre. Votre préférence est sauvegardée localement.
-            </Typography.Text>
+            </div>
           </div>
 
           {/* Theme toggle card */}
@@ -190,10 +190,10 @@ export default function SettingsPage() {
           <Divider />
 
           {/* Quick toggle */}
-          <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-slate-800">
+          <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--bg-elevated)' }}>
             <div>
-              <div className="font-semibold">Mode sombre</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>Mode sombre</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                 {dark ? 'Interface sombre activée' : 'Interface claire activée'}
               </div>
             </div>
@@ -207,10 +207,10 @@ export default function SettingsPage() {
             />
           </div>
 
-          <div className="p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30">
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          <div className="p-4 rounded-xl" style={{ border: '1px solid rgba(99,102,241,0.15)', background: 'rgba(99,102,241,0.05)' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
               💡 La préférence est sauvegardée dans <code>localStorage</code>. Lors du prochain chargement, votre choix sera automatiquement restauré.
-            </Typography.Text>
+            </div>
           </div>
         </div>
       ),
@@ -244,7 +244,7 @@ export default function SettingsPage() {
           <Descriptions column={1} size="small" bordered>
             <Descriptions.Item label="Email">{user?.email || '—'}</Descriptions.Item>
             <Descriptions.Item label="ID Compte">
-              <Typography.Text code style={{ fontSize: 11 }}>{user?.id || '—'}</Typography.Text>
+              <code style={{ fontSize: 11, background: 'var(--bg-elevated)', padding: '2px 6px', borderRadius: 4, color: 'var(--text-1)' }}>{user?.id || '—'}</code>
             </Descriptions.Item>
             <Descriptions.Item label="Créé le">
               {profile?.created_at ? new Date(profile.created_at).toLocaleString('fr-FR') : '—'}
@@ -347,9 +347,9 @@ export default function SettingsPage() {
                       />
                     ))}
                   </div>
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                     {pwdForm.newPwd.length < 6 ? 'Trop court' : pwdForm.newPwd.length < 9 ? 'Moyen' : pwdForm.newPwd.length < 12 ? 'Fort' : 'Très fort'}
-                  </Typography.Text>
+                  </div>
                 </div>
               )}
               <Button
@@ -369,9 +369,9 @@ export default function SettingsPage() {
             title={<span><LockOutlined style={{ marginRight: 8 }} />Réinitialisation par email</span>}
             size="small"
           >
-            <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-              Envoyer un lien de réinitialisation à <strong>{user?.email}</strong>. Utile si vous oubliez votre mot de passe actuel.
-            </Typography.Text>
+            <div style={{ display: 'block', marginBottom: 12, fontSize: 13, color: 'var(--text-3)' }}>
+              Envoyer un lien de réinitialisation à <strong style={{ color: 'var(--text-1)' }}>{user?.email}</strong>. Utile si vous oubliez votre mot de passe actuel.
+            </div>
             <Button icon={<LockOutlined />} onClick={() => void sendResetEmail()}>
               Envoyer le lien de réinitialisation
             </Button>
@@ -382,9 +382,9 @@ export default function SettingsPage() {
             title={<span><SafetyCertificateOutlined style={{ marginRight: 8 }} />Sessions actives</span>}
             size="small"
           >
-            <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ display: 'block', marginBottom: 12, fontSize: 13, color: 'var(--text-3)' }}>
               Fermer toutes les sessions ouvertes sur tous les appareils. Vous serez redirigé vers la page de connexion.
-            </Typography.Text>
+            </div>
             <Descriptions column={1} size="small" bordered style={{ marginBottom: 12 }}>
               <Descriptions.Item label="Email">{user?.email || '—'}</Descriptions.Item>
               <Descriptions.Item label="Dernière connexion">
@@ -410,10 +410,10 @@ export default function SettingsPage() {
       children: (
         <div className="max-w-lg space-y-4">
           <div>
-            <Typography.Title level={5} style={{ margin: 0, marginBottom: 4 }}>Préférences de notification</Typography.Title>
-            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-heading)', margin: 0, marginBottom: 4 }}>Préférences de notification</div>
+            <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
               Configurez quels événements déclenchent des alertes dans le panneau d'administration.
-            </Typography.Text>
+            </div>
           </div>
 
           {[
@@ -430,8 +430,8 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 <span style={{ fontSize: 20 }}>{icon}</span>
                 <div>
-                  <div className="font-semibold">{label}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{desc}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>{label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{desc}</div>
                 </div>
               </div>
               <Switch
@@ -463,10 +463,10 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          <div className="p-4 rounded-xl border border-amber-100 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/30">
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          <div className="p-4 rounded-xl" style={{ border: '1px solid rgba(245,158,11,0.20)', background: 'rgba(245,158,11,0.05)' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
               ⚡ Les notifications push (FCM) nécessitent une configuration serveur supplémentaire. Ces paramètres contrôlent les notifications in-app uniquement.
-            </Typography.Text>
+            </div>
           </div>
         </div>
       ),

@@ -129,16 +129,25 @@ const ORDER_STATUS_OPTIONS = [
 
 function statusTag(status?: string | null) {
   const s = String(status || '').toLowerCase();
-  const map: Record<string, { color: string; label: string }> = {
-    pending: { color: 'gold', label: 'En attente' },
-    confirmed: { color: 'processing', label: 'Confirmée' },
-    processing: { color: 'processing', label: 'En cours' },
-    shipped: { color: 'blue', label: 'Expédiée' },
-    delivered: { color: 'green', label: 'Livrée' },
-    cancelled: { color: 'red', label: 'Annulée' },
+  const map: Record<string, { color: string; bg: string; label: string }> = {
+    pending:    { color: '#F59E0B', bg: 'rgba(245,158,11,0.10)',  label: 'En attente' },
+    confirmed:  { color: '#3B82F6', bg: 'rgba(59,130,246,0.10)',  label: 'Confirmée' },
+    processing: { color: '#8B5CF6', bg: 'rgba(139,92,246,0.10)',  label: 'En cours' },
+    shipped:    { color: '#14B8A6', bg: 'rgba(20,184,166,0.10)',  label: 'Expédiée' },
+    delivered:  { color: '#10B981', bg: 'rgba(16,185,129,0.10)',  label: 'Livrée' },
+    cancelled:  { color: '#EF4444', bg: 'rgba(239,68,68,0.10)',   label: 'Annulée' },
   };
-  const v = map[s] || { color: 'default', label: status || '—' };
-  return <Tag color={v.color}>{v.label}</Tag>;
+  const v = map[s] || { color: 'var(--text-3)', bg: 'var(--bg-hover)', label: status || '—' };
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+      color: v.color, backgroundColor: v.bg,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: v.color }} />
+      {v.label}
+    </span>
+  );
 }
 
 function periodToRange(period: PeriodKey) {
@@ -933,19 +942,36 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* 1. Header Analytics Live */}
-      <Card className="overflow-hidden border-0 shadow-sm bg-gradient-to-r from-slate-50 to-slate-100/80 dark:from-slate-800/80 dark:to-slate-900/80" styles={{ body: { padding: 20 } }}>
+      <div
+        style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          padding: '14px 20px',
+          boxShadow: 'var(--card-shadow)',
+        }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#10B981' }} />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ background: '#10B981' }} />
               </span>
-              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">LIVE</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#10B981', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>LIVE</span>
             </div>
-            <span className="text-sm text-slate-500 dark:text-slate-400">Dernière mise à jour</span>
-            <span className="text-sm font-mono font-medium text-slate-700 dark:text-slate-300 tabular-nums">{liveTimestamp}</span>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${overallTrend.up === true ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : overallTrend.up === false ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Dernière mise à jour</span>
+            <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--text-1)' }}>{liveTimestamp}</span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: overallTrend.up === true ? 'rgba(16,185,129,0.10)' : overallTrend.up === false ? 'rgba(239,68,68,0.10)' : 'var(--bg-elevated)',
+                color: overallTrend.up === true ? '#10B981' : overallTrend.up === false ? '#EF4444' : 'var(--text-2)',
+              }}
+            >
               {overallTrend.text}
             </span>
           </div>
@@ -954,13 +980,12 @@ export default function DashboardPage() {
               value={period}
               options={[{ label: '24h', value: '24h' }, { label: '7j', value: '7d' }, { label: '30j', value: '30d' }]}
               onChange={(v) => setPeriod(v as PeriodKey)}
-              className="shadow-inner"
             />
             <Button onClick={() => refresh()} loading={loading} type="primary" size="middle">Actualiser</Button>
             <Button onClick={handleExport} disabled={loading}>Exporter CSV</Button>
           </div>
         </div>
-      </Card>
+      </div>
 
       {error && (
         <Card>
@@ -983,129 +1008,69 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* 2. KPI Cards ultra visuel */}
+      {/* 2. KPI Cards */}
       <Row gutter={[16, 16]}>
-        <Col xs={12} md={6}>
-          <Card hoverable className="transition-all hover:shadow-md" onClick={() => setOrderStatusFilter('all')} styles={{ body: { padding: 20 } }}>
-            {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Total commandes</div>
-                  <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{kpis.totalOrders}</div>
-                  {prevKpis.totalOrders > 0 && (
-                    <span className={`text-xs font-medium ${variation.orderPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {variation.orderPct >= 0 ? '↑' : '↓'} {Math.abs(Math.round(variation.orderPct * 10) / 10)}%
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                    <ShoppingOutlined className="text-indigo-600 dark:text-indigo-400 text-lg" />
+        {([
+          { label: 'Total commandes', value: kpis.totalOrders, pct: variation.orderPct, prev: prevKpis.totalOrders, color: '#6366F1', bg: 'rgba(99,102,241,0.10)', icon: <ShoppingOutlined />, spark: ordersSeries, sparkColor: '#6366F1', onClick: () => setOrderStatusFilter('all'), invertTrend: false },
+          { label: 'En attente', value: kpis.pending, pct: variation.pendingPct, prev: prevKpis.pending, color: '#F59E0B', bg: 'rgba(245,158,11,0.10)', icon: <ArrowUpOutlined />, spark: pendingSeries, sparkColor: '#F59E0B', onClick: () => setOrderStatusFilter('pending'), invertTrend: true },
+          { label: 'Livrées', value: kpis.delivered, pct: variation.deliveredPct, prev: prevKpis.delivered, color: '#10B981', bg: 'rgba(16,185,129,0.10)', icon: <span style={{ fontWeight: 700 }}>✓</span>, spark: deliveredSeries, sparkColor: '#10B981', onClick: () => setOrderStatusFilter('delivered'), invertTrend: false },
+          { label: 'Revenus', value: null, pct: variation.revenuePct, prev: prevKpis.revenue, color: '#8B5CF6', bg: 'rgba(139,92,246,0.10)', icon: <span style={{ fontWeight: 700 }}>F</span>, spark: revenueSeries, sparkColor: '#8B5CF6', onClick: undefined, revenue: kpis.revenue, invertTrend: false },
+        ] as const).map((kpi, i) => (
+          <Col xs={12} md={6} key={i}>
+            <Card hoverable={!!kpi.onClick} onClick={kpi.onClick} styles={{ body: { padding: 20 } }}>
+              {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-3)', marginBottom: 4 }}>{kpi.label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: kpi.value !== null ? 'var(--text-1)' : 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>
+                      {kpi.value !== null ? kpi.value : <>{Math.round(kpi.revenue!).toLocaleString('fr-FR')} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>FCFA</span></>}
+                    </div>
+                    {kpi.prev > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 500, color: (kpi.invertTrend ? kpi.pct <= 0 : kpi.pct >= 0) ? '#10B981' : '#EF4444' }}>
+                        {kpi.pct >= 0 ? '↑' : '↓'} {Math.abs(Math.round(kpi.pct * 10) / 10)}%
+                      </span>
+                    )}
                   </div>
-                  <MiniSparkline data={ordersSeries} color="#4f46e5" />
-                </div>
-              </div>
-            )}
-          </Card>
-        </Col>
-        <Col xs={12} md={6}>
-          <Card hoverable className="transition-all hover:shadow-md" onClick={() => setOrderStatusFilter('pending')} styles={{ body: { padding: 20 } }}>
-            {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">En attente</div>
-                  <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">{kpis.pending}</div>
-                  {prevKpis.pending > 0 && (
-                    <span className={`text-xs font-medium ${variation.pendingPct >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                      {variation.pendingPct >= 0 ? '↑' : '↓'} {Math.abs(Math.round(variation.pendingPct * 10) / 10)}%
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-                    <ArrowUpOutlined className="text-amber-600 dark:text-amber-400 text-lg" />
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: kpi.bg, color: kpi.color, fontSize: 16 }}>
+                      {kpi.icon}
+                    </div>
+                    <MiniSparkline data={kpi.spark as any} color={kpi.sparkColor} />
                   </div>
-                  <MiniSparkline data={pendingSeries} color="#d97706" />
                 </div>
-              </div>
-            )}
-          </Card>
-        </Col>
-        <Col xs={12} md={6}>
-          <Card hoverable className="transition-all hover:shadow-md" onClick={() => setOrderStatusFilter('delivered')} styles={{ body: { padding: 20 } }}>
-            {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Livrées</div>
-                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{kpis.delivered}</div>
-                  {prevKpis.delivered > 0 && (
-                    <span className={`text-xs font-medium ${variation.deliveredPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {variation.deliveredPct >= 0 ? '↑' : '↓'} {Math.abs(Math.round(variation.deliveredPct * 10) / 10)}%
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                    <span className="text-emerald-600 dark:text-emerald-400 text-lg font-bold">✓</span>
-                  </div>
-                  <MiniSparkline data={deliveredSeries} color="#059669" />
-                </div>
-              </div>
-            )}
-          </Card>
-        </Col>
-        <Col xs={12} md={6}>
-          <Card className="transition-all hover:shadow-md" styles={{ body: { padding: 20 } }}>
-            {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Revenus</div>
-                  <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{Math.round(kpis.revenue).toLocaleString('fr-FR')} <span className="text-sm font-normal text-slate-500">FCFA</span></div>
-                  {prevKpis.revenue > 0 && (
-                    <span className={`text-xs font-medium ${variation.revenuePct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {variation.revenuePct >= 0 ? '↑' : '↓'} {Math.abs(Math.round(variation.revenuePct * 10) / 10)}%
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-                    <span className="text-violet-600 dark:text-violet-400 text-lg font-bold">F</span>
-                  </div>
-                  <MiniSparkline data={revenueSeries} color="#7c3aed" />
-                </div>
-              </div>
-            )}
-          </Card>
-        </Col>
+              )}
+            </Card>
+          </Col>
+        ))}
       </Row>
 
       {/* 3. Alertes & Top recherches & Checkout donut */}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
-          <Card title={<span className="font-semibold">Alertes critiques</span>} className="border-red-200/50 dark:border-red-900/30" styles={{ body: { padding: 16 } }}>
+          <Card title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Alertes critiques</span>} styles={{ body: { padding: 16 } }}>
             {loading ? <Skeleton active paragraph={{ rows: 5 }} /> : (
               <div className="space-y-3">
                 {alerts.filter((a) => a.severity === 'high' || a.severity === 'medium').map((a) => (
                   <div key={`${a.title}-${a.detail}`} className="flex items-center justify-between gap-2">
                     <Badge status={a.severity === 'high' ? 'error' : 'warning'} />
-                    <span className="text-sm font-medium flex-1 truncate">{a.title}</span>
-                    <Typography.Text type="secondary" className="text-xs">{a.detail}</Typography.Text>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)', flex: 1 }} className="truncate">{a.title}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{a.detail}</span>
                   </div>
                 ))}
                 {outOfStockProducts.length > 0 && (
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-                    <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Ruptures de stock</div>
-                    <ul className="space-y-1 max-h-24 overflow-y-auto">
+                  <div className="pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', marginBottom: 8 }}>Ruptures de stock</div>
+                    <ul className="space-y-1 max-h-24 overflow-y-auto" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                       {outOfStockProducts.slice(0, 5).map((p) => (
-                        <li key={p.id} className="text-sm truncate">{p.name || p.id.slice(0, 8)}</li>
+                        <li key={p.id} style={{ fontSize: 13, color: 'var(--text-2)' }} className="truncate">{p.name || p.id.slice(0, 8)}</li>
                       ))}
                     </ul>
-                    <Button type="link" size="small" className="p-0 mt-1 h-auto" onClick={() => router.push('/products?stock=out')}>Voir tout →</Button>
+                    <Button type="link" size="small" style={{ padding: 0, marginTop: 4, height: 'auto' }} onClick={() => router.push('/products?stock=out')}>Voir tout →</Button>
                   </div>
                 )}
                 {alerts.every((a) => a.severity === 'low') && (
-                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                    <Badge status="success" /> <span className="text-sm">Tout est OK</span>
+                  <div className="flex items-center gap-2" style={{ color: '#10B981' }}>
+                    <Badge status="success" /> <span style={{ fontSize: 13 }}>Tout est OK</span>
                   </div>
                 )}
               </div>
@@ -1113,23 +1078,23 @@ export default function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title={<span className="font-semibold">Top recherches</span>} styles={{ body: { padding: 16 } }}>
+          <Card title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Top recherches</span>} styles={{ body: { padding: 16 } }}>
             {loading ? <Skeleton active paragraph={{ rows: 5 }} /> : topSearches.length === 0 ? (
-              <Typography.Text type="secondary" className="block py-4 text-center">Aucune recherche</Typography.Text>
+              <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-3)', fontSize: 13 }}>Aucune recherche</div>
             ) : (
               <div className="space-y-3">
-                {topSearches.slice(0, 5).map((r, i) => {
+                {topSearches.slice(0, 5).map((r) => {
                   const pct = Math.max(8, topSearchesMax ? Math.round((Number(r.count || 0) / topSearchesMax) * 100) : 0);
                   return (
-                    <div key={r.term} className="cursor-pointer group" onClick={() => drilldownToOrders(r.term)}>
-                      <div className="flex items-center justify-between gap-2 mb-1">
+                    <div key={r.term} className="cursor-pointer" onClick={() => drilldownToOrders(r.term)}>
+                      <div className="flex items-center justify-between gap-2" style={{ marginBottom: 4 }}>
                         <Tooltip title={r.term}>
-                          <span className="text-sm font-medium truncate flex-1">{r.term}</span>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }} className="truncate flex-1">{r.term}</span>
                         </Tooltip>
-                        <span className="text-xs text-slate-500 tabular-nums">{r.count}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{r.count}</span>
                       </div>
-                      <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                      <div style={{ height: 6, background: 'var(--bg-elevated)', borderRadius: 999, overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: '#6366F1', borderRadius: 999, transition: 'width 300ms ease' }} />
                       </div>
                     </div>
                   );
@@ -1139,7 +1104,7 @@ export default function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title={<span className="font-semibold">Checkout abandonné</span>} styles={{ body: { padding: 16 } }}>
+          <Card title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Checkout abandonné</span>} styles={{ body: { padding: 16 } }}>
             {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
               <div className="flex flex-col items-center">
                 {(() => {
@@ -1150,7 +1115,7 @@ export default function DashboardPage() {
                   ].filter((d) => d.value > 0);
                   return (
                     <>
-                      <div className="w-32 h-32 relative">
+                      <div style={{ width: 128, height: 128, position: 'relative' }}>
                         {donutData.length > 0 ? (
                           <Pie
                             data={donutData}
@@ -1158,17 +1123,17 @@ export default function DashboardPage() {
                             colorField="type"
                             radius={1}
                             innerRadius={0.6}
-                            color={['#f59e0b', '#10b981']}
+                            color={['#F59E0B', '#10B981']}
                             legend={false}
                           />
                         ) : (
-                          <div className="w-full h-full rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                            <span className="text-2xl font-bold text-slate-400">0</span>
+                          <div className="w-full h-full rounded-full flex items-center justify-center" style={{ background: 'var(--bg-elevated)' }}>
+                            <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-3)' }}>0</span>
                           </div>
                         )}
                       </div>
-                      <Typography.Text type="secondary" className="mt-2">Événements abandonnés</Typography.Text>
-                      <Typography.Text strong>{checkoutAbandoned}</Typography.Text>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>Événements abandonnés</span>
+                      <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)' }}>{checkoutAbandoned}</span>
                     </>
                   );
                 })()}
@@ -1182,23 +1147,23 @@ export default function DashboardPage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>
           <Card
-            title={<span className="font-semibold">Commandes (série)</span>}
-            extra={<Typography.Text type="secondary">{dayjs(range.dateFrom).format('DD/MM')} → {dayjs(range.dateTo).format('DD/MM')}</Typography.Text>}
+            title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Commandes (série)</span>}
+            extra={<span style={{ fontSize: 12, color: 'var(--text-3)' }}>{dayjs(range.dateFrom).format('DD/MM')} → {dayjs(range.dateTo).format('DD/MM')}</span>}
             styles={{ body: { padding: 20 } }}
           >
             {loading ? <Skeleton active paragraph={{ rows: 6 }} /> : <Line {...ordersChartConfig} />}
           </Card>
         </Col>
         <Col xs={24} lg={10}>
-          <Card title={<span className="font-semibold">Funnel (sessions)</span>} styles={{ body: { padding: 20 } }}>
+          <Card title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Funnel (sessions)</span>} styles={{ body: { padding: 20 } }}>
             {loading ? (
               <Skeleton active paragraph={{ rows: 6 }} />
             ) : (
               <>
                 <Column {...funnelChartConfig} />
                 <div className="mt-3 flex items-center justify-between px-1">
-                  <Typography.Text type="secondary">Conversion (Achat / Visite)</Typography.Text>
-                  <Typography.Text strong className="text-indigo-600 dark:text-indigo-400">{Math.round(conversion * 1000) / 10}%</Typography.Text>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Conversion (Achat / Visite)</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#6366F1' }}>{Math.round(conversion * 1000) / 10}%</span>
                 </div>
               </>
             )}
@@ -1214,7 +1179,7 @@ export default function DashboardPage() {
             ) : (
               <>
                 <Statistic title="Rupture stock" value={Math.round(kpis.stockoutRate * 1000) / 10} suffix="%" />
-                <Typography.Text type="secondary">{kpis.outOfStockCount} / {kpis.totalProducts} produits</Typography.Text>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{kpis.outOfStockCount} / {kpis.totalProducts} produits</div>
               </>
             )}
           </Card>
@@ -1226,7 +1191,7 @@ export default function DashboardPage() {
             ) : (
               <>
                 <Statistic title="En cours" value={kpis.inProgress} />
-                <Typography.Text type="secondary">Confirmées / en préparation / expédiées</Typography.Text>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>Confirmées / en préparation / expédiées</div>
               </>
             )}
           </Card>
@@ -1238,7 +1203,7 @@ export default function DashboardPage() {
             ) : (
               <>
                 <Statistic title="Annulées" value={kpis.cancelled} />
-                <Typography.Text type="secondary">Sur la période sélectionnée</Typography.Text>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>Sur la période sélectionnée</div>
               </>
             )}
           </Card>
@@ -1249,7 +1214,7 @@ export default function DashboardPage() {
         <Col xs={24} lg={14}>
           <div ref={recentOrdersRef} />
           <Card
-            title="Commandes récentes"
+            title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Commandes récentes</span>}
             extra={(
               <div className="flex flex-wrap items-center gap-2">
                 <Segmented
@@ -1323,7 +1288,7 @@ export default function DashboardPage() {
         <Col xs={24} lg={10}>
           <Row gutter={[12, 12]}>
             <Col span={24}>
-              <Card title="Top produits">
+              <Card title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Top produits</span>}>
                 <Table
                   size="small"
                   rowKey="key"
@@ -1339,7 +1304,13 @@ export default function DashboardPage() {
                       render: (v: string, r: TopRow, index: number) => {
                         const rank = index + 1;
                         const rankBadge = rank <= 3 ? (
-                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold ${rank === 1 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400' : rank === 2 ? 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200' : 'bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300'}`}>
+                          <span
+                            className="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold"
+                            style={{
+                              background: rank === 1 ? 'linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%)' : rank === 2 ? 'linear-gradient(135deg, #E5E7EB 0%, #9CA3AF 100%)' : 'linear-gradient(135deg, #FDE68A 0%, #FCD34D 100%)',
+                              color: rank === 1 ? '#78350F' : rank === 2 ? '#1F2937' : '#92400E',
+                            }}
+                          >
                             {rank}
                           </span>
                         ) : null;
@@ -1350,7 +1321,7 @@ export default function DashboardPage() {
                               {r.imageUrl ? (
                                 <Image src={r.imageUrl} alt="" width={38} height={38} preview={false} style={{ objectFit: 'cover', borderRadius: 10 }} />
                               ) : (
-                                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(0,0,0,0.06)' }} />
+                                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--bg-elevated)' }} />
                               )}
                               <span className="truncate max-w-[160px]">{v}</span>
                             </div>
@@ -1368,10 +1339,10 @@ export default function DashboardPage() {
                         return (
                           <div style={{ minWidth: 120 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                              <Typography.Text type="secondary" style={{ fontSize: 12 }}>{pct}%</Typography.Text>
+                              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{pct}%</span>
                             </div>
-                            <div style={{ height: 8, background: 'rgba(0,0,0,0.06)', borderRadius: 999 }}>
-                              <div style={{ width: `${pct}%`, height: 8, background: '#1677ff', borderRadius: 999 }} />
+                            <div style={{ height: 6, background: 'var(--bg-elevated)', borderRadius: 999 }}>
+                              <div style={{ width: `${pct}%`, height: 6, background: '#6366F1', borderRadius: 999 }} />
                             </div>
                           </div>
                         );
@@ -1413,7 +1384,7 @@ export default function DashboardPage() {
             </Col>
             <Col span={24}>
               <Card
-                title={<span className="font-semibold">Top catégories</span>}
+                title={<span style={{ fontWeight: 600, fontFamily: 'var(--font-heading)' }}>Top catégories</span>}
                 extra={(
                   <Button size="small" onClick={() => setHideUncategorized((v) => !v)}>
                     {hideUncategorized ? 'Afficher Sans catégorie' : 'Masquer Sans catégorie'}
@@ -1450,7 +1421,7 @@ export default function DashboardPage() {
                             render: (v: any) => {
                               const s = String(v || '—');
                               if (s.trim().toLowerCase() === 'sans catégorie') return <Tag color="default">Sans catégorie</Tag>;
-                              return <Typography.Text strong>{s}</Typography.Text>;
+                              return <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{s}</span>;
                             },
                           },
                           { title: 'Qté', dataIndex: 'qty', width: 70, align: 'right' },
@@ -1462,7 +1433,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <Typography.Text type="secondary" className="block py-4 text-center">Aucune catégorie avec ventes</Typography.Text>
+                  <div style={{ display: 'block', padding: '16px 0', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>Aucune catégorie avec ventes</div>
                 )}
               </Card>
             </Col>
@@ -1504,10 +1475,8 @@ export default function DashboardPage() {
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <Typography.Text type="secondary">Total</Typography.Text>
-                <div style={{ marginTop: 4 }}>
-                  <Typography.Title level={4} style={{ margin: 0 }}>{drawerTotal.toLocaleString()} FCFA</Typography.Title>
-                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Total</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-heading)' }}>{drawerTotal.toLocaleString()} FCFA</div>
               </div>
               <Space size={8} wrap>
                 {statusTag(drawerOrderDetails?.status ?? selectedOrder.status)}
@@ -1518,14 +1487,14 @@ export default function DashboardPage() {
             <Row gutter={[12, 12]}>
               <Col span={12}>
                 <div>
-                  <Typography.Text type="secondary">Client</Typography.Text>
-                  <div><Typography.Text strong>{drawerOrderDetails?.customer_name ?? selectedOrder.customer_name ?? '—'}</Typography.Text></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Client</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{drawerOrderDetails?.customer_name ?? selectedOrder.customer_name ?? '—'}</div>
                 </div>
               </Col>
               <Col span={12}>
                 <div>
-                  <Typography.Text type="secondary">Téléphone</Typography.Text>
-                  <div><Typography.Text strong>{drawerContact || '—'}</Typography.Text></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Téléphone</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{drawerContact || '—'}</div>
                 </div>
               </Col>
             </Row>
@@ -1533,19 +1502,17 @@ export default function DashboardPage() {
             <Row gutter={[12, 12]}>
               <Col span={12}>
                 <div>
-                  <Typography.Text type="secondary">Créée le</Typography.Text>
-                  <div><Typography.Text strong>{dayjs(drawerOrderDetails?.created_at ?? selectedOrder.created_at).format('DD/MM/YYYY HH:mm:ss')}</Typography.Text></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Créée le</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{dayjs(drawerOrderDetails?.created_at ?? selectedOrder.created_at).format('DD/MM/YYYY HH:mm:ss')}</div>
                 </div>
               </Col>
               <Col span={12}>
                 <div>
-                  <Typography.Text type="secondary">Paiement</Typography.Text>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Paiement</div>
                   <div>
-                    <Typography.Text strong>{paymentLabel}</Typography.Text>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{paymentLabel}</div>
                     {drawerOrderDetails?.paid_at ? (
-                      <div>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>Payé: {dayjs(drawerOrderDetails.paid_at).format('DD/MM HH:mm')}</Typography.Text>
-                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>Payé: {dayjs(drawerOrderDetails.paid_at).format('DD/MM HH:mm')}</div>
                     ) : null}
                   </div>
                 </div>
@@ -1553,14 +1520,14 @@ export default function DashboardPage() {
             </Row>
 
             <div>
-              <Typography.Text type="secondary">Adresse</Typography.Text>
-              <div><Typography.Text strong>{drawerAddressLabel || '—'}</Typography.Text></div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Adresse</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{drawerAddressLabel || '—'}</div>
             </div>
 
             <Divider style={{ margin: '12px 0' }} />
 
             <div>
-              <Typography.Title level={5} style={{ margin: 0 }}>Suivi</Typography.Title>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-heading)', margin: 0 }}>Suivi</div>
               <div style={{ marginTop: 10 }}>
                 <Steps size="small" current={timeline.current} items={timeline.items} />
               </div>
@@ -1569,33 +1536,29 @@ export default function DashboardPage() {
             <Divider style={{ margin: '12px 0' }} />
 
             <div>
-              <Typography.Title level={5} style={{ margin: 0 }}>Actions</Typography.Title>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-heading)', margin: 0 }}>Actions</div>
               <div style={{ marginTop: 10 }} className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
-                  <Typography.Text type="secondary">Statut</Typography.Text>
-                  <div style={{ marginTop: 6 }}>
-                    <Select
-                      value={String(drawerOrderDetails?.status ?? selectedOrder.status ?? 'pending')}
-                      style={{ width: '100%' }}
-                      disabled={drawerActionLoading}
-                      options={ORDER_STATUS_OPTIONS}
-                      onChange={(v) => updateOrderPatch({ status: v })}
-                    />
-                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Statut</div>
+                  <Select
+                    value={String(drawerOrderDetails?.status ?? selectedOrder.status ?? 'pending')}
+                    style={{ width: '100%' }}
+                    disabled={drawerActionLoading}
+                    options={ORDER_STATUS_OPTIONS}
+                    onChange={(v) => updateOrderPatch({ status: v })}
+                  />
                 </div>
                 <div>
-                  <Typography.Text type="secondary">Livreur</Typography.Text>
-                  <div style={{ marginTop: 6 }}>
-                    <Select
-                      allowClear
-                      placeholder="Assigner un livreur"
-                      value={drawerOrderDetails?.driver_id ?? null}
-                      style={{ width: '100%' }}
-                      disabled={drawerActionLoading}
-                      options={drivers}
-                      onChange={(v) => updateOrderPatch({ driver_id: v ?? null })}
-                    />
-                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Livreur</div>
+                  <Select
+                    allowClear
+                    placeholder="Assigner un livreur"
+                    value={drawerOrderDetails?.driver_id ?? null}
+                    style={{ width: '100%' }}
+                    disabled={drawerActionLoading}
+                    options={drivers}
+                    onChange={(v) => updateOrderPatch({ driver_id: v ?? null })}
+                  />
                 </div>
               </div>
             </div>
@@ -1603,8 +1566,8 @@ export default function DashboardPage() {
             <Divider style={{ margin: '12px 0' }} />
 
             <div className="flex items-center justify-between">
-              <Typography.Title level={5} style={{ margin: 0 }}>Articles</Typography.Title>
-              <Typography.Text type="secondary">{drawerItems.length} article(s)</Typography.Text>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-heading)', margin: 0 }}>Articles</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{drawerItems.length} article(s)</div>
             </div>
 
             {drawerLoading ? (
@@ -1664,17 +1627,17 @@ export default function DashboardPage() {
             <Divider style={{ margin: '12px 0' }} />
 
             <div className="flex items-center justify-between">
-              <Typography.Text type="secondary">Sous-total items</Typography.Text>
-              <Typography.Text strong>{Math.round(drawerItemsSubtotal).toLocaleString()} FCFA</Typography.Text>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Sous-total items</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{Math.round(drawerItemsSubtotal).toLocaleString()} FCFA</div>
             </div>
-            <div className="flex items-center justify-between">
-              <Typography.Text type="secondary">Total commande</Typography.Text>
-              <Typography.Text strong>{Math.round(drawerTotal).toLocaleString()} FCFA</Typography.Text>
+            <div className="flex items-center justify-between" style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Total commande</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{Math.round(drawerTotal).toLocaleString()} FCFA</div>
             </div>
 
-            <div>
-              <Typography.Text type="secondary">Identifiant</Typography.Text>
-              <div><Typography.Text code>{selectedOrder.id}</Typography.Text></div>
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Identifiant</div>
+              <code style={{ fontSize: 12, padding: '2px 6px', background: 'var(--bg-elevated)', borderRadius: 4, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>{selectedOrder.id}</code>
             </div>
           </div>
         )}
@@ -1704,13 +1667,13 @@ export default function DashboardPage() {
           <div className="py-10 flex justify-center"><Skeleton active paragraph={{ rows: 6 }} /></div>
         ) : productError ? (
           <Card>
-            <Typography.Text type="danger">{productError}</Typography.Text>
+            <div style={{ color: '#EF4444', fontSize: 14 }}>{productError}</div>
           </Card>
         ) : productRow ? (
           <div className="space-y-3">
             <Card styles={{ body: { padding: 14 } }}>
               <div className="flex flex-col md:flex-row gap-3">
-                <div style={{ width: 180, height: 180, borderRadius: 16, overflow: 'hidden', background: 'rgba(0,0,0,0.04)' }}>
+                <div style={{ width: 180, height: 180, borderRadius: 16, overflow: 'hidden', background: 'var(--bg-elevated)' }}>
                   {(() => {
                     const imgs = Array.isArray(productRow.images) ? productRow.images : [];
                     const src = productRow.main_image || imgs[0] || null;
@@ -1718,14 +1681,14 @@ export default function DashboardPage() {
                       <Image src={src} alt="" width={180} height={180} preview={false} style={{ objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <EyeOutlined style={{ fontSize: 44, opacity: 0.25 }} />
+                        <EyeOutlined style={{ fontSize: 44, opacity: 0.25, color: 'var(--text-3)' }} />
                       </div>
                     );
                   })()}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <Typography.Title level={4} style={{ margin: 0 }}>{productRow.name || '—'}</Typography.Title>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-heading)', margin: 0 }}>{productRow.name || '—'}</div>
                   <div style={{ marginTop: 6 }}>
                     <Space wrap size={8}>
                       {productRow.sku ? <Tag>SKU: {productRow.sku}</Tag> : null}
@@ -1740,14 +1703,14 @@ export default function DashboardPage() {
                     {(() => {
                       const c = productRow.categories;
                       const cat = Array.isArray(c) ? (c[0] || null) : (c || null);
-                      return cat?.name ? <Typography.Text type="secondary">Catégorie: {cat.name}</Typography.Text> : <Typography.Text type="secondary">Catégorie: —</Typography.Text>;
+                      return <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Catégorie: {cat?.name || '—'}</div>;
                     })()}
                   </div>
 
                   {productRow.description ? (
                     <div style={{ marginTop: 12 }}>
-                      <Typography.Text type="secondary">Description</Typography.Text>
-                      <div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{productRow.description}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>Description</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>{productRow.description}</div>
                     </div>
                   ) : null}
                 </div>
