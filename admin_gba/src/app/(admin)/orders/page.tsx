@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useQueryState, parseAsString, parseAsInteger } from 'nuqs';
 import {
@@ -9,6 +9,7 @@ import {
   updateOrderStatus, bulkUpdateOrderStatus,
   type OrderRow, type OrderDetailsRow,
 } from '@/lib/services/orders';
+import { supabase } from '@/lib/supabase/client';
 import { KpiCard } from '@/components/ui/custom/KpiCard';
 import { PageHeader } from '@/components/ui/custom/PageHeader';
 import { StatusBadge } from '@/components/ui/custom/StatusBadge';
@@ -21,14 +22,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ShoppingCart, DollarSign, Clock, CheckCircle2,
   Search, Filter, Download, ChevronLeft, ChevronRight,
   RefreshCw, User, Phone, MapPin, Package, Truck, Loader2,
-  TrendingUp,
+  TrendingUp, Printer, UserCheck, AlertTriangle,
+  ShoppingBag, Eye,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import type { OrderItem } from '@/lib/services/orders';
 
 const PAGE_SIZE = 20;
 
@@ -60,7 +71,7 @@ function exportCSV(orders: OrderRow[]) {
     o.customer_phone || '',
     o.status || '',
     o.total_amount || 0,
-    o.total_items || 0,
+    o.item_count ?? o.total_items ?? o.items?.length ?? 0,
     fmtDate(o.created_at),
   ].join(';'));
   const csv = [header, ...rows].join('\n');
@@ -78,11 +89,25 @@ function OrdersContent() {
   const [search, setSearch] = useQueryState('q', parseAsString.withDefault(''));
   const [status, setStatus] = useQueryState('status', parseAsString.withDefault('all'));
   const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1));
+  const [focusOrderId, setFocusOrderId] = useQueryState('focus', parseAsString.withDefault(''));
 
   // Local state
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerOrderId, setDrawerOrderId] = useState<string | null>(null);
+  const [drawerTab, setDrawerTab] = useState<'details' | 'timeline' | 'actions'>('details');
   const [bulkStatus, setBulkStatus] = useState('');
+  const [availableDrivers, setAvailableDrivers] = useState<{id:string;name:string}[]>([]);
+  const [itemsModalOrder, setItemsModalOrder] = useState<OrderRow | null>(null);
+
+  // Load drivers once
+  const loadDrivers = useCallback(async () => {
+    if (availableDrivers.length > 0) return;
+    try {
+      const { data } = await import('@/lib/supabase/client').then(m => m.supabase
+        .from('profiles').select('id,first_name,last_name').eq('role','driver').limit(100));
+      setAvailableDrivers(((data||[]) as any[]).map(d => ({ id: d.id, name: `${d.first_name||''} ${d.last_name||''}`.trim() })));
+    } catch {}
+  }, [availableDrivers.length]);
 
   // Queries
   const ordersQuery = useQuery({
@@ -102,6 +127,20 @@ function OrdersContent() {
     queryFn: () => fetchOrderDetails(drawerOrderId!),
     enabled: !!drawerOrderId,
     staleTime: 0,
+  });
+
+  const deliveryHistoryQuery = useQuery({
+    queryKey: ['delivery_status_history', drawerOrderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('delivery_status_history')
+        .select('id, status, note, created_at, created_by')
+        .eq('order_id', drawerOrderId!)
+        .order('created_at', { ascending: true });
+      if (error) return [];
+      return data || [];
+    },
+    enabled: drawerTab === 'timeline' && !!drawerOrderId,
   });
 
   // Mutations
@@ -147,6 +186,46 @@ function OrdersContent() {
   }, [orders, selected.size]);
 
   const detail = detailQuery.data as OrderDetailsRow | null | undefined;
+
+  useEffect(() => {
+    if (!focusOrderId) return;
+    const inPage = orders.find((o) => o.id === focusOrderId);
+    if (inPage) {
+      setDrawerOrderId(inPage.id);
+      setDrawerTab('details');
+      void setFocusOrderId('');
+      return;
+    }
+    if (!drawerOrderId && /^[0-9a-f-]{36}$/i.test(focusOrderId)) {
+      setDrawerOrderId(focusOrderId);
+      setDrawerTab('details');
+      void setFocusOrderId('');
+    }
+  }, [focusOrderId, orders, drawerOrderId, setFocusOrderId]);
+
+  function printDeliverySlip() {
+    if (!detail) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Bon de livraison #${detail.order_number || detail.id.slice(0,8)}</title>
+      <style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:0 auto}
+      h1{font-size:18px;border-bottom:2px solid #333;padding-bottom:8px}
+      .row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:13px}
+      .total{font-weight:bold;font-size:14px;margin-top:8px}</style></head><body>
+      <h1>Bon de livraison GBA</h1>
+      <p style="font-size:12px;color:#666">N° ${detail.order_number || detail.id.slice(0,8)} — ${fmtDate(detail.created_at)}</p>
+      <h2 style="font-size:14px;margin-top:16px">Client</h2>
+      <p style="font-size:13px">${detail.customer_name || '—'}<br>${detail.customer_phone || ''}<br>${[detail.shipping_city, detail.shipping_district].filter(Boolean).join(', ')}</p>
+      ${detail.driver_name ? `<h2 style="font-size:14px;margin-top:16px">Livreur</h2><p style="font-size:13px">${detail.driver_name}</p>` : ''}
+      <h2 style="font-size:14px;margin-top:16px">Articles</h2>
+      ${(detail.order_items || []).map(i => `<div class="row"><span>${i.product_name} × ${i.quantity}</span><span>${i.total_price ? fmtCurrency(i.total_price) : '—'}</span></div>`).join('')}
+      <div class="row total"><span>Total</span><span>${detail.total_amount ? fmtCurrency(detail.total_amount) : '—'}</span></div>
+      <p style="font-size:11px;color:#999;margin-top:24px">GBA Admin — Imprimé le ${fmtDate(new Date().toISOString())}</p>
+      </body></html>`);
+    win.document.close();
+    win.print();
+  }
 
   return (
     <div className="space-y-5">
@@ -289,8 +368,25 @@ function OrdersContent() {
                   <td className="px-4 py-3">
                     <StatusBadge status={order.status || 'pending'} size="sm" />
                   </td>
-                  <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden md:table-cell">
-                    {order.total_items ?? '—'}
+                  <td className="px-4 py-3 text-right text-xs hidden md:table-cell" onClick={e => e.stopPropagation()}>
+                    {(() => {
+                      const items = order.items ?? [];
+                      const count = order.item_count ?? order.total_items ?? items.length;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setItemsModalOrder(order)}
+                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <ShoppingBag size={14} className="shrink-0" />
+                          <span className="font-medium text-foreground tabular-nums">{count}</span>
+                          <span className="text-muted-foreground">
+                            article{count !== 1 ? 's' : ''}
+                          </span>
+                          <Eye size={12} className="shrink-0 text-muted-foreground" />
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-right font-medium tabular-nums">
                     {order.total_amount ? fmtCurrency(order.total_amount) : '—'}
@@ -346,12 +442,28 @@ function OrdersContent() {
       </Card>
 
       {/* Detail drawer */}
-      <Sheet open={!!drawerOrderId} onOpenChange={open => !open && setDrawerOrderId(null)}>
+      <Sheet open={!!drawerOrderId} onOpenChange={open => { if (!open) { setDrawerOrderId(null); setDrawerTab('details'); } }}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto p-0">
           <SheetHeader className="px-4 pt-4 pb-3 border-b border-border sticky top-0 bg-background z-10">
-            <SheetTitle className="text-sm">
-              Commande #{detail?.order_number || drawerOrderId?.slice(0, 8)}
-            </SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-sm">
+                Commande #{detail?.order_number || drawerOrderId?.slice(0, 8)}
+              </SheetTitle>
+              <div className="flex gap-1.5">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={printDeliverySlip} disabled={!detail}>
+                  <Printer className="h-3 w-3 mr-1" />Imprimer
+                </Button>
+              </div>
+            </div>
+            {/* Drawer tabs */}
+            <div className="flex gap-0 mt-2 border border-border rounded-md overflow-hidden">
+              {([['details','Détails'],['timeline','Timeline'],['actions','Actions']] as const).map(([v,l]) => (
+                <button key={v} onClick={() => { setDrawerTab(v); if (v==='actions') loadDrivers(); }}
+                  className={`flex-1 py-1 text-[11px] font-medium transition-colors ${
+                    drawerTab===v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}>{l}</button>
+              ))}
+            </div>
           </SheetHeader>
 
           {detailQuery.isLoading ? (
@@ -359,7 +471,10 @@ function OrdersContent() {
               {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : detail ? (
-            <div className="p-4 space-y-5">
+            <div className="p-4">
+              {/* TAB: DETAILS */}
+              {drawerTab === 'details' && (
+              <div className="space-y-5">
               {/* Status + quick change */}
               <div className="flex items-center justify-between">
                 <StatusBadge status={detail.status || 'pending'} />
@@ -486,12 +601,136 @@ function OrdersContent() {
                   {detail.notes}
                 </div>
               )}
+              </div>
+              )}
+
+              {drawerTab === 'timeline' && (
+                <div className="p-4 space-y-3 text-sm">
+                  <p className="font-medium text-foreground text-xs uppercase tracking-wide text-muted-foreground">
+                    Historique livraison
+                  </p>
+                  {deliveryHistoryQuery.isLoading && <Skeleton className="h-20 w-full" />}
+                  {!deliveryHistoryQuery.isLoading && (deliveryHistoryQuery.data || []).length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Aucun historique enregistré pour le moment. Les transitions livraison apparaîtront ici lorsque le flux
+                      métier écrira dans <span className="font-mono">delivery_status_history</span> (assignation livreur,
+                      changements de statut).
+                    </p>
+                  )}
+                  {(deliveryHistoryQuery.data || []).map((h: { id: string; status: string; note?: string | null; created_at: string }) => (
+                    <div key={h.id} className="border-l-2 border-primary/50 pl-3 py-1">
+                      <div className="font-medium text-foreground">{h.status}</div>
+                      <div className="text-[11px] text-muted-foreground">{fmtDate(h.created_at)}</div>
+                      {h.note && <div className="text-xs mt-1 text-muted-foreground">{h.note}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {drawerTab === 'actions' && (
+                <div className="p-4 space-y-3 text-sm">
+                  <p className="text-muted-foreground">Assignation livreur et changement de statut depuis l&apos;onglet Détails ou la liste principale.</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-4 text-center text-sm text-muted-foreground">Commande introuvable</div>
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={!!itemsModalOrder}
+        onOpenChange={(open) => {
+          if (!open) setItemsModalOrder(null);
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              Articles de la commande #{itemsModalOrder?.id.slice(0, 8)}
+            </DialogTitle>
+          </DialogHeader>
+          {itemsModalOrder ? (
+            (() => {
+              const modalItems: OrderItem[] = itemsModalOrder.items ?? [];
+              const subtotal = modalItems.reduce((s, i) => s + Number(i.total_price ?? 0), 0);
+              const totalOrder = Number(itemsModalOrder.total_amount ?? 0);
+              const shipping = Math.max(0, totalOrder - subtotal);
+              return (
+                <>
+                  <div>
+                    {modalItems.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4">Aucun article lié.</p>
+                    ) : (
+                      modalItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-3 py-3 border-b border-border last:border-0"
+                        >
+                          <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0">
+                            {item.product_image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={item.product_image}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package size={20} className="text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{item.product_name}</p>
+                            {item.sku ? (
+                              <p className="text-xs text-muted-foreground">{item.sku}</p>
+                            ) : null}
+                            <p className="text-sm">
+                              Qté: <strong>{item.quantity}</strong>
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold">
+                              {item.total_price != null
+                                ? `${fmtCurrency(item.total_price)}`
+                                : '—'}
+                            </p>
+                            {item.unit_price != null ? (
+                              <p className="text-xs text-muted-foreground">
+                                {fmtCurrency(item.unit_price)} × {item.quantity}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <DialogFooter className="flex-col items-stretch gap-2 sm:flex-col border-t border-border pt-4 mt-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Sous-total</span>
+                      <span className="tabular-nums">{fmtCurrency(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Livraison (estim.)</span>
+                      <span className="tabular-nums">{fmtCurrency(shipping)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-sm pt-1 border-t border-border">
+                      <span>Total</span>
+                      <span className="tabular-nums">
+                        {itemsModalOrder.total_amount != null
+                          ? fmtCurrency(itemsModalOrder.total_amount)
+                          : fmtCurrency(subtotal + shipping)}
+                      </span>
+                    </div>
+                  </DialogFooter>
+                </>
+              );
+            })()
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

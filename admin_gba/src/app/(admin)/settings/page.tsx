@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { User, Lock, Bell, Moon, Sun, Save, Loader2 } from 'lucide-react';
+import { User, Lock, Bell, Moon, Sun, Save, Loader2, Mail } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 type ProfileForm = { first_name: string; last_name: string; phone: string; city: string; email: string; role: string; created_at: string };
@@ -18,6 +18,7 @@ const TABS = [
   { id: 'profile', label: 'Profil', icon: User },
   { id: 'security', label: 'Sécurité', icon: Lock },
   { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'email', label: 'Email', icon: Mail },
   { id: 'appearance', label: 'Apparence', icon: Sun },
 ] as const;
 type TabId = typeof TABS[number]['id'];
@@ -40,6 +41,19 @@ export default function SettingsPage() {
   // Notifications
   const [notif, setNotif] = useState({ new_orders: true, delivery_updates: true, low_stock: true, payment_alerts: true });
 
+  // Email (Resend / préférences serveur)
+  const [emailPrefs, setEmailPrefs] = useState({
+    notifications_enabled: true,
+    admin_email: '',
+    cc_emails: '',
+    from_name: '',
+    notify_new_order: true,
+    notify_security: true,
+  });
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailTestLoading, setEmailTestLoading] = useState(false);
+
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
     setProfileLoading(true);
@@ -49,6 +63,71 @@ export default function SettingsPage() {
   }, [user?.id]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  const loadEmailPrefs = useCallback(async () => {
+    setEmailLoading(true);
+    try {
+      const r = await fetch('/api/settings/email', { credentials: 'include' });
+      const j = (await r.json()) as { data?: Record<string, unknown> };
+      const d = j.data || {};
+      setEmailPrefs({
+        notifications_enabled: d.notifications_enabled !== false,
+        admin_email: String(d.admin_email || ''),
+        cc_emails: String(d.cc_emails || ''),
+        from_name: String(d.from_name || ''),
+        notify_new_order: d.notify_new_order !== false,
+        notify_security: d.notify_security !== false,
+      });
+    } catch {
+      toast.error('Chargement préférences email impossible');
+    } finally {
+      setEmailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'email') void loadEmailPrefs();
+  }, [tab, loadEmailPrefs]);
+
+  const saveEmailPrefs = async () => {
+    setEmailSaving(true);
+    try {
+      const r = await fetch('/api/settings/email', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          notifications_enabled: emailPrefs.notifications_enabled,
+          admin_email: emailPrefs.admin_email.trim() || null,
+          cc_emails: emailPrefs.cc_emails.trim() || null,
+          from_name: emailPrefs.from_name.trim() || null,
+          notify_new_order: emailPrefs.notify_new_order,
+          notify_security: emailPrefs.notify_security,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Erreur');
+      toast.success('Préférences email enregistrées (clé settings.email_notification_prefs)');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const sendTestEmail = async () => {
+    setEmailTestLoading(true);
+    try {
+      const r = await fetch('/api/email/test', { method: 'POST', credentials: 'include' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Échec');
+      toast.success(`Test envoyé → ${j.to}${j.messageId ? ` (${j.messageId})` : ''}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setEmailTestLoading(false);
+    }
+  };
 
   const saveProfile = async () => {
     if (!user?.id) return;
@@ -82,7 +161,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className={`space-y-5 ${tab === 'email' ? 'max-w-3xl' : 'max-w-2xl'}`}>
       <PageHeader title="Paramètres" />
 
       {/* Tab nav */}
@@ -183,6 +262,105 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Email tab */}
+      {tab === 'email' && (
+        <Card>
+          <CardContent className="p-5 space-y-4">
+            <p className="text-sm font-medium">Notifications email (Resend)</p>
+            <p className="text-xs text-muted-foreground">
+              Variables <code className="rounded bg-muted px-1">RESEND_API_KEY</code>,{' '}
+              <code className="rounded bg-muted px-1">EMAIL_FROM</code> dans .env.local. Journal : table{' '}
+              <code className="rounded bg-muted px-1">email_logs</code> (migration SQL).
+            </p>
+            <Separator />
+            {emailLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Notifications activées</p>
+                    <p className="text-xs text-muted-foreground">Désactive les envois non critiques côté intégrations futures</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEmailPrefs((p) => ({ ...p, notifications_enabled: !p.notifications_enabled }))}
+                    className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${emailPrefs.notifications_enabled ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform mt-0.5 ${emailPrefs.notifications_enabled ? 'translate-x-4' : 'translate-x-0.5'}`}
+                    />
+                  </button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Email admin principal</label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={emailPrefs.admin_email}
+                      onChange={(e) => setEmailPrefs((p) => ({ ...p, admin_email: e.target.value }))}
+                      placeholder="admin@…"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Copie (CC), séparés par virgule</label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={emailPrefs.cc_emails}
+                      onChange={(e) => setEmailPrefs((p) => ({ ...p, cc_emails: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Nom expéditeur (info — l’adresse reste EMAIL_FROM)</label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={emailPrefs.from_name}
+                      onChange={(e) => setEmailPrefs((p) => ({ ...p, from_name: e.target.value }))}
+                      placeholder="GBA Admin"
+                    />
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-3">
+                  {(
+                    [
+                      { key: 'notify_new_order' as const, label: 'Nouvelle commande', desc: 'À brancher sur les routes orders' },
+                      { key: 'notify_security' as const, label: 'Événements sécurité', desc: 'Alertes sessions / IP (intégration progressive)' },
+                    ] as const
+                  ).map((n) => (
+                    <div key={n.key} className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-sm font-medium">{n.label}</p>
+                        <p className="text-xs text-muted-foreground">{n.desc}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEmailPrefs((prev) => ({ ...prev, [n.key]: !prev[n.key] }))}
+                        className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${emailPrefs[n.key] ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform mt-0.5 ${emailPrefs[n.key] ? 'translate-x-4' : 'translate-x-0.5'}`}
+                        />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button type="button" onClick={saveEmailPrefs} disabled={emailSaving} className="h-9">
+                    {emailSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                    Sauvegarder
+                  </Button>
+                  <Button type="button" variant="outline" onClick={sendTestEmail} disabled={emailTestLoading} className="h-9">
+                    {emailTestLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                    Envoyer un test
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

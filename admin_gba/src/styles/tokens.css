@@ -1,0 +1,27 @@
+/**
+ * GBA Admin — tokens marque + sidebar (shadcn reste dans globals :root / .dark).
+ */
+:root {
+  --brand: #6c47ff;
+  --success: #00d4aa;
+  --danger: #ff4b6e;
+  --warning: #ffb020;
+  --sidebar-bg: #0a0a0f;
+  --sidebar-border: color-mix(in srgb, #ffffff 8%, transparent);
+  --sidebar-fg: #f4f4f5;
+  --sidebar-muted: #a1a1aa;
+
+  --gba-brand: var(--brand);
+  --gba-brand-muted: color-mix(in srgb, var(--brand) 18%, transparent);
+  --gba-success: var(--success);
+  --gba-danger: var(--danger);
+  --gba-warning: var(--warning);
+  --gba-sidebar-bg: var(--sidebar-bg);
+  --gba-sidebar-border: var(--sidebar-border);
+  --gba-sidebar-fg: var(--sidebar-fg);
+  --gba-sidebar-muted: var(--sidebar-muted);
+}
+
+.dark {
+  /* réservé extensions dark spécifiques marque */
+}

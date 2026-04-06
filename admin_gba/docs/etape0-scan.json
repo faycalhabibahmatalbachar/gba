@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "admin_app": "admin_gba",
+    "purpose": "ÉTAPE 0 — inventaire avant évolutions majeures",
+    "note": "Tables core (orders, products, profiles) souvent inférées (ALTER/VIEW/app), pas toujours CREATE dans ce dépôt."
+  },
+  "stack": {
+    "next": "16.x",
+    "react": "19.x",
+    "tailwind": "4.x",
+    "supabase": "@supabase/supabase-js + @supabase/ssr",
+    "tables_charts": "@tanstack/react-table, recharts, framer-motion",
+    "maps": "leaflet + react-leaflet (Mapbox non listé dans package.json)"
+  },
+  "bff_routes": [
+    "/api/dashboard",
+    "/api/analytics",
+    "/api/users",
+    "/api/users/export",
+    "/api/users/at-risk",
+    "/api/users/[id]",
+    "/api/users/[id]/device-tokens",
+    "/api/users/[id]/password-reset",
+    "/api/users/[id]/sessions",
+    "/api/orders/export",
+    "/api/reviews/[id]",
+    "/api/admin/push",
+    "/api/admin/cleanup-stale-tokens"
+  ],
+  "admin_pages": [
+    "/dashboard",
+    "/analytics",
+    "/users",
+    "/products",
+    "/products/categories",
+    "/orders",
+    "/deliveries/tracking",
+    "/drivers",
+    "/messages",
+    "/notifications",
+    "/audit",
+    "/settings",
+    "/monitoring",
+    "/banners",
+    "/reports",
+    "/reviews",
+    "/inventory",
+    "/cms",
+    "/security"
+  ],
+  "schema_warnings": [
+    "chat_* (migrations) vs conversations/messages (code) — à réconcilier",
+    "audit_logs : migration 20260401000000 ; fallback user_activities si cache PostgREST incomplet"
+  ]
+}

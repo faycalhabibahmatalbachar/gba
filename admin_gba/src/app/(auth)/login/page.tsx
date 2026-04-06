@@ -1,13 +1,34 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, ShieldCheck } from 'lucide-react';
+
+function GateMessage() {
+  const sp = useSearchParams();
+  const code = sp.get('error');
+  const reason = sp.get('reason');
+  if (!code && !reason) return null;
+  return (
+    <div className="mb-4 space-y-2 rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-3 text-xs text-destructive">
+      <p className="font-medium">{reason || `Accès refusé (${code})`}</p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full border-destructive/40"
+        onClick={() => void supabase.auth.signOut().then(() => window.location.replace('/login'))}
+      >
+        Déconnecter cette session
+      </Button>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,9 +43,30 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      void fetch('/api/security/login-attempts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          success: true,
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        }),
+      });
       router.push('/dashboard');
       router.refresh();
     } catch (err: any) {
+      void fetch('/api/security/login-attempts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          success: false,
+          reason: String(err?.message || 'invalid_credentials'),
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        }),
+      });
       toast.error(err.message || 'Identifiants invalides');
     } finally {
       setLoading(false);
@@ -51,6 +93,9 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
+          <Suspense fallback={null}>
+            <GateMessage />
+          </Suspense>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">Adresse email</Label>

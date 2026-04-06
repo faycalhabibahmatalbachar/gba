@@ -21,6 +21,17 @@ const ORDER_STATUS: Record<string, StatusConfig> = {
   open:       { label: 'Ouvert',   color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
   closed:     { label: 'Fermé',    color: '#6B7280', bg: 'rgba(107,114,128,0.12)' },
   resolved:   { label: 'Résolu',   color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+  draft:      { label: 'Brouillon', color: '#6B7280', bg: 'rgba(107,114,128,0.15)' },
+  archived:   { label: 'Archivé',  color: '#6B7280', bg: 'rgba(107,114,128,0.15)' },
+  published:  { label: 'Publié',   color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+  in_stock:   { label: 'En stock', color: '#00D4AA', bg: 'rgba(0,212,170,0.12)' },
+  low_stock:  { label: 'Stock bas', color: '#FFB020', bg: 'rgba(255,176,32,0.15)' },
+  out_of_stock: { label: 'Rupture', color: '#FF4B6E', bg: 'rgba(255,75,110,0.12)' },
+  completed:  { label: 'Terminé',  color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+  failed:     { label: 'Échec',    color: '#FF4B6E', bg: 'rgba(255,75,110,0.12)' },
+  pending_moderation: { label: 'Modération', color: '#FFB020', bg: 'rgba(255,176,32,0.15)' },
+  approved: { label: 'Approuvé', color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+  rejected: { label: 'Rejeté', color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
 };
 
 interface StatusBadgeProps {

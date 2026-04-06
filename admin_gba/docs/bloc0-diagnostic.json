@@ -1,0 +1,53 @@
+{
+  "missing_columns": [
+    {
+      "column": "categories.accent_color",
+      "referenced_in": ["src/app/api/categories/route.ts", "src/app/(admin)/products/categories/page.tsx"],
+      "in_repo_migrations": "Non garanti avant application de 20260404000000_gba_complete_schema.sql (categories n’y ajoute que is_active) — à compléter par migration dédiée."
+    },
+    {
+      "column": "categories.icon vs icon_key",
+      "referenced_in": ["api/categories uses icon_key", "categories page form icon_key"],
+      "note": "Le code utilise icon_key ; la spec utilisateur cite icon — pas bloquant si migration ajoute les deux ou une seule."
+    },
+    {
+      "column": "chat_messages.is_important (dédiée)",
+      "referenced_in": ["PATCH /api/messages/[id] stocke important dans metadata"],
+      "note": "Colonne is_important absente du schéma initial — enrichissement recommandé."
+    },
+    {
+      "column": "chat_messages.deleted_at / deleted_by",
+      "referenced_in": ["api/messages/[id] PATCH deleted"],
+      "note": "À vérifier sur instance ; migrations hub peuvent les avoir ajoutés."
+    }
+  ],
+  "pages_404": [
+    {
+      "path": "/deliveries/tracking",
+      "repo_status": "page présente: src/app/(admin)/deliveries/tracking/page.tsx",
+      "likely_cause_if_404": "déploiement sans build, middleware, ou base URL incorrecte"
+    },
+    {
+      "path": "/drivers/live",
+      "repo_status": "page présente: src/app/(admin)/drivers/live/page.tsx",
+      "likely_cause_if_404": "idem"
+    }
+  ],
+  "console_errors": [
+    "categories.accent_color does not exist (PostgREST) si colonne non migrée",
+    "order_items / total_items à 0 si aucune ligne order_items pour les commandes",
+    "navigator.clipboard sur contexte non sécurisé (HTTP) — corrigé par fallback execCommand",
+    "MediaRecorder / getUserMedia NotAllowedError — comportement navigateur"
+  ],
+  "duplicate_tables": [
+    "push_campaigns défini dans 20260404000000_gba_complete_schema.sql et logique proche de push_logs / schedules selon migrations",
+    "ip_whitelist / ip_blacklist vs ip_rules (si spec utilisateur crée ip_rules ailleurs) — à consolider côté produit"
+  ],
+  "gps_page_location": "src/app/(admin)/drivers/live/page.tsx + src/app/(admin)/deliveries/tracking/page.tsx ; composant carte: src/components/ui/custom/TrackingMap.tsx (Leaflet + OSM/CARTO)",
+  "broken_features": [
+    "Liste commandes: total_items peut rester 0 sans lignes order_items ou sans BFF agrégant les items",
+    "Livraisons: fetchDeliveries lit order_details_view côté client (RLS) — noms livreur dépendent de orders.driver_id = profiles.id",
+    "Pas de GET /api/orders dans le repo avant correction (seulement export) — liste via supabase client direct"
+  ],
+  "scan_method": "grep + lecture migrations supabase/migrations/*.sql + arborescence src/app — pas d’accès SQL live à l’instance Supabase depuis l’agent"
+}

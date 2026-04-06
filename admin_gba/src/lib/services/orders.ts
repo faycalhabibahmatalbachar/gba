@@ -1,4 +1,16 @@
 import { supabase } from '@/lib/supabase/client';
+import { parseApiJson } from '@/lib/fetch-api-json';
+
+export type OrderItem = {
+  id: string;
+  product_id: string;
+  product_name?: string;
+  product_image?: string | null;
+  sku?: string;
+  quantity: number;
+  unit_price?: number;
+  total_price?: number;
+};
 
 export type OrderRow = {
   id: string;
@@ -9,6 +21,8 @@ export type OrderRow = {
   customer_phone?: string | null;
   total_amount: number | null;
   total_items?: number | null;
+  item_count?: number;
+  items?: OrderItem[];
   status: string | null;
   driver_id?: string | null;
   driver_name?: string | null;
@@ -38,8 +52,6 @@ export type OrdersKpis = {
   deliveryRate: number;
 };
 
-const SELECT_COLS = 'id, order_number, created_at, customer_name, customer_phone, customer_phone_profile, total_amount, total_items, status, driver_id, driver_name';
-
 function applyFilters(q: any, params: FetchOrdersParams) {
   let qq = q;
   if (params.status && params.status !== 'all') qq = qq.eq('status', params.status);
@@ -58,36 +70,29 @@ function applyFilters(q: any, params: FetchOrdersParams) {
 export async function fetchOrders(params: FetchOrdersParams = {}) {
   const page = params.page ?? 1;
   const pageSize = Math.min(params.pageSize ?? 20, 100);
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
   const sortBy = params.sortBy || 'created_at';
-  const ascending = params.sortOrder !== 'desc';
+  const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';
 
-  const baseQ = supabase
-    .from('orders')
-    .select(SELECT_COLS, { count: 'exact' })
-    .order(sortBy, { ascending })
-    .range(from, to);
+  const qs = new URLSearchParams();
+  qs.set('page', String(page));
+  qs.set('pageSize', String(pageSize));
+  qs.set('sortBy', sortBy);
+  qs.set('sortOrder', sortOrder);
+  if (params.search?.trim()) qs.set('search', params.search.trim());
+  if (params.status && params.status !== 'all') qs.set('status', params.status);
+  if (params.driverId) qs.set('driverId', params.driverId);
+  if (params.dateFrom) qs.set('dateFrom', params.dateFrom);
+  if (params.dateTo) qs.set('dateTo', params.dateTo);
+  if (params.amountMin != null) qs.set('amountMin', String(params.amountMin));
+  if (params.amountMax != null) qs.set('amountMax', String(params.amountMax));
 
-  const q = applyFilters(baseQ, params);
-  const res = await q;
-
-  if (res.error) {
-    const msg = String((res.error as any)?.message || '').toLowerCase();
-    const fallbackCols = 'id, order_number, created_at, customer_name, customer_phone, total_amount, status, driver_id, driver_name';
-    if (msg.includes('does not exist') || msg.includes('column') || msg.includes('schema cache')) {
-      const fallback = applyFilters(
-        supabase.from('orders').select(fallbackCols, { count: 'exact' }).order(sortBy, { ascending }).range(from, to),
-        params,
-      );
-      const r = await fallback;
-      if (r.error) throw r.error;
-      return { data: (r.data || []) as OrderRow[], count: r.count || 0 };
-    }
-    throw res.error;
+  const r = await fetch(`/api/orders?${qs.toString()}`, { credentials: 'include' });
+  const j = await parseApiJson<{ data: OrderRow[]; count: number }>(r);
+  if (!r.ok) {
+    const err = j as { error?: string };
+    throw new Error(err.error || `HTTP ${r.status}`);
   }
-
-  return { data: (res.data || []) as OrderRow[], count: res.count || 0 };
+  return { data: j.data ?? [], count: j.count ?? 0 };
 }
 
 /** KPIs for current filters. Revenue/avg are computed from up to 5000 rows for performance. */
@@ -165,16 +170,6 @@ export async function bulkAssignDriver(orderIds: string[], driverId: string | nu
     .in('id', orderIds);
   if (error) throw error;
 }
-
-export type OrderItem = {
-  id: string;
-  product_id: string;
-  product_name?: string;
-  product_image?: string;
-  quantity: number;
-  unit_price?: number;
-  total_price?: number;
-};
 
 export type OrderDetailsRow = {
   id: string;

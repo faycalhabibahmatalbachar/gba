@@ -14,15 +14,23 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Image as ImageIcon, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 
-type Banner = { id: string; title?: string | null; image_url?: string | null; link_url?: string | null; is_active?: boolean | null; sort_order?: number | null; created_at: string };
+type Banner = {
+  id: string;
+  title?: string | null;
+  image_url?: string | null;
+  link_url?: string | null;
+  is_active?: boolean | null;
+  display_order?: number | null;
+  created_at: string;
+};
 
 async function fetchBanners(): Promise<Banner[]> {
-  const { data, error } = await supabase.from('banners').select('*').order('sort_order', { ascending: true });
+  const { data, error } = await supabase.from('banners').select('*').order('display_order', { ascending: true });
   if (error) throw error;
   return (data || []) as Banner[];
 }
 async function createBanner(b: Partial<Banner>) {
-  const { error } = await supabase.from('banners').insert({ ...b, is_active: true });
+  const { error } = await supabase.from('banners').insert({ ...b, is_active: true, display_order: b.display_order ?? 0 });
   if (error) throw error;
 }
 async function toggleBanner(id: string, active: boolean) {

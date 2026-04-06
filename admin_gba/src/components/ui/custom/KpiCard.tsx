@@ -1,21 +1,24 @@
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 
-interface KpiCardProps {
+export interface KpiCardProps {
   label: string;
   value: string | number;
-  icon: React.ReactNode;
+  icon: ReactNode;
   iconColor?: string;
   iconBg?: string;
   trend?: number; // percentage change, positive = up
   trendLabel?: string;
+  /** Mini graphique optionnel (ex. sparkline Recharts) */
+  sparkline?: ReactNode;
   loading?: boolean;
   className?: string;
 }
 
 export function KpiCard({
   label, value, icon, iconColor, iconBg,
-  trend, trendLabel, loading, className,
+  trend, trendLabel, sparkline, loading, className,
 }: KpiCardProps) {
   const trendUp = trend !== undefined && trend > 0;
   const trendDown = trend !== undefined && trend < 0;
@@ -63,6 +66,10 @@ export function KpiCard({
           </div>
         )}
       </div>
+      {sparkline && <div className="mt-3 h-10 w-full min-w-0 opacity-90">{sparkline}</div>}
     </div>
   );
 }
+
+/** Alias export (spec naming). */
+export const KPICard = KpiCard;

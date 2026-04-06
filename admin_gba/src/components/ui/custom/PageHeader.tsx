@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-interface PageHeaderProps {
+export interface PageHeaderProps {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
