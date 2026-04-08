@@ -13,6 +13,7 @@ import 'localization/app_localizations.dart';
 import 'providers/language_provider.dart';
 import 'services/location_background_service.dart';
 import 'services/driver_notification_service.dart';
+import 'config/app_config.dart';
 import 'screens/driver/driver_home_screen.dart';
 
 /// Top-level background FCM handler — must be a free function annotated with
@@ -76,10 +77,8 @@ Future<void> main() async {
 
   try {
     await Supabase.initialize(
-      url: const String.fromEnvironment('SUPABASE_URL',
-          defaultValue: 'https://uvlrgwdbjegoavjfdrzb.supabase.co'),
-      anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY',
-          defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bHJnd2RiamVnb2F2amZkcnpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMzI3ODYsImV4cCI6MjA3MTgwODc4Nn0.ZuMcEKbCKo5CtQGdn2KAHqHfBdROpvtLp7nJpJSHOUQ'),
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
     );
   } catch (_) {
     // Already initialized by main.dart — fine when running in shared build

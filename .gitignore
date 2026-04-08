@@ -38,6 +38,9 @@ next-env.d.ts
 # vitest
 .vitest
 
+# Flutter — local build secrets (copy from dart_defines.example.json)
+dart_defines.json
+
 # Flutter
 .dart_tool/
 .flutter-plugins

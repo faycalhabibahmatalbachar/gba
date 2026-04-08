@@ -57,6 +57,18 @@ Ce document liste des améliorations **priorisées** (sécurité, robustesse off
 
 ---
 
+## Builds Android (APK) avec `dart_defines`
+
+Les flavors sont définis dans `android/app/build.gradle.kts` (`client` / `driver`).
+
+1. Copier [`dart_defines.example.json`](../dart_defines.example.json) vers `dart_defines.json` à la racine du dépôt (fichier ignoré par git) et renseigner les clés.
+2. **APK client** : `flutter build apk --flavor client -t lib/main.dart --dart-define-from-file=dart_defines.json`
+3. **APK livreur** : `flutter build apk --flavor driver -t lib/main_driver.dart --dart-define-from-file=dart_defines.json`
+
+Les sorties se trouvent sous `build/app/outputs/flutter-apk/`.
+
+---
+
 ## Observabilité
 
 - **Télémétrie** : erreurs + latence Supabase + « funnel » commande (événements anonymisés).

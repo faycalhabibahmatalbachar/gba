@@ -2,11 +2,13 @@
 
 ## Project settings
 
-- Root Directory: `admin_gba`
+- Root Directory: **`admin_gba`** (required). If this is empty, `admin-nextjs`, or the repo root, production will **not** match local `npm run dev` inside `admin_gba` (for example `/orders` may show only a status filter instead of status **and** command type: *Toutes les commandes / Commandes spéciales / Commandes standard*).
 - Install Command: `npm install`
 - Build Command: `npm run build`
 - Output Directory: `.next`
 - Node.js: align with `package.json` engines (or latest LTS)
+- Production Branch: usually `main`. Confirm the deployed commit SHA on Vercel matches GitHub `main` after each release.
+- Prefer **one** Vercel project as canonical production admin; duplicate projects (`*.vercel.app`) often drift on Root Directory or env vars—delete or use the second only for previews.
 
 ## Required environment variables (Production + Preview)
 
@@ -28,6 +30,7 @@
 ## Pre-release validation
 
 1. Local build: `cd admin_gba && npm run build`
+1b. (Optionnel) Vérifier que Resend ou SMTP est défini sans envoyer d’email : `cd admin_gba && npm run check:email-env` (chargez les variables depuis votre shell ou `node --env-file=.env.local` si Node 20+).
 2. Verify critical routes (no 500):
    - `/orders`
    - `/deliveries`
