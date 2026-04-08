@@ -27,6 +27,10 @@ export type OrderRow = {
   driver_id?: string | null;
   driver_name?: string | null;
   payment_method?: string | null;
+  notes?: string | null;
+  is_special_mobile?: boolean;
+  special_payload?: Record<string, unknown> | null;
+  quote_status?: string | null;
 };
 
 export type FetchOrdersParams = {
@@ -41,6 +45,7 @@ export type FetchOrdersParams = {
   amountMax?: number | null;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  kind?: 'all' | 'special_mobile' | 'standard';
 };
 
 export type OrdersKpis = {
@@ -80,6 +85,7 @@ export async function fetchOrders(params: FetchOrdersParams = {}) {
   qs.set('sortOrder', sortOrder);
   if (params.search?.trim()) qs.set('search', params.search.trim());
   if (params.status && params.status !== 'all') qs.set('status', params.status);
+  if (params.kind && params.kind !== 'all') qs.set('kind', params.kind);
   if (params.driverId) qs.set('driverId', params.driverId);
   if (params.dateFrom) qs.set('dateFrom', params.dateFrom);
   if (params.dateTo) qs.set('dateTo', params.dateTo);
@@ -206,6 +212,9 @@ export type OrderDetailsRow = {
   delivered_at?: string | null;
   cancelled_at?: string | null;
   notes?: string | null;
+  is_special_mobile?: boolean;
+  special_payload?: Record<string, unknown> | null;
+  quote_status?: string | null;
   order_items?: OrderItem[];
 };
 

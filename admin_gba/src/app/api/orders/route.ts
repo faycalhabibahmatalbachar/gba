@@ -38,12 +38,49 @@ type OrderEmbedRow = {
   total_amount: number | null;
   shipping_address?: unknown;
   notes?: string | null;
+  metadata?: Record<string, unknown> | null;
   driver_id?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
   order_items?: OrderItemEmbed[] | null;
   driver_profile?: DriverEmbed | DriverEmbed[];
 };
+
+function parseSpecialPayload(raw: unknown): Record<string, unknown> | null {
+  if (!raw) return null;
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  if (!t) return null;
+  try {
+    const j = JSON.parse(t) as unknown;
+    return typeof j === 'object' && j !== null && !Array.isArray(j) ? (j as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function detectSpecialMobile(order: OrderEmbedRow, payload: Record<string, unknown> | null): boolean {
+  const notes = String(order.notes || '').toLowerCase();
+  const num = String(order.order_number || '').toLowerCase();
+  if (notes.includes('special') || notes.includes('devis') || notes.includes('quotation')) return true;
+  if (num.startsWith('sp-')) return true;
+  if (!payload) return false;
+  const keys = Object.keys(payload).map((k) => k.toLowerCase());
+  return keys.some((k) => k.includes('special') || k.includes('quote') || k.includes('devis') || k.includes('custom'));
+}
+
+function deriveQuoteStatus(payload: Record<string, unknown> | null): string | null {
+  if (!payload) return null;
+  const candidates = [payload.quote_status, payload.devis_status, payload.quotation_status, payload.status_devis];
+  const raw = candidates.find((v) => typeof v === 'string' && String(v).trim()) as string | undefined;
+  if (!raw) return null;
+  const k = raw.toLowerCase();
+  if (k.includes('wait') || k.includes('pending') || k.includes('attente')) return 'en_attente';
+  if (k.includes('answered') || k.includes('sent') || k.includes('repon')) return 'repondu';
+  if (k.includes('expire')) return 'expire';
+  return raw;
+}
 
 function unwrapOne<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
@@ -77,6 +114,9 @@ function mapOrderRow(order: OrderEmbedRow) {
   const driverName = dp
     ? `${dp.first_name ?? ''} ${dp.last_name ?? ''}`.trim() || null
     : null;
+  const specialPayload = parseSpecialPayload(order.notes || order.metadata);
+  const isSpecialMobile = detectSpecialMobile(order, specialPayload);
+  const quoteStatus = deriveQuoteStatus(specialPayload);
 
   return {
     id: order.id,
@@ -90,6 +130,10 @@ function mapOrderRow(order: OrderEmbedRow) {
     item_count: itemCount,
     items,
     status: order.status,
+    notes: order.notes ?? null,
+    is_special_mobile: isSpecialMobile,
+    special_payload: specialPayload,
+    quote_status: quoteStatus,
     driver_id: order.driver_id ?? null,
     driver_name: driverName,
     payment_method: order.payment_method ?? null,
@@ -107,6 +151,7 @@ const SELECT_FULL = `
   total_amount,
   shipping_address,
   notes,
+  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -134,6 +179,7 @@ const SELECT_NO_DRIVER = `
   total_amount,
   shipping_address,
   notes,
+  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -160,6 +206,7 @@ const SELECT_NO_PRODUCTS = `
   total_amount,
   shipping_address,
   notes,
+  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -184,6 +231,7 @@ type ListFilterParams = {
   amountMin?: number | null;
   amountMax?: number | null;
   search?: string;
+  kind?: 'all' | 'special_mobile' | 'standard';
 };
 
 function applyListFilters<
@@ -192,6 +240,7 @@ function applyListFilters<
     gte: (c: string, v: string | number) => Q;
     lte: (c: string, v: string | number) => Q;
     or: (f: string) => Q;
+    not: (column: string, operator: string, value: string) => Q;
   },
 >(q: Q, params: ListFilterParams): Q {
   let qq = q;
@@ -204,6 +253,14 @@ function applyListFilters<
   if (params.search?.trim()) {
     const s = params.search.trim();
     qq = qq.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`);
+  }
+  if (params.kind === 'special_mobile') {
+    qq = qq.or(
+      'notes.ilike.%special%,notes.ilike.%mobile%,notes.ilike.%devis%,notes.ilike.%quote%,order_number.ilike.SP-%',
+    );
+  }
+  if (params.kind === 'standard') {
+    qq = qq.not('order_number', 'ilike', 'SP-%').not('notes', 'ilike', '%special%');
   }
   return qq;
 }
@@ -233,6 +290,8 @@ export async function GET(req: Request) {
   const amountMin = amountMinRaw != null && amountMinRaw !== '' ? Number(amountMinRaw) : null;
   const amountMax = amountMaxRaw != null && amountMaxRaw !== '' ? Number(amountMaxRaw) : null;
   const sortByRaw = url.searchParams.get('sortBy') || 'created_at';
+  const kindRaw = url.searchParams.get('kind') || 'all';
+  const kind = kindRaw === 'special_mobile' || kindRaw === 'standard' ? kindRaw : 'all';
   const sortBy = SORT_WHITELIST.has(sortByRaw) ? sortByRaw : 'created_at';
   const sortOrder = url.searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
   const ascending = sortOrder === 'asc';
@@ -245,6 +304,7 @@ export async function GET(req: Request) {
     amountMin: Number.isFinite(amountMin as number) ? amountMin : null,
     amountMax: Number.isFinite(amountMax as number) ? amountMax : null,
     search,
+    kind,
   };
 
   const runSelect = async (selectStr: string) => {

@@ -17,6 +17,9 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:gal/gal.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../localization/app_localizations.dart';
 import '../../services/messaging_service.dart';
 import '../../widgets/app_drawer.dart';
@@ -51,7 +54,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
   bool _isSending = false;
   bool _isTyping = false;
-  
+  bool _isRecordingVoice = false;
+  int _recordingSeconds = 0;
+  final AudioPlayer _voicePlayer = AudioPlayer();
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  String? _playingVoiceMessageId;
+  StreamSubscription<void>? _voiceCompleteSub;
+  Timer? _recordingTicker;
+
   // Subscription pour éviter l'erreur setState après dispose
   var _messageSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _realtimeSub;
@@ -62,6 +72,117 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _initAnimations();
     _loadConversation();
     _messageController.addListener(_onTypingChanged);
+    _voiceCompleteSub = _voicePlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _playingVoiceMessageId = null);
+    });
+  }
+
+  String? _audioPlaybackUrl(Message m) {
+    if (m.messageType != 'audio') return null;
+    final raw = m.attachments;
+    if (raw is List && raw.isNotEmpty) {
+      final first = raw.first;
+      if (first is Map && first['url'] is String) {
+        return first['url'] as String;
+      }
+    }
+    final t = m.message.trim();
+    if (t.startsWith('http')) return t;
+    return null;
+  }
+
+  Future<void> _toggleVoicePlayback(String messageId, String url) async {
+    if (_playingVoiceMessageId == messageId) {
+      await _voicePlayer.pause();
+      if (mounted) setState(() => _playingVoiceMessageId = null);
+      return;
+    }
+    await _voicePlayer.stop();
+    await _voicePlayer.play(UrlSource(url));
+    if (mounted) setState(() => _playingVoiceMessageId = messageId);
+  }
+
+  Future<void> _toggleVoiceRecording() async {
+    if (_conversation == null) return;
+    final messaging = Provider.of<MessagingService>(context, listen: false);
+    final localizations = AppLocalizations.of(context);
+
+    if (_isRecordingVoice) {
+      final path = await _audioRecorder.stop();
+      _recordingTicker?.cancel();
+      if (mounted) {
+        setState(() => _isRecordingVoice = false);
+      }
+      if (path != null && path.isNotEmpty) {
+        try {
+          await messaging.sendVoiceMessage(
+            conversationId: _conversation!.id,
+            recordingPath: path,
+            durationSec: _recordingSeconds > 0 ? _recordingSeconds : null,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Message vocal envoyé')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localizations.translateParams('chat_error_sending_with_details', {'error': e.toString()})),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+      if (mounted) setState(() => _recordingSeconds = 0);
+      return;
+    }
+
+    final perm = await Permission.microphone.request();
+    if (!perm.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(localizations.translate('permission_denied'))),
+        );
+      }
+      return;
+    }
+    if (!await _audioRecorder.hasPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Micro indisponible')),
+        );
+      }
+      return;
+    }
+
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}/gba_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    try {
+      await _audioRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+      _recordingTicker?.cancel();
+      _recordingTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || !_isRecordingVoice) return;
+        setState(() => _recordingSeconds += 1);
+      });
+      if (mounted) {
+        setState(() {
+          _isRecordingVoice = true;
+          _recordingSeconds = 0;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Enregistrement: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _downloadImageToDevice(String imageUrl) async {
@@ -729,14 +850,128 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMessageBubble(Message message, bool isMe) {
+    if (message.deletedAt != null) {
+      return Padding(
+        padding: EdgeInsets.only(
+          left: isMe ? 50 : 0,
+          right: isMe ? 0 : 50,
+          bottom: 8,
+        ),
+        child: Row(
+          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Text(
+                'Message supprimé',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final audioUrl = _audioPlaybackUrl(message);
+    if (audioUrl != null) {
+      return Padding(
+        padding: EdgeInsets.only(
+          left: isMe ? 50 : 0,
+          right: isMe ? 0 : 50,
+          bottom: 8,
+        ),
+        child: Row(
+          mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (!isMe) ...[
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: Theme.of(context).primaryColor,
+                child: const Icon(Icons.support_agent, size: 20, color: Colors.white),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: isMe
+                      ? LinearGradient(
+                          colors: [
+                            Theme.of(context).primaryColor,
+                            Theme.of(context).primaryColor.withOpacity(0.9),
+                          ],
+                        )
+                      : null,
+                  color: isMe ? null : Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        _playingVoiceMessageId == message.id ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                        color: isMe ? Colors.white : Theme.of(context).primaryColor,
+                        size: 36,
+                      ),
+                      onPressed: () => _toggleVoicePlayback(message.id, audioUrl),
+                    ),
+                    Flexible(
+                      child: Text(
+                        'Message vocal',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isMe ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      DateFormat('HH:mm').format(message.createdAt),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isMe ? Colors.white.withValues(alpha: 0.75) : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final contentText = (message.content ?? message.message).trim();
-    final isImage = contentText.startsWith('http') &&
-        (contentText.contains('/storage/v1/object/public/chat/') ||
-            contentText.endsWith('.jpg') ||
-            contentText.endsWith('.jpeg') ||
-            contentText.endsWith('.png') ||
-            contentText.endsWith('.webp') ||
-            contentText.endsWith('.gif'));
+    final imageUrl = (message.imageUrl != null && message.imageUrl!.trim().isNotEmpty)
+        ? message.imageUrl!.trim()
+        : null;
+    final imageCandidate = imageUrl ?? contentText;
+    final isImage = message.messageType == 'image' ||
+        (imageCandidate.startsWith('http') &&
+            (imageCandidate.contains('/storage/v1/object/public/') ||
+                imageCandidate.endsWith('.jpg') ||
+                imageCandidate.endsWith('.jpeg') ||
+                imageCandidate.endsWith('.png') ||
+                imageCandidate.endsWith('.webp') ||
+                imageCandidate.endsWith('.gif')));
 
     return Padding(
       padding: EdgeInsets.only(
@@ -808,8 +1043,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 children: [
                   if (isImage)
                     GestureDetector(
-                      onTap: () => _openImageFullScreen(contentText),
-                      onLongPress: () => _showImageActions(contentText),
+                      onTap: () => _openImageFullScreen(imageCandidate),
+                      onLongPress: () => _showImageActions(imageCandidate),
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border.all(
@@ -822,7 +1057,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(13),
                           child: CachedNetworkImage(
-                            imageUrl: contentText,
+                            imageUrl: imageCandidate,
                             width: 220,
                             height: 220,
                             fit: BoxFit.cover,
@@ -917,6 +1152,19 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       child: SafeArea(
         child: Row(
           children: [
+            IconButton(
+              icon: Icon(
+                _isRecordingVoice ? Icons.stop_circle : Icons.mic_none_rounded,
+                color: _isRecordingVoice ? Colors.red : Theme.of(context).primaryColor,
+              ),
+              tooltip: _isRecordingVoice ? 'Arrêter et envoyer' : 'Message vocal',
+              onPressed: () => _toggleVoiceRecording(),
+            ),
+            if (_isRecordingVoice)
+              Text(
+                '${(_recordingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_recordingSeconds % 60).toString().padLeft(2, '0')}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red),
+              ),
             IconButton(
               icon: Icon(
                 Icons.attach_file,
@@ -1156,6 +1404,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     // Annuler les subscriptions pour éviter setState après dispose
     _messageSubscription?.cancel();
     _realtimeSub?.cancel();
+    _voiceCompleteSub?.cancel();
+    _recordingTicker?.cancel();
+    unawaited(_audioRecorder.dispose());
+    _voicePlayer.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();

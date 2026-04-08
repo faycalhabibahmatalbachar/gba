@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '*.supabase.in' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: '*.unsplash.com' },
+      { protocol: 'https', hostname: 'tse4.mm.bing.net' },
+      { protocol: 'https', hostname: '*.mm.bing.net' },
       { protocol: 'https', hostname: 'res.cloudinary.com' },
       { protocol: 'https', hostname: '*.cloudinary.com' },
     ],

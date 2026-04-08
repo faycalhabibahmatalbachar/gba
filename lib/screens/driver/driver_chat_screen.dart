@@ -1,22 +1,24 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Chat screen for drivers to communicate with customers about their orders.
 /// Uses the same `chat_conversations` and `chat_messages` tables as the
-/// client app and the web admin `PremiumAdminChat.jsx`.
+/// client app and the web admin.
 class DriverChatScreen extends StatefulWidget {
-  /// The customer's user ID to open or create a conversation with.
   final String customerId;
-
-  /// Optional label (name) to display in the app bar.
   final String? customerName;
-
-  /// Optional order context to reference in the conversation.
   final String? orderId;
 
   const DriverChatScreen({
@@ -34,12 +36,19 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
   final _supabase = Supabase.instance.client;
   final _messageCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _audioRecorder = AudioRecorder();
+  final _audioPlayer = AudioPlayer();
 
   String? _conversationId;
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isRecording = false;
+  int _recordingSecs = 0;
+  String? _playingMessageId;
+  StreamSubscription<void>? _audioCompleteSub;
   StreamSubscription? _messagesSub;
+  Timer? _recordTimer;
 
   static const _purple = Color(0xFF667eea);
   static const _violet = Color(0xFF764ba2);
@@ -47,19 +56,24 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
   @override
   void initState() {
     super.initState();
+    _audioCompleteSub = _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _playingMessageId = null);
+    });
     _initConversation();
   }
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
     _messageCtrl.dispose();
     _scrollCtrl.dispose();
     _messagesSub?.cancel();
+    _audioCompleteSub?.cancel();
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
-  /// Find or open the customer's existing support conversation.
-  /// The driver joins the same conversation the customer has with support.
   Future<void> _initConversation() async {
     final driverId = _supabase.auth.currentUser?.id;
     if (driverId == null) return;
@@ -67,7 +81,6 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Look for the customer's existing conversation (user_id = customerId)
       final existing = await _supabase
           .from('chat_conversations')
           .select('id')
@@ -78,16 +91,17 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
 
       if (existing != null) {
         _conversationId = existing['id'].toString();
-        debugPrint('[DriverChat] found existing conv: $_conversationId');
       } else {
-        // Create a conversation on behalf of the customer
-        final result = await _supabase.from('chat_conversations').insert({
-          'user_id': widget.customerId,
-          'status': 'active',
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        }).select('id').single();
+        final result = await _supabase
+            .from('chat_conversations')
+            .insert({
+              'user_id': widget.customerId,
+              'status': 'active',
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            })
+            .select('id')
+            .single();
         _conversationId = result['id'].toString();
-        debugPrint('[DriverChat] created conv: $_conversationId');
       }
 
       await _loadMessages();
@@ -107,8 +121,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
           .select('*')
           .eq('conversation_id', _conversationId!)
           .order('created_at', ascending: true)
-          .limit(200);
-
+          .limit(300);
       if (mounted) {
         setState(() => _messages = List<Map<String, dynamic>>.from(data));
         _scrollToBottom();
@@ -125,112 +138,259 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
         .stream(primaryKey: ['id'])
         .eq('conversation_id', _conversationId!)
         .listen((data) {
-      if (mounted) {
-        setState(() {
-          _messages = List<Map<String, dynamic>>.from(data)
-            ..sort((a, b) =>
-                (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''));
-        });
-        _scrollToBottom();
-      }
+      if (!mounted) return;
+      setState(() {
+        _messages = List<Map<String, dynamic>>.from(data)
+          ..sort((a, b) => (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''));
+      });
+      _scrollToBottom();
     });
+  }
+
+  Future<void> _sendPayload({
+    required String body,
+    required String type,
+    List<Map<String, dynamic>> attachments = const [],
+    String? imageUrl,
+  }) async {
+    if (_conversationId == null) return;
+    final driverId = _supabase.auth.currentUser?.id;
+    if (driverId == null) return;
+
+    await _supabase.from('chat_messages').insert({
+      'conversation_id': _conversationId,
+      'sender_id': driverId,
+      'message': body,
+      'message_type': type,
+      'attachments': attachments,
+      'image_url': imageUrl,
+      'is_read': false,
+    });
+
+    await _supabase.from('chat_conversations').update({
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', _conversationId!);
   }
 
   Future<void> _sendMessage() async {
     final text = _messageCtrl.text.trim();
     if (text.isEmpty || _conversationId == null) return;
-
-    final driverId = _supabase.auth.currentUser?.id;
-    if (driverId == null) return;
-
-    setState(() => _isSending = true);
+    setState(() {
+      _isSending = true;
+    });
     _messageCtrl.clear();
-
     try {
-      await _supabase.from('chat_messages').insert({
-        'conversation_id': _conversationId,
-        'sender_id': driverId,
-        'message': text,
-        'is_read': false,
-      });
-
-      // Update conversation timestamp
-      await _supabase.from('chat_conversations').update({
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', _conversationId!);
-
+      await _sendPayload(body: text, type: 'text');
       HapticFeedback.lightImpact();
     } catch (e) {
-      debugPrint('[DriverChat] send error: $e');
-      _messageCtrl.text = text; // restore on failure
+      debugPrint('[DriverChat] send text error: $e');
+      _messageCtrl.text = text;
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
   }
 
-  Future<void> _pickAndSendImage() async {
+  Future<String?> _uploadBinary({
+    required String fileName,
+    required List<int> bytes,
+    required String contentType,
+  }) async {
     final driverId = _supabase.auth.currentUser?.id;
-    if (driverId == null || _conversationId == null) return;
+    if (driverId == null || _conversationId == null) return null;
+    final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
+    final objectPath = '$driverId/$_conversationId/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+    final buckets = ['chat-attachments', 'chat', 'gba-chat'];
+    for (final bucket in buckets) {
+      try {
+        await _supabase.storage.from(bucket).uploadBinary(
+              objectPath,
+              Uint8List.fromList(bytes),
+              fileOptions: FileOptions(cacheControl: '3600', upsert: true, contentType: contentType),
+            );
+        return _supabase.storage.from(bucket).getPublicUrl(objectPath);
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
 
+  Future<void> _pickAndSendImage() async {
+    if (_conversationId == null) return;
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 80,
+      maxWidth: 1400,
+      maxHeight: 1400,
+      imageQuality: 85,
     );
     if (image == null) return;
-
     setState(() => _isSending = true);
     try {
       final bytes = await image.readAsBytes();
-      final name = image.name.trim().isEmpty ? 'image.jpg' : image.name.trim();
-      final dot = name.lastIndexOf('.');
-      final ext = (dot >= 0 && dot < name.length - 1)
-          ? name.substring(dot + 1).toLowerCase()
-          : 'jpg';
-      final safeExt = ext.length <= 5 ? ext : 'jpg';
-
-      final objectPath =
-          '$driverId/$_conversationId/${DateTime.now().millisecondsSinceEpoch}.$safeExt';
-      await _supabase.storage.from('chat').uploadBinary(
-            objectPath,
-            bytes,
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
-          );
-      final imageUrl = _supabase.storage.from('chat').getPublicUrl(objectPath);
-
-      if (imageUrl.isEmpty) {
-        debugPrint('[DriverChat] image upload returned empty URL');
-        return;
-      }
-
-      await _supabase.from('chat_messages').insert({
-        'conversation_id': _conversationId,
-        'sender_id': driverId,
-        'message': imageUrl,
-        'image_url': imageUrl,
-        'is_read': false,
-      });
-
-      await _supabase.from('chat_conversations').update({
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', _conversationId!);
-
+      final ext = image.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+      final url = await _uploadBinary(
+        fileName: 'image.$ext',
+        bytes: bytes,
+        contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+      );
+      if (url == null || url.isEmpty) throw Exception('Upload image échoué');
+      await _sendPayload(
+        body: url,
+        type: 'image',
+        imageUrl: url,
+        attachments: [
+          {
+            'url': url,
+            'name': image.name,
+            'size': bytes.length,
+            'type': ext == 'png' ? 'image/png' : 'image/jpeg',
+          }
+        ],
+      );
       HapticFeedback.lightImpact();
     } catch (e) {
       debugPrint('[DriverChat] image send error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur envoi image: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erreur envoi image: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
+  }
+
+  Future<void> _toggleVoiceRecord() async {
+    if (_conversationId == null) return;
+    if (_isRecording) {
+      final path = await _audioRecorder.stop();
+      _recordTimer?.cancel();
+      if (mounted) setState(() => _isRecording = false);
+      if (path != null && path.isNotEmpty) {
+        setState(() => _isSending = true);
+        try {
+          final file = File(path);
+          final bytes = await file.readAsBytes();
+          final url = await _uploadBinary(
+            fileName: 'voice.m4a',
+            bytes: bytes,
+            contentType: 'audio/mp4',
+          );
+          if (url == null || url.isEmpty) throw Exception('Upload vocal échoué');
+          await _sendPayload(
+            body: url,
+            type: 'audio',
+            attachments: [
+              {
+                'url': url,
+                'name': 'voice.m4a',
+                'size': bytes.length,
+                'type': 'audio/mp4',
+                'duration_sec': _recordingSecs,
+              }
+            ],
+          );
+          HapticFeedback.mediumImpact();
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erreur vocal: $e'), backgroundColor: Colors.red),
+            );
+          }
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isSending = false;
+              _recordingSecs = 0;
+            });
+          }
+        }
+      }
+      return;
+    }
+
+    final p = await Permission.microphone.request();
+    if (!p.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permission micro refusée')),
+        );
+      }
+      return;
+    }
+    if (!await _audioRecorder.hasPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Micro indisponible')),
+        );
+      }
+      return;
+    }
+
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}/driver_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    try {
+      await _audioRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || !_isRecording) return;
+        setState(() => _recordingSecs += 1);
+      });
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+          _recordingSecs = 0;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossible de démarrer le vocal: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleAudioPlayback(String messageId, String url) async {
+    if (_playingMessageId == messageId) {
+      await _audioPlayer.pause();
+      if (mounted) setState(() => _playingMessageId = null);
+      return;
+    }
+    await _audioPlayer.stop();
+    await _audioPlayer.play(UrlSource(url));
+    if (mounted) setState(() => _playingMessageId = messageId);
+  }
+
+  List<Map<String, dynamic>> _extractAttachments(Map<String, dynamic> msg) {
+    final raw = msg['attachments'];
+    if (raw is List) {
+      return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final parsed = jsonDecode(raw);
+        if (parsed is List) {
+          return parsed.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+      } catch (_) {}
+    }
+    return const [];
+  }
+
+  String? _audioUrl(Map<String, dynamic> msg) {
+    if ((msg['message_type'] ?? '') != 'audio') return null;
+    final at = _extractAttachments(msg);
+    if (at.isNotEmpty && at.first['url'] is String) return at.first['url'] as String;
+    final body = (msg['message'] ?? '').toString().trim();
+    return body.startsWith('http') ? body : null;
+  }
+
+  int? _audioDuration(Map<String, dynamic> msg) {
+    final at = _extractAttachments(msg);
+    if (at.isNotEmpty && at.first['duration_sec'] is num) return (at.first['duration_sec'] as num).toInt();
+    return null;
   }
 
   void _scrollToBottom() {
@@ -278,18 +438,12 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
                 children: [
                   Text(
                     widget.customerName ?? 'Client',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   if (widget.orderId != null)
                     Text(
                       'Commande #${widget.orderId!.length > 8 ? widget.orderId!.substring(0, 8).toUpperCase() : widget.orderId}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.75),
-                      ),
+                      style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.75)),
                     ),
                 ],
               ),
@@ -301,7 +455,6 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
           ? const Center(child: CircularProgressIndicator(color: _purple))
           : Column(
               children: [
-                // Messages list
                 Expanded(
                   child: _messages.isEmpty
                       ? _buildEmptyChat()
@@ -313,18 +466,25 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
                             final msg = _messages[index];
                             final isMe = msg['sender_id'] == driverId;
                             return _MessageBubble(
-                              text: msg['message'] ?? msg['content'] ?? '',
+                              text: (msg['message'] ?? msg['content'] ?? '').toString(),
                               imageUrl: msg['image_url']?.toString(),
+                              messageType: (msg['message_type'] ?? 'text').toString(),
+                              audioUrl: _audioUrl(msg),
+                              audioDurationSec: _audioDuration(msg),
+                              isPlayingAudio: _playingMessageId == (msg['id']?.toString() ?? ''),
+                              onAudioTap: () {
+                                final u = _audioUrl(msg);
+                                final id = msg['id']?.toString() ?? '';
+                                if (u != null && id.isNotEmpty) {
+                                  _toggleAudioPlayback(id, u);
+                                }
+                              },
                               isMe: isMe,
-                              time: DateTime.tryParse(
-                                      msg['created_at'] ?? '') ??
-                                  DateTime.now(),
+                              time: DateTime.tryParse((msg['created_at'] ?? '').toString()) ?? DateTime.now(),
                             );
                           },
                         ),
                 ),
-
-                // Input bar
                 _buildInputBar(),
               ],
             ),
@@ -343,24 +503,16 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
               height: 80,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    _purple.withValues(alpha: 0.15),
-                    _violet.withValues(alpha: 0.15),
-                  ],
+                  colors: [_purple.withValues(alpha: 0.15), _violet.withValues(alpha: 0.15)],
                 ),
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: const Icon(Icons.chat_bubble_outline,
-                  size: 40, color: _purple),
+              child: const Icon(Icons.chat_bubble_outline, size: 40, color: _purple),
             ),
             const SizedBox(height: 20),
             const Text(
               'Démarrer la conversation',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF2D3436),
-              ),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF2D3436)),
             ),
             const SizedBox(height: 8),
             Text(
@@ -376,8 +528,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
 
   Widget _buildInputBar() {
     return Container(
-      padding: EdgeInsets.fromLTRB(
-          16, 8, 8, MediaQuery.of(context).padding.bottom + 8),
+      padding: EdgeInsets.fromLTRB(16, 8, 8, MediaQuery.of(context).padding.bottom + 8),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -390,27 +541,45 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
       ),
       child: Row(
         children: [
-          // Attach image button
           GestureDetector(
             onTap: _isSending ? null : _pickAndSendImage,
             child: Container(
               width: 40,
               height: 40,
               margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: _purple.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: _purple.withValues(alpha: 0.1), shape: BoxShape.circle),
               child: Icon(Icons.attach_file_rounded, color: _purple, size: 20),
             ),
           ),
+          GestureDetector(
+            onTap: _isSending ? null : _toggleVoiceRecord,
+            child: Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: _isRecording ? Colors.red.withValues(alpha: 0.15) : _purple.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _isRecording ? Icons.stop_circle : Icons.mic_none_rounded,
+                color: _isRecording ? Colors.red : _purple,
+                size: 20,
+              ),
+            ),
+          ),
+          if (_isRecording)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                '${(_recordingSecs ~/ 60).toString().padLeft(2, '0')}:${(_recordingSecs % 60).toString().padLeft(2, '0')}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red),
+              ),
+            ),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(24),
-              ),
+              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(24)),
               child: TextField(
                 controller: _messageCtrl,
                 textInputAction: TextInputAction.send,
@@ -445,10 +614,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
               child: _isSending
                   ? const Padding(
                       padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
                   : const Icon(Icons.send, color: Colors.white, size: 20),
             ),
@@ -459,17 +625,25 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
   }
 }
 
-// ─── Message bubble ───────────────────────────────────────────────────────────
-
 class _MessageBubble extends StatelessWidget {
   final String text;
   final String? imageUrl;
+  final String messageType;
+  final String? audioUrl;
+  final int? audioDurationSec;
+  final bool isPlayingAudio;
+  final VoidCallback? onAudioTap;
   final bool isMe;
   final DateTime time;
 
   const _MessageBubble({
     required this.text,
     this.imageUrl,
+    required this.messageType,
+    this.audioUrl,
+    this.audioDurationSec,
+    this.isPlayingAudio = false,
+    this.onAudioTap,
     required this.isMe,
     required this.time,
   });
@@ -485,12 +659,12 @@ class _MessageBubble extends StatelessWidget {
             t.endsWith('.webp'));
   }
 
-  String get _imgSrc =>
-      (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl! : text.trim();
+  String get _imgSrc => (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl! : text.trim();
 
   @override
   Widget build(BuildContext context) {
-    final isImg = _isImage;
+    final isImg = messageType == 'image' || _isImage;
+    final isAudio = messageType == 'audio' && audioUrl != null && audioUrl!.isNotEmpty;
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(18),
       topRight: const Radius.circular(18),
@@ -501,18 +675,13 @@ class _MessageBubble extends StatelessWidget {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         margin: const EdgeInsets.only(bottom: 8),
         padding: isImg
             ? const EdgeInsets.all(4)
             : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          gradient: isMe
-              ? const LinearGradient(
-                  colors: [Color(0xFF667eea), Color(0xFF764ba2)])
-              : null,
+          gradient: isMe ? const LinearGradient(colors: [Color(0xFF667eea), Color(0xFF764ba2)]) : null,
           color: isMe ? null : Colors.white,
           borderRadius: radius,
           boxShadow: [
@@ -524,8 +693,7 @@ class _MessageBubble extends StatelessWidget {
           ],
         ),
         child: Column(
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (isImg)
               ClipRRect(
@@ -551,11 +719,34 @@ class _MessageBubble extends StatelessWidget {
                     width: 220,
                     height: 220,
                     color: Colors.grey.shade200,
-                    child: const Center(
-                      child: Icon(Icons.broken_image_outlined, size: 32),
-                    ),
+                    child: const Center(child: Icon(Icons.broken_image_outlined, size: 32)),
                   ),
                 ),
+              )
+            else if (isAudio)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    iconSize: 30,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      isPlayingAudio ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                      color: isMe ? Colors.white : const Color(0xFF667eea),
+                    ),
+                    onPressed: onAudioTap,
+                  ),
+                  Text(
+                    audioDurationSec != null
+                        ? '${(audioDurationSec! ~/ 60).toString().padLeft(2, '0')}:${(audioDurationSec! % 60).toString().padLeft(2, '0')}'
+                        : 'Message vocal',
+                    style: TextStyle(
+                      color: isMe ? Colors.white : const Color(0xFF2D3436),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               )
             else
               Text(
@@ -568,15 +759,11 @@ class _MessageBubble extends StatelessWidget {
               ),
             const SizedBox(height: 4),
             Padding(
-              padding: isImg
-                  ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2)
-                  : EdgeInsets.zero,
+              padding: isImg ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2) : EdgeInsets.zero,
               child: Text(
                 '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
                 style: TextStyle(
-                  color: isMe
-                      ? Colors.white.withValues(alpha: 0.7)
-                      : Colors.grey.shade400,
+                  color: isMe ? Colors.white.withValues(alpha: 0.7) : Colors.grey.shade400,
                   fontSize: 10,
                 ),
               ),

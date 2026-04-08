@@ -24,6 +24,15 @@ type Banner = {
   created_at: string;
 };
 
+function canUseNextImage(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 async function fetchBanners(): Promise<Banner[]> {
   const { data, error } = await supabase.from('banners').select('*').order('display_order', { ascending: true });
   if (error) throw error;
@@ -120,7 +129,12 @@ export default function BannersPage() {
             <Card key={b.id} className={`overflow-hidden ${!b.is_active ? 'opacity-60' : ''}`}>
               <div className="aspect-[16/6] bg-muted relative overflow-hidden">
                 {b.image_url ? (
-                  <Image src={b.image_url} alt={b.title || 'Bannière'} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+                  canUseNextImage(b.image_url) ? (
+                    <Image src={b.image_url} alt={b.title || 'Bannière'} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" unoptimized />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={b.image_url} alt={b.title || 'Bannière'} className="h-full w-full object-cover" />
+                  )
                 ) : (
                   <div className="flex h-full items-center justify-center">
                     <ImageIcon className="h-8 w-8 text-muted-foreground/30" />

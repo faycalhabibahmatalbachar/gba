@@ -63,6 +63,25 @@ function fmtDate(iso: string) {
   try { return format(new Date(iso), 'dd MMM yyyy HH:mm', { locale: fr }); } catch { return iso; }
 }
 
+function parseSpecialPayload(raw: unknown): Record<string, unknown> | null {
+  if (!raw) return null;
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  if (typeof raw !== 'string') return null;
+  try {
+    const j = JSON.parse(raw) as unknown;
+    return typeof j === 'object' && j !== null && !Array.isArray(j) ? (j as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function isSpecialOrder(order: Pick<OrderRow, 'order_number' | 'notes' | 'is_special_mobile'>): boolean {
+  if (order.is_special_mobile) return true;
+  const n = String(order.notes || '').toLowerCase();
+  const num = String(order.order_number || '').toLowerCase();
+  return num.startsWith('sp-') || n.includes('special') || n.includes('devis') || n.includes('quote');
+}
+
 function exportCSV(orders: OrderRow[]) {
   const header = ['N°Commande', 'Client', 'Téléphone', 'Statut', 'Montant', 'Articles', 'Date'].join(';');
   const rows = orders.map(o => [
@@ -88,6 +107,7 @@ function OrdersContent() {
   // URL state
   const [search, setSearch] = useQueryState('q', parseAsString.withDefault(''));
   const [status, setStatus] = useQueryState('status', parseAsString.withDefault('all'));
+  const [kind, setKind] = useQueryState('kind', parseAsString.withDefault('all'));
   const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1));
   const [focusOrderId, setFocusOrderId] = useQueryState('focus', parseAsString.withDefault(''));
 
@@ -111,8 +131,15 @@ function OrdersContent() {
 
   // Queries
   const ordersQuery = useQuery({
-    queryKey: ['orders', { search, status, page }],
-    queryFn: () => fetchOrders({ page, pageSize: PAGE_SIZE, search: search || undefined, status: status || undefined }),
+    queryKey: ['orders', { search, status, kind, page }],
+    queryFn: () =>
+      fetchOrders({
+        page,
+        pageSize: PAGE_SIZE,
+        search: search || undefined,
+        status: status || undefined,
+        kind: (kind as 'all' | 'special_mobile' | 'standard') || 'all',
+      }),
     staleTime: 20_000,
   });
 
@@ -285,6 +312,16 @@ function OrdersContent() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={kind} onValueChange={v => { setKind(v && v !== 'all' ? v : null); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[210px] text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les commandes</SelectItem>
+                <SelectItem value="special_mobile">Commandes spéciales (mobile)</SelectItem>
+                <SelectItem value="standard">Commandes standard</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Bulk actions */}
             {selected.size > 0 && (
@@ -358,6 +395,11 @@ function OrdersContent() {
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                     #{order.order_number || order.id.slice(0, 8)}
+                    {isSpecialOrder(order) ? (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                        spéciale mobile
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <div className="font-medium truncate max-w-[140px]">{order.customer_name || '—'}</div>
@@ -601,6 +643,35 @@ function OrdersContent() {
                   {detail.notes}
                 </div>
               )}
+              {(() => {
+                const payload = parseSpecialPayload(detail.notes) || detail.special_payload || null;
+                const special = isSpecialOrder({
+                  order_number: detail.order_number,
+                  notes: detail.notes ?? null,
+                  is_special_mobile: detail.is_special_mobile,
+                });
+                const quoteStatus = detail.quote_status || (payload?.quote_status as string | undefined) || (payload?.devis_status as string | undefined) || null;
+                if (!special && !payload) return null;
+                return (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+                    <p className="mb-1 font-medium text-amber-700 dark:text-amber-400">Commande spéciale (mobile)</p>
+                    {quoteStatus ? (
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Statut devis: <span className="font-medium text-foreground">{quoteStatus}</span>
+                      </p>
+                    ) : null}
+                    {payload ? (
+                      <pre className="max-h-48 overflow-auto rounded bg-background p-2 text-[11px] leading-relaxed">
+                        {JSON.stringify(payload, null, 2)}
+                      </pre>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Les détails spéciaux sont stockés dans les notes.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               </div>
               )}
 

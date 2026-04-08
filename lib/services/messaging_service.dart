@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -352,7 +353,11 @@ class MessagingService extends ChangeNotifier {
             sender_id,
             message,
             is_read,
-            created_at
+            created_at,
+            deleted_at,
+            message_type,
+            attachments,
+            image_url
           ''')
           .eq('conversation_id', conversationId)
           .order('created_at', ascending: true);
@@ -398,6 +403,7 @@ class MessagingService extends ChangeNotifier {
     String messageType = 'text',
     Map<String, dynamic>? metadata,
     List<String>? attachmentUrls,
+    List<Map<String, dynamic>>? attachmentsJson,
   }) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) throw Exception('Non connecté');
@@ -408,13 +414,19 @@ class MessagingService extends ChangeNotifier {
       _log('Type: $messageType');
       _log('Sender: $userId');
 
-      // Créer le message avec les colonnes existantes uniquement
-      final messageData = {
+      final messageData = <String, dynamic>{
         'conversation_id': conversationId,
         'sender_id': userId,
         'message': content,
         'is_read': false,
+        'message_type': messageType,
       };
+      if (attachmentsJson != null && attachmentsJson.isNotEmpty) {
+        messageData['attachments'] = attachmentsJson;
+      }
+      if (metadata != null && metadata.isNotEmpty) {
+        messageData['metadata'] = metadata;
+      }
       
       _log('Données du message à insérer: $messageData');
 
@@ -429,7 +441,9 @@ class MessagingService extends ChangeNotifier {
       final response = await _supabase
           .from('chat_messages')
           .insert(messageData)
-          .select('id, conversation_id, sender_id, message, is_read, created_at')
+          .select(
+            'id, conversation_id, sender_id, message, is_read, created_at, deleted_at, message_type, attachments, image_url',
+          )
           .single();
       
       _log('Message envoyé avec succès: ${response['id']}');
@@ -621,6 +635,85 @@ class MessagingService extends ChangeNotifier {
     _typingIndicators[conversationId] = isTyping;
     _log('Indicateur frappe - ConvId: $conversationId, Typing: $isTyping');
     notifyListeners();
+  }
+
+  Future<String?> uploadChatVoice({
+    required String conversationId,
+    required String filePath,
+  }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('Non connecté');
+
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return null;
+      final bytes = await file.readAsBytes();
+      final lower = filePath.toLowerCase();
+      final ext = lower.endsWith('.ogg')
+          ? 'ogg'
+          : lower.endsWith('.webm')
+              ? 'webm'
+              : 'm4a';
+      final objectPath = '$userId/$conversationId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final contentType = ext == 'ogg'
+          ? 'audio/ogg'
+          : ext == 'webm'
+              ? 'audio/webm'
+              : 'audio/mp4';
+      final opts = FileOptions(cacheControl: '3600', upsert: true, contentType: contentType);
+      for (final bucket in ['chat-attachments', 'chat', 'gba-chat']) {
+        try {
+          await _supabase.storage.from(bucket).uploadBinary(objectPath, bytes, fileOptions: opts);
+          return _supabase.storage.from(bucket).getPublicUrl(objectPath);
+        } catch (_) {
+          continue;
+        }
+      }
+      return null;
+    } catch (e, stackTrace) {
+      _log('Erreur upload vocal chat: $e\n$stackTrace', level: 'ERROR');
+      return null;
+    }
+  }
+
+  Future<void> sendVoiceMessage({
+    required String conversationId,
+    required String recordingPath,
+    int? durationSec,
+  }) async {
+    final url = await uploadChatVoice(
+      conversationId: conversationId,
+      filePath: recordingPath,
+    );
+    if (url == null) throw Exception('Upload vocal échoué');
+    final lower = recordingPath.toLowerCase();
+    final ext = lower.endsWith('.ogg')
+        ? 'ogg'
+        : lower.endsWith('.webm')
+            ? 'webm'
+            : 'm4a';
+    final mime = ext == 'ogg'
+        ? 'audio/ogg'
+        : ext == 'webm'
+            ? 'audio/webm'
+            : 'audio/mp4';
+    final file = File(recordingPath);
+    final size = await file.exists() ? await file.length() : 0;
+    final attachments = <Map<String, dynamic>>[
+      {
+        'url': url,
+        'name': 'voice.$ext',
+        'type': mime,
+        'size': size,
+        if (durationSec != null) 'duration_sec': durationSec,
+      },
+    ];
+    await sendMessage(
+      conversationId: conversationId,
+      content: url,
+      messageType: 'audio',
+      attachmentsJson: attachments,
+    );
   }
 
   Future<String?> uploadChatImage({

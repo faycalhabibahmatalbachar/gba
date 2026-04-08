@@ -349,6 +349,14 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
     setPendingFiles((p) => [...p, { url: j.url, name: j.name, size: j.size, type: j.type }]);
   }, []);
 
+  const canUseMic = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const hasMedia = Boolean(navigator.mediaDevices?.getUserMedia);
+    const secure =
+      window.isSecureContext || /^localhost$|^127\./i.test(window.location.hostname);
+    return hasMedia && secure;
+  }, []);
+
   React.useLayoutEffect(() => {
     uploadFileRef.current = uploadFile;
   }, [uploadFile]);
@@ -870,8 +878,9 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
               variant="outline"
               size="icon"
               className="h-9 w-9"
-              title="Message vocal"
+              title={canUseMic ? 'Message vocal' : 'Micro indisponible (utilisez HTTPS ou pièce jointe audio)'}
               onClick={() => void startRecording()}
+              disabled={!canUseMic}
             >
               <Mic className="h-4 w-4" />
             </Button>
@@ -899,6 +908,11 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
         </div>
         {mentionOpen ? (
           <p className="mt-1 text-[10px] text-muted-foreground">Mention : recherche profils disponible dans une prochaine itération.</p>
+        ) : null}
+        {!canUseMic ? (
+          <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-400">
+            Le micro est indisponible dans ce contexte. Utilisez HTTPS ou joignez un fichier audio via le bouton pièce jointe.
+          </p>
         ) : null}
       </div>
 
