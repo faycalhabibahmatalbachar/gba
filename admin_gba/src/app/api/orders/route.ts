@@ -151,7 +151,6 @@ const SELECT_FULL = `
   total_amount,
   shipping_address,
   notes,
-  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -179,7 +178,6 @@ const SELECT_NO_DRIVER = `
   total_amount,
   shipping_address,
   notes,
-  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -206,7 +204,6 @@ const SELECT_NO_PRODUCTS = `
   total_amount,
   shipping_address,
   notes,
-  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -219,6 +216,22 @@ const SELECT_NO_PRODUCTS = `
     product_name,
     product_image
   )
+`;
+
+const SELECT_MIN_SAFE = `
+  id,
+  order_number,
+  created_at,
+  updated_at,
+  status,
+  payment_status,
+  payment_method,
+  total_amount,
+  shipping_address,
+  notes,
+  driver_id,
+  customer_name,
+  customer_phone
 `;
 
 const SORT_WHITELIST = new Set(['created_at', 'total_amount', 'status', 'order_number']);
@@ -324,6 +337,12 @@ export async function GET(req: Request) {
     const msg = String(res.error.message || '');
     if (msg.includes('products') || msg.includes('relationship')) {
       res = await runSelect(SELECT_NO_PRODUCTS);
+    }
+  }
+  if (res.error) {
+    const msg = String(res.error.message || '');
+    if (msg.includes('metadata') || msg.includes('column orders.metadata does not exist')) {
+      res = await runSelect(SELECT_MIN_SAFE);
     }
   }
 

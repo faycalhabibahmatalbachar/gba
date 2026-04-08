@@ -13,8 +13,9 @@ export type DashboardApiPayload = {
     avgBasket: number;
   };
   windowSummary?: { orders: number; revenue: number };
+  windowMeta?: { start: string; end: string; sampledOrders: number };
   revenueSeries: { date: string; revenue: number }[];
-  ordersByStatus: { status: string; count: number }[];
+  ordersByStatus: { status: string; statusLabel?: string; count: number }[];
   orderHourHeatmap: { hour: string; count: number }[];
   topProducts: { name: string; sales: number }[];
   funnel: { name: string; value: number }[];

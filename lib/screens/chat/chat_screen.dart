@@ -141,7 +141,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
 
     final perm = await Permission.microphone.request();
-    if (!perm.isGranted) {
+    if (perm.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone bloque. Ouvrez les parametres de l application.')),
+        );
+      }
+      await openAppSettings();
+      return;
+    }
+    if (perm.isDenied || perm.isRestricted || perm.isLimited) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(localizations.translate('permission_denied'))),
@@ -152,7 +161,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (!await _audioRecorder.hasPermission()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Micro indisponible')),
+          const SnackBar(content: Text('Microphone indisponible sur cet appareil')),
         );
       }
       return;

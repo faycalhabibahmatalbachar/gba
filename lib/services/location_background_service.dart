@@ -98,6 +98,8 @@ Future<void> _onBackgroundStart(ServiceInstance service) async {
     ).listen(
       (pos) async {
         if (driverId == null && userId == null) return;
+        if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
+        if (pos.latitude.abs() > 90 || pos.longitude.abs() > 180) return;
         final now = DateTime.now();
         if (now.difference(lastSent).inSeconds < _kMinIntervalSeconds) return;
         lastSent = now;

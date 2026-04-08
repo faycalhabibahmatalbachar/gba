@@ -86,8 +86,53 @@ function fmtDate(iso: string) {
 }
 
 async function fetchDrivers() {
-  const { data } = await supabase.from('profiles').select('id, full_name, phone').eq('role', 'driver').order('full_name');
-  return (data || []) as { id: string; full_name: string | null; phone?: string | null }[];
+  const primary = await supabase
+    .from('profiles')
+    .select('id, full_name, first_name, last_name, phone')
+    .or('role.eq.driver,role.eq.livreur')
+    .eq('is_active', true)
+    .limit(300);
+  let err = primary.error;
+  let data: unknown[] = (primary.data || []) as unknown[];
+
+  if (err && String(err.message || '').includes('full_name')) {
+    const fallbackNoFullName = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, phone')
+      .or('role.eq.driver,role.eq.livreur')
+      .eq('is_active', true)
+      .limit(300);
+    err = fallbackNoFullName.error;
+    data = (fallbackNoFullName.data || []) as unknown[];
+  }
+
+  if (err && String(err.message || '').includes('is_active')) {
+    const fallbackNoActive = await supabase
+      .from('profiles')
+      .select('id, full_name, first_name, last_name, phone')
+      .or('role.eq.driver,role.eq.livreur')
+      .limit(300);
+    err = fallbackNoActive.error;
+    data = (fallbackNoActive.data || []) as unknown[];
+  }
+
+  if (err) throw new Error(err.message || 'Impossible de charger les livreurs');
+
+  const rows = data as Array<{
+    id: string;
+    full_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    phone?: string | null;
+  }>;
+
+  return rows
+    .map((r) => ({
+      id: r.id,
+      full_name: (r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim() || null) as string | null,
+      phone: r.phone ?? null,
+    }))
+    .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || ''), 'fr'));
 }
 
 function DeliveriesContent() {
@@ -330,7 +375,7 @@ function DeliveriesContent() {
               </div>
               {!drivers.length ? (
                 <p className="text-xs text-amber-600">
-                  Aucun profil avec le rôle livreur trouvé. Créez ou mettez à jour des comptes livreurs.
+                  Aucun livreur actif trouvé apres verification. Verifiez le role (driver/livreur) et l&apos;activation du profil.
                 </p>
               ) : null}
             </div>

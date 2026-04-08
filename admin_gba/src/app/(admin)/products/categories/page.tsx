@@ -30,6 +30,7 @@ import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { ChevronRight, ChevronDown, GripVertical, Plus, Trash2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { parseApiJson } from '@/lib/fetch-api-json';
 
 type Cat = {
   id: string;
@@ -189,6 +190,7 @@ export default function CategoriesAdminPage() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [delCat, setDelCat] = React.useState<Cat | null>(null);
   const [migrateTo, setMigrateTo] = React.useState('');
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
     name: '',
     slug: '',
@@ -203,13 +205,16 @@ export default function CategoriesAdminPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const r = await fetch('/api/categories', { credentials: 'include' });
-      const j = await r.json();
+      const j = await parseApiJson<{ data?: Cat[]; error?: string }>(r);
       if (!r.ok) throw new Error(j.error || 'Erreur');
       setFlat(j.data || []);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erreur');
+      const msg = e instanceof Error ? e.message : 'Erreur';
+      setLoadError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -411,6 +416,22 @@ export default function CategoriesAdminPage() {
       )}
 
       <Card className="p-4">
+        {loadError ? (
+          <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+            Chargement incomplet des categories: {loadError}
+          </div>
+        ) : null}
+        {!loading && flat.length > 0 ? (
+          <div className="mb-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span>Total categories: {flat.length}</span>
+            <span>
+              Produits lies: {flat.reduce((s, c) => s + Number(c.product_count || 0), 0).toLocaleString('fr-FR')}
+            </span>
+            <span>
+              CA cumule: {Math.round(flat.reduce((s, c) => s + Number(c.revenue_total || 0), 0)).toLocaleString('fr-FR')} XOF
+            </span>
+          </div>
+        ) : null}
         {loading ? (
           <p className="text-sm text-muted-foreground">Chargement…</p>
         ) : flat.length === 0 ? (

@@ -18,6 +18,31 @@ function sum(nums: number[]) {
   return nums.reduce((a, b) => a + b, 0);
 }
 
+function statusFrLabel(raw: string | null | undefined): string {
+  const k = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  const labels: Record<string, string> = {
+    pending: 'En attente',
+    payment_pending: 'Paiement en attente',
+    paid: 'Payee',
+    confirmed: 'Confirmee',
+    processing: 'En preparation',
+    packed: 'Emballee',
+    ready_to_ship: 'Prete a expedier',
+    shipped: 'Expediee',
+    out_for_delivery: 'En livraison',
+    delivered: 'Livree',
+    completed: 'Terminee',
+    cancelled: 'Annulee',
+    refunded: 'Remboursee',
+    returned: 'Retournee',
+    failed: 'Echec',
+  };
+  return labels[k] || (raw ? `Statut: ${raw}` : 'Inconnu');
+}
+
 export async function GET(req: Request) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
@@ -37,7 +62,8 @@ export async function GET(req: Request) {
 
   const now = new Date();
   const today0 = startOfDay(now).toISOString();
-  const windowStart = subDays(now, chartDays).toISOString();
+  const windowStartDate = startOfDay(subDays(now, chartDays - 1));
+  const windowStart = windowStartDate.toISOString();
   const d90 = subDays(now, 90).toISOString();
 
   try {
@@ -114,7 +140,11 @@ export async function GET(req: Request) {
       revenue,
     }));
 
-    const ordersByStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
+    const ordersByStatus = Object.entries(statusCounts).map(([status, count]) => ({
+      status,
+      statusLabel: statusFrLabel(status),
+      count,
+    }));
 
     const heatmapData = heatHours.map((count, hour) => ({ hour: `${hour}h`, count }));
 
@@ -188,6 +218,11 @@ export async function GET(req: Request) {
         avgBasket: avgBasketToday,
       },
       windowSummary: { orders: totalO, revenue: windowRevenue },
+      windowMeta: {
+        start: windowStartDate.toISOString(),
+        end: now.toISOString(),
+        sampledOrders: totalO,
+      },
       revenueSeries,
       ordersByStatus,
       orderHourHeatmap: heatmapData,

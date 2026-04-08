@@ -110,6 +110,8 @@ class DriverLocationService {
   /// Upsert a position into `driver_locations` AND insert into history.
   Future<void> _upsertPosition(String driverId, Position pos) async {
     try {
+      if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
+      if (pos.latitude.abs() > 90 || pos.longitude.abs() > 180) return;
       final now = DateTime.now().toUtc().toIso8601String();
       
       // Double write: current table + history table

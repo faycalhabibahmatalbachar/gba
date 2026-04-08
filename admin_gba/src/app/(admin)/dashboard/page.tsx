@@ -256,9 +256,14 @@ export default function DashboardPage() {
           <Card className="p-3">
             <div className="font-medium text-foreground">{data.chartDays} jours</div>
             <div>{data.windowSummary.orders} commandes · {fmtCurrency(data.windowSummary.revenue)} CA</div>
+            {data.windowMeta?.start ? (
+              <div className="mt-1 text-[10px]">
+                Fenetre: {fmtDate(data.windowMeta.start)} a {fmtDate(data.windowMeta.end)}
+              </div>
+            ) : null}
           </Card>
           <Card className="p-3">
-            <div className="font-medium text-foreground">Big data (échantillon)</div>
+            <div className="font-medium text-foreground">Commerce (echantillon)</div>
             <div>LTV moy. ~{fmtCurrency(data.bigData.avgLtv)} · Réachat {Math.round(data.bigData.repeatPurchaseRate * 100)}%</div>
             <div className="mt-1 text-[10px]">{data.bigData.cohortNote}</div>
           </Card>
@@ -324,7 +329,7 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={data?.ordersByStatus || []} margin={{ top: 4, right: 4, left: 0, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="status" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" height={50} stroke="var(--border)" />
+                  <XAxis dataKey="statusLabel" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" height={50} stroke="var(--border)" />
                   <YAxis tick={{ fontSize: 10 }} stroke="var(--border)" width={32} />
                   <RechartsTooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]}>

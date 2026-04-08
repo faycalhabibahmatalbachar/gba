@@ -311,7 +311,16 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
     }
 
     final p = await Permission.microphone.request();
-    if (!p.isGranted) {
+    if (p.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone bloque. Activez-le dans les parametres.')),
+        );
+      }
+      await openAppSettings();
+      return;
+    }
+    if (p.isDenied || p.isRestricted || p.isLimited) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Permission micro refusée')),
