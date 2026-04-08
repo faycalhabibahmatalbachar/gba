@@ -6,6 +6,12 @@ import { evaluateAdminGate, loadGatePayload } from '@/lib/security/admin-middlew
 
 const LOGIN = '/login';
 
+function extractIp(request: NextRequest): string | null {
+  const xf = request.headers.get('x-forwarded-for');
+  if (xf) return xf.split(',')[0]?.trim() || null;
+  return request.headers.get('x-real-ip')?.trim() || null;
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -71,6 +77,36 @@ export async function proxy(request: NextRequest) {
         });
 
         if (!decision.ok) {
+          if (decision.code === 'IP_NOT_WHITELISTED') {
+            const ip = extractIp(request);
+            if (ip) {
+              const profile = await sbAdmin.from('profiles').select('role,email').eq('id', user.id).maybeSingle();
+              const role = String(profile.data?.role || '');
+              const email = String(profile.data?.email || user.email || '');
+              const trustedEmail = String(process.env.ADMIN_NOTIFICATION_EMAIL || '').trim().toLowerCase();
+              const canRecover =
+                role === 'superadmin' ||
+                role === 'super_admin' ||
+                (trustedEmail && email.toLowerCase() === trustedEmail);
+              if (canRecover) {
+                const cur = await sbAdmin.from('settings').select('value').eq('key', 'security_access').maybeSingle();
+                const v = (cur.data?.value || {}) as Record<string, unknown>;
+                const existing = Array.isArray(v.emergency_allowlist_ips)
+                  ? v.emergency_allowlist_ips.map((x) => String(x))
+                  : [];
+                if (!existing.includes(ip)) {
+                  await sbAdmin.from('settings').upsert(
+                    {
+                      key: 'security_access',
+                      value: { ...v, emergency_allowlist_ips: [...existing, ip], emergency_recovery_at: new Date().toISOString() },
+                    },
+                    { onConflict: 'key' },
+                  );
+                }
+                return NextResponse.next({ request });
+              }
+            }
+          }
           if (isApi) {
             return NextResponse.json(
               { error: decision.message, code: decision.code },

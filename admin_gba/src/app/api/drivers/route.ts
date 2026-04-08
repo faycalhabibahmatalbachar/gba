@@ -213,8 +213,9 @@ export async function GET(req: Request) {
     for (const L of locRows || []) {
       const did = String((L as { driver_id: string }).driver_id);
       if (latestLoc[did]) continue;
-      const lat = (L as { lat: number }).lat;
-      const lng = (L as { lng: number }).lng;
+      const lat = Number((L as { lat: number | null }).lat);
+      const lng = Number((L as { lng: number | null }).lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const at =
         (L as { recorded_at?: string }).recorded_at ||
         (L as { captured_at?: string }).captured_at ||
@@ -238,7 +239,7 @@ export async function GET(req: Request) {
       const curLng = d.current_lng as number | null | undefined;
       const lastAt = (d.last_location_at as string | null | undefined) || undefined;
       const fallbackGps =
-        curLat != null && curLng != null
+        Number.isFinite(Number(curLat)) && Number.isFinite(Number(curLng))
           ? { lat: Number(curLat), lng: Number(curLng), at: lastAt || new Date().toISOString() }
           : null;
       return {

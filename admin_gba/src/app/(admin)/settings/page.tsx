@@ -48,7 +48,14 @@ export default function SettingsPage() {
     cc_emails: '',
     from_name: '',
     notify_new_order: true,
+    notify_special_order: true,
+    notify_order_status_changed: true,
+    notify_new_user: true,
+    notify_new_message: true,
     notify_security: true,
+    notify_all_audit_events: false,
+    email_provider: 'auto',
+    dedup_window_sec: 120,
   });
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
@@ -76,7 +83,14 @@ export default function SettingsPage() {
         cc_emails: String(d.cc_emails || ''),
         from_name: String(d.from_name || ''),
         notify_new_order: d.notify_new_order !== false,
+        notify_special_order: d.notify_special_order !== false,
+        notify_order_status_changed: d.notify_order_status_changed !== false,
+        notify_new_user: d.notify_new_user !== false,
+        notify_new_message: d.notify_new_message !== false,
         notify_security: d.notify_security !== false,
+        notify_all_audit_events: d.notify_all_audit_events === true,
+        email_provider: String(d.email_provider || 'auto'),
+        dedup_window_sec: Number(d.dedup_window_sec || 120),
       });
     } catch {
       toast.error('Chargement préférences email impossible');
@@ -102,7 +116,14 @@ export default function SettingsPage() {
           cc_emails: emailPrefs.cc_emails.trim() || null,
           from_name: emailPrefs.from_name.trim() || null,
           notify_new_order: emailPrefs.notify_new_order,
+          notify_special_order: emailPrefs.notify_special_order,
+          notify_order_status_changed: emailPrefs.notify_order_status_changed,
+          notify_new_user: emailPrefs.notify_new_user,
+          notify_new_message: emailPrefs.notify_new_message,
           notify_security: emailPrefs.notify_security,
+          notify_all_audit_events: emailPrefs.notify_all_audit_events,
+          email_provider: emailPrefs.email_provider,
+          dedup_window_sec: emailPrefs.dedup_window_sec,
         }),
       });
       const j = await r.json();
@@ -270,11 +291,16 @@ export default function SettingsPage() {
       {tab === 'email' && (
         <Card>
           <CardContent className="p-5 space-y-4">
-            <p className="text-sm font-medium">Notifications email (Resend)</p>
+            <p className="text-sm font-medium">Notifications email (Resend prioritaire, SMTP fallback)</p>
             <p className="text-xs text-muted-foreground">
-              Variables <code className="rounded bg-muted px-1">RESEND_API_KEY</code>,{' '}
-              <code className="rounded bg-muted px-1">EMAIL_FROM</code> dans .env.local. Journal : table{' '}
-              <code className="rounded bg-muted px-1">email_logs</code> (migration SQL).
+              Si <code className="rounded bg-muted px-1">RESEND_API_KEY</code> est présent, les envois utilisent Resend
+              (comme ton test réussi). Sinon fallback SMTP Brevo avec{' '}
+              <code className="rounded bg-muted px-1">SMTP_HOST</code>,{' '}
+              <code className="rounded bg-muted px-1">SMTP_PORT</code>,{' '}
+              <code className="rounded bg-muted px-1">SMTP_USER</code>,{' '}
+              <code className="rounded bg-muted px-1">SMTP_PASS</code> dans .env.local (Brevo:
+              <code className="rounded bg-muted px-1 ml-1">smtp-relay.brevo.com</code>). Journal :{' '}
+              <code className="rounded bg-muted px-1">email_logs</code>.
             </p>
             <Separator />
             {emailLoading ? (
@@ -315,12 +341,14 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-muted-foreground">Nom expéditeur (info — l’adresse reste EMAIL_FROM)</label>
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Nom expéditeur (affichage UI — l’envoi utilise EMAIL_FROM / EMAIL_FROM_NAME du serveur)
+                    </label>
                     <Input
                       className="h-9 text-sm"
                       value={emailPrefs.from_name}
                       onChange={(e) => setEmailPrefs((p) => ({ ...p, from_name: e.target.value }))}
-                      placeholder="GBA Admin"
+                      placeholder="GBA"
                     />
                   </div>
                 </div>
@@ -329,7 +357,12 @@ export default function SettingsPage() {
                   {(
                     [
                       { key: 'notify_new_order' as const, label: 'Nouvelle commande', desc: 'À brancher sur les routes orders' },
+                      { key: 'notify_special_order' as const, label: 'Commande spéciale', desc: 'Commande prioritaire/spéciale' },
+                      { key: 'notify_order_status_changed' as const, label: 'Changement statut commande', desc: 'Assignation et transitions clés' },
+                      { key: 'notify_new_user' as const, label: 'Nouveau utilisateur', desc: 'Création/invitation via admin' },
+                      { key: 'notify_new_message' as const, label: 'Nouveau message', desc: 'Messages chat entrants' },
                       { key: 'notify_security' as const, label: 'Événements sécurité', desc: 'Alertes sessions / IP (intégration progressive)' },
+                      { key: 'notify_all_audit_events' as const, label: 'Toutes actions (audit)', desc: 'Phase 2: flux global audit_logs' },
                     ] as const
                   ).map((n) => (
                     <div key={n.key} className="flex items-center justify-between py-1">
@@ -348,6 +381,31 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   ))}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Provider email</label>
+                    <select
+                      value={emailPrefs.email_provider}
+                      onChange={(e) => setEmailPrefs((p) => ({ ...p, email_provider: e.target.value }))}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    >
+                      <option value="auto">Auto (Resend puis SMTP)</option>
+                      <option value="smtp">SMTP (Brevo)</option>
+                      <option value="resend">Resend</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Fenêtre anti-duplication (sec)</label>
+                    <Input
+                      className="h-9 text-sm"
+                      type="number"
+                      min={30}
+                      max={86400}
+                      value={String(emailPrefs.dedup_window_sec)}
+                      onChange={(e) => setEmailPrefs((p) => ({ ...p, dedup_window_sec: Number(e.target.value || 120) }))}
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button type="button" onClick={saveEmailPrefs} disabled={emailSaving} className="h-9">

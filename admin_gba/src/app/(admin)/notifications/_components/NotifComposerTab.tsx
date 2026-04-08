@@ -37,7 +37,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/custom/EmptyState';
 import { logAuditEvent } from '@/lib/audit/audit-logger';
-import { Send, Users, User, AlertTriangle, Trash2, Plus } from 'lucide-react';
+import { Send, Users, User, AlertTriangle, Trash2, Plus, MessageSquare } from 'lucide-react';
 import type { PushDraft, SegmentFiltersState } from './notif-types';
 
 const MAX_SYNC = 400;
@@ -91,6 +91,8 @@ export function NotifComposerTab({ draftFromTemplate, onConsumeDraft }: Props) {
   const [scheduledLocal, setScheduledLocal] = React.useState('');
   const [jobId, setJobId] = React.useState<string | null>(null);
   const [confirmAllOpen, setConfirmAllOpen] = React.useState(false);
+  const [channelPush, setChannelPush] = React.useState(true);
+  const [channelInApp, setChannelInApp] = React.useState(false);
 
   const [schedDialog, setSchedDialog] = React.useState(false);
   const [schedName, setSchedName] = React.useState('');
@@ -407,15 +409,53 @@ export function NotifComposerTab({ draftFromTemplate, onConsumeDraft }: Props) {
       toast.error('Titre et message requis');
       return;
     }
+    if (!channelPush && !channelInApp) {
+      toast.error('Sélectionnez au moins un canal (Push ou In-App)');
+      return;
+    }
     if (mode === 'individual') {
-      sendIndividualMut.mutate();
+      if (channelPush) sendIndividualMut.mutate();
+      if (channelInApp && selectedUserId) {
+        void fetch('/api/messages/broadcast-inapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            target: 'specific',
+            user_ids: [selectedUserId],
+            message: { body, message_type: 'text', attachments: [] },
+            send_push: false,
+          }),
+        }).then(async (r) => {
+          const x = await r.json();
+          if (!r.ok) throw new Error(x.error || 'In-app échec');
+          toast.success('Message in-app envoyé');
+        }).catch((e: Error) => toast.error(e.message));
+      }
       return;
     }
     if (mode === 'all') {
       setConfirmAllOpen(true);
       return;
     }
-    sendCampaignMut.mutate({ filters: filtersPayload });
+    if (channelPush) sendCampaignMut.mutate({ filters: filtersPayload });
+    if (channelInApp) {
+      void fetch('/api/messages/broadcast-inapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          target: 'segment',
+          filters: filtersPayload,
+          message: { body, message_type: 'text', attachments: [] },
+          send_push: false,
+        }),
+      }).then(async (r) => {
+        const x = await r.json();
+        if (!r.ok) throw new Error(x.error || 'Broadcast in-app échec');
+        toast.success(`Broadcast in-app envoyé (${x.sent_count || 0})`);
+      }).catch((e: Error) => toast.error(e.message));
+    }
   };
 
   const estimate = estimateQ.data ?? 0;
@@ -656,6 +696,20 @@ export function NotifComposerTab({ draftFromTemplate, onConsumeDraft }: Props) {
                   Contexte GPS attaché : {gpsLat}, {gpsLng} (source : {contextSrc})
                 </p>
               ) : null}
+            </div>
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-medium">Canal d'envoi</p>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={channelPush} onCheckedChange={setChannelPush} />
+                  Push
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={channelInApp} onCheckedChange={setChannelInApp} />
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  In-App
+                </label>
+              </div>
             </div>
 
             <Button

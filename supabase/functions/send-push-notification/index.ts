@@ -753,12 +753,24 @@ Deno.serve(async (req) => {
       }
 
       default: {
-        // Generic pass-through (already localized by caller)
-        if (payload.user_ids?.length) {
-          targetUserIds = payload.user_ids;
+        // Generic pass-through (admin panel / custom): title+body in payload root
+        const st = payload.specific_tokens as string[] | undefined;
+        if (Array.isArray(st) && st.length) {
+          const { data: tokRows } = await supabase
+            .from('device_tokens')
+            .select('user_id, token')
+            .in('token', st);
+          targetUserIds = [...new Set((tokRows ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean))];
+          templateKey = '__passthrough';
+          console.log(`[PUSH] default/specific_tokens → ${targetUserIds.length} user(s), ${st.length} token filter`);
+        } else if (Array.isArray(payload.user_ids) && payload.user_ids.length) {
+          targetUserIds = payload.user_ids as string[];
           templateKey = '__passthrough';
         }
-        data = payload.data ?? {};
+        data = (payload.data as Record<string, string>) ?? {};
+        if (typeof payload.image_url === 'string' && payload.image_url.length) {
+          imageUrl = payload.image_url;
+        }
         console.log(`[PUSH] default/passthrough type="${type}" → ${targetUserIds.length} targets`);
       }
     }
@@ -800,6 +812,14 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[PUSH] Found ${tokenRows.length} device token(s) for ${targetUserIds.length} user(s)`);
+
+    let rowsForSend = tokenRows as { token: string; user_id: string; platform?: string; locale?: string }[];
+    const stFilter = payload.specific_tokens as string[] | undefined;
+    if (Array.isArray(stFilter) && stFilter.length) {
+      const allow = new Set(stFilter.map(String));
+      rowsForSend = rowsForSend.filter((r) => allow.has(r.token));
+      console.log(`[PUSH] specific_tokens filter → ${rowsForSend.length} row(s)`);
+    }
 
     // Fetch language preferences for all target users
     const { data: profiles } = await supabase
@@ -886,7 +906,7 @@ Deno.serve(async (req) => {
 
     // Send in parallel batches of 20
     const concurrency = 20;
-    const tokenList = tokenRows.filter((r: any) => r.token).map((r: any) => ({
+    const tokenList = rowsForSend.filter((r: any) => r.token).map((r: any) => ({
       token: r.token as string,
       user_id: r.user_id as string,
       lang: langMap[r.user_id] ?? 'fr',

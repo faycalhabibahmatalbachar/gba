@@ -50,6 +50,10 @@ class Message with _$Message {
     @JsonKey(name: 'sender_type') @Default('customer') String senderType,
     @JsonKey(name: 'is_read') required bool isRead,
     @JsonKey(name: 'created_at') required DateTime createdAt,
+    @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+    @JsonKey(name: 'message_type') @Default('text') String messageType,
+    @JsonKey(name: 'attachments') Object? attachments,
+    @JsonKey(name: 'image_url') String? imageUrl,
   }) = _Message;
 
   factory Message.fromJson(Map<String, dynamic> json) =>

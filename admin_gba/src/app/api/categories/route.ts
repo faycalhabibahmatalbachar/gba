@@ -6,8 +6,12 @@ import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
-const CAT_SELECT =
+const CAT_SELECT_WITH_COLOR =
   'id,name,slug,description,parent_id,sort_order,is_active,link_url,accent_color,icon_key,image_url';
+const CAT_SELECT_NO_COLOR =
+  'id,name,slug,description,parent_id,sort_order,is_active,link_url,icon_key,image_url';
+const CAT_SELECT_MIN =
+  'id,name,slug,description,parent_id,sort_order,is_active,link_url,image_url';
 
 const postSchema = z.object({
   name: z.string().min(1).max(200),
@@ -64,11 +68,29 @@ export async function GET() {
   }
 
   try {
-    const { data: rows, error } = await sb
+    let { data: rows, error } = await sb
       .from('categories')
-      .select(CAT_SELECT)
+      .select(CAT_SELECT_WITH_COLOR)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
+    if (error && /accent_color/i.test(error.message || '')) {
+      const fallback = await sb
+        .from('categories')
+        .select(CAT_SELECT_NO_COLOR)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+      rows = (fallback.data || []).map((r) => ({ ...r, accent_color: null }));
+      error = fallback.error;
+    }
+    if (error && /icon_key/i.test(error.message || '')) {
+      const fallback = await sb
+        .from('categories')
+        .select(CAT_SELECT_MIN)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+      rows = (fallback.data || []).map((r) => ({ ...r, accent_color: null, icon_key: null }));
+      error = fallback.error;
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -124,7 +146,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { data: created, error } = await sb
+    let { data: created, error } = await sb
       .from('categories')
       .insert({
         name: p.name,
@@ -138,8 +160,39 @@ export async function POST(req: Request) {
         icon_key: p.icon_key ?? null,
         image_url: p.image_url ?? null,
       })
-      .select(CAT_SELECT)
+      .select(CAT_SELECT_WITH_COLOR)
       .single();
+    if (error && /accent_color/i.test(error.message || '')) {
+      const payloadNoColor = {
+        name: p.name,
+        slug: p.slug,
+        description: p.description ?? null,
+        parent_id: p.parent_id ?? null,
+        sort_order: p.sort_order,
+        is_active: p.is_active,
+        link_url: p.link_url ?? null,
+        icon_key: p.icon_key ?? null,
+        image_url: p.image_url ?? null,
+      };
+      const fallback = await sb.from('categories').insert(payloadNoColor).select(CAT_SELECT_NO_COLOR).single();
+      created = fallback.data ? ({ ...fallback.data, accent_color: null } as typeof created) : created;
+      error = fallback.error;
+    }
+    if (error && /icon_key/i.test(error.message || '')) {
+      const payloadMin = {
+        name: p.name,
+        slug: p.slug,
+        description: p.description ?? null,
+        parent_id: p.parent_id ?? null,
+        sort_order: p.sort_order,
+        is_active: p.is_active,
+        link_url: p.link_url ?? null,
+        image_url: p.image_url ?? null,
+      };
+      const fallback = await sb.from('categories').insert(payloadMin).select(CAT_SELECT_MIN).single();
+      created = fallback.data ? ({ ...fallback.data, accent_color: null, icon_key: null } as typeof created) : created;
+      error = fallback.error;
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

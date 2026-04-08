@@ -805,9 +805,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       SizedBox(
-                        height: 220,
+                        height: 250,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           itemCount: similarProducts.length,
@@ -818,13 +818,14 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                 context.push('/product/${similar['id']}');
                               },
                               child: Container(
-                                width: 140,
+                                width: 150,
                                 margin: const EdgeInsets.only(right: 12),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
-                                      height: 140,
+                                      height: 150,
                                       decoration: BoxDecoration(
                                         color: Colors.grey.shade200,
                                         borderRadius: BorderRadius.circular(8),
@@ -838,23 +839,27 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    Text(
-                                      similar['name'] ?? '',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
+                                    Flexible(
+                                      child: Text(
+                                        similar['name'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 6),
                                     Text(
-                                      '${similar['price']} FCFA',
+                                      '${similar['price'] ?? 0} FCFA',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                         color: Theme.of(context).primaryColor,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),

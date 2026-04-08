@@ -13,7 +13,19 @@ const patchSchema = z.object({
   cc_emails: z.string().max(2000).optional().nullable(),
   from_name: z.string().max(120).optional().nullable(),
   notify_new_order: z.boolean().optional(),
+  notify_special_order: z.boolean().optional(),
+  notify_order_status_changed: z.boolean().optional(),
+  notify_new_user: z.boolean().optional(),
+  notify_new_message: z.boolean().optional(),
   notify_security: z.boolean().optional(),
+  notify_all_audit_events: z.boolean().optional(),
+  email_provider: z.enum(['auto', 'smtp', 'resend']).optional(),
+  reply_to: z.string().email().optional().nullable(),
+  bcc_emails: z.string().max(2000).optional().nullable(),
+  recipient_allowlist: z.array(z.string().email()).max(200).optional().nullable(),
+  recipient_denylist: z.array(z.string().email()).max(200).optional().nullable(),
+  dedup_window_sec: z.number().int().min(30).max(86400).optional(),
+  min_priority: z.enum(['high', 'normal', 'low']).optional(),
 });
 
 export async function GET() {

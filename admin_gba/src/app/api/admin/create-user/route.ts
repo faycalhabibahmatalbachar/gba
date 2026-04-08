@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
+import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +74,11 @@ export async function POST(req: Request) {
         description: 'Invitation utilisateur',
         changes: { after: { email: p.email, role: p.role } },
       });
+      await emitAdminNotification({
+        type: 'user_created',
+        payload: { email: p.email, role: p.role, invited: true },
+        actorUserId: auth.userId,
+      });
       return NextResponse.json({ success: true, invited: true });
     }
 
@@ -120,6 +126,13 @@ export async function POST(req: Request) {
       changes: {
         after: { email: p.email, role: p.role, firstName: p.firstName, lastName: p.lastName },
       },
+    });
+    await emitAdminNotification({
+      type: 'user_created',
+      payload: { email: p.email, role: p.role, invited: false },
+      actorUserId: auth.userId,
+      entityId: uid,
+      priority: 'normal',
     });
 
     return NextResponse.json({

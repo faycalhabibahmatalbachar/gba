@@ -2,6 +2,10 @@
  * GBA Admin — tokens marque + sidebar (shadcn reste dans globals :root / .dark).
  */
 :root {
+  /* Polices système uniquement (pas de next/font/google → build sans accès à fonts.gstatic.com). */
+  --font-dm-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-outfit: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-jetbrains: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --brand: #6c47ff;
   --success: #00d4aa;
   --danger: #ff4b6e;

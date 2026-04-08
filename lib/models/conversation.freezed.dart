@@ -441,6 +441,14 @@ mixin _$Message {
   bool get isRead => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
   DateTime get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'deleted_at')
+  DateTime? get deletedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'message_type')
+  String get messageType => throw _privateConstructorUsedError;
+  @JsonKey(name: 'attachments')
+  Object? get attachments => throw _privateConstructorUsedError;
+  @JsonKey(name: 'image_url')
+  String? get imageUrl => throw _privateConstructorUsedError;
 
   /// Serializes this Message to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -464,7 +472,11 @@ abstract class $MessageCopyWith<$Res> {
       String? content,
       @JsonKey(name: 'sender_type') String senderType,
       @JsonKey(name: 'is_read') bool isRead,
-      @JsonKey(name: 'created_at') DateTime createdAt});
+      @JsonKey(name: 'created_at') DateTime createdAt,
+      @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+      @JsonKey(name: 'message_type') String messageType,
+      @JsonKey(name: 'attachments') Object? attachments,
+      @JsonKey(name: 'image_url') String? imageUrl});
 }
 
 /// @nodoc
@@ -490,6 +502,10 @@ class _$MessageCopyWithImpl<$Res, $Val extends Message>
     Object? senderType = null,
     Object? isRead = null,
     Object? createdAt = null,
+    Object? deletedAt = freezed,
+    Object? messageType = null,
+    Object? attachments = freezed,
+    Object? imageUrl = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -524,6 +540,19 @@ class _$MessageCopyWithImpl<$Res, $Val extends Message>
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      deletedAt: freezed == deletedAt
+          ? _value.deletedAt
+          : deletedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      messageType: null == messageType
+          ? _value.messageType
+          : messageType // ignore: cast_nullable_to_non_nullable
+              as String,
+      attachments: freezed == attachments ? _value.attachments : attachments,
+      imageUrl: freezed == imageUrl
+          ? _value.imageUrl
+          : imageUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -543,7 +572,11 @@ abstract class _$$MessageImplCopyWith<$Res> implements $MessageCopyWith<$Res> {
       String? content,
       @JsonKey(name: 'sender_type') String senderType,
       @JsonKey(name: 'is_read') bool isRead,
-      @JsonKey(name: 'created_at') DateTime createdAt});
+      @JsonKey(name: 'created_at') DateTime createdAt,
+      @JsonKey(name: 'deleted_at') DateTime? deletedAt,
+      @JsonKey(name: 'message_type') String messageType,
+      @JsonKey(name: 'attachments') Object? attachments,
+      @JsonKey(name: 'image_url') String? imageUrl});
 }
 
 /// @nodoc
@@ -567,6 +600,10 @@ class __$$MessageImplCopyWithImpl<$Res>
     Object? senderType = null,
     Object? isRead = null,
     Object? createdAt = null,
+    Object? deletedAt = freezed,
+    Object? messageType = null,
+    Object? attachments = freezed,
+    Object? imageUrl = freezed,
   }) {
     return _then(_$MessageImpl(
       id: null == id
@@ -601,6 +638,19 @@ class __$$MessageImplCopyWithImpl<$Res>
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      deletedAt: freezed == deletedAt
+          ? _value.deletedAt
+          : deletedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      messageType: null == messageType
+          ? _value.messageType
+          : messageType // ignore: cast_nullable_to_non_nullable
+              as String,
+      attachments: freezed == attachments ? _value.attachments : attachments,
+      imageUrl: freezed == imageUrl
+          ? _value.imageUrl
+          : imageUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -616,7 +666,11 @@ class _$MessageImpl implements _Message {
       this.content,
       @JsonKey(name: 'sender_type') this.senderType = 'customer',
       @JsonKey(name: 'is_read') required this.isRead,
-      @JsonKey(name: 'created_at') required this.createdAt});
+      @JsonKey(name: 'created_at') required this.createdAt,
+      @JsonKey(name: 'deleted_at') this.deletedAt,
+      @JsonKey(name: 'message_type') this.messageType = 'text',
+      @JsonKey(name: 'attachments') this.attachments,
+      @JsonKey(name: 'image_url') this.imageUrl});
 
   factory _$MessageImpl.fromJson(Map<String, dynamic> json) =>
       _$$MessageImplFromJson(json);
@@ -642,10 +696,22 @@ class _$MessageImpl implements _Message {
   @override
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
+  @override
+  @JsonKey(name: 'deleted_at')
+  final DateTime? deletedAt;
+  @override
+  @JsonKey(name: 'message_type')
+  final String messageType;
+  @override
+  @JsonKey(name: 'attachments')
+  final Object? attachments;
+  @override
+  @JsonKey(name: 'image_url')
+  final String? imageUrl;
 
   @override
   String toString() {
-    return 'Message(id: $id, conversationId: $conversationId, senderId: $senderId, message: $message, content: $content, senderType: $senderType, isRead: $isRead, createdAt: $createdAt)';
+    return 'Message(id: $id, conversationId: $conversationId, senderId: $senderId, message: $message, content: $content, senderType: $senderType, isRead: $isRead, createdAt: $createdAt, deletedAt: $deletedAt, messageType: $messageType, attachments: $attachments, imageUrl: $imageUrl)';
   }
 
   @override
@@ -664,13 +730,33 @@ class _$MessageImpl implements _Message {
                 other.senderType == senderType) &&
             (identical(other.isRead, isRead) || other.isRead == isRead) &&
             (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt));
+                other.createdAt == createdAt) &&
+            (identical(other.deletedAt, deletedAt) ||
+                other.deletedAt == deletedAt) &&
+            (identical(other.messageType, messageType) ||
+                other.messageType == messageType) &&
+            const DeepCollectionEquality()
+                .equals(other.attachments, attachments) &&
+            (identical(other.imageUrl, imageUrl) ||
+                other.imageUrl == imageUrl));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, conversationId, senderId,
-      message, content, senderType, isRead, createdAt);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      conversationId,
+      senderId,
+      message,
+      content,
+      senderType,
+      isRead,
+      createdAt,
+      deletedAt,
+      messageType,
+      const DeepCollectionEquality().hash(attachments),
+      imageUrl);
 
   /// Create a copy of Message
   /// with the given fields replaced by the non-null parameter values.
@@ -697,8 +783,11 @@ abstract class _Message implements Message {
       final String? content,
       @JsonKey(name: 'sender_type') final String senderType,
       @JsonKey(name: 'is_read') required final bool isRead,
-      @JsonKey(name: 'created_at')
-      required final DateTime createdAt}) = _$MessageImpl;
+      @JsonKey(name: 'created_at') required final DateTime createdAt,
+      @JsonKey(name: 'deleted_at') final DateTime? deletedAt,
+      @JsonKey(name: 'message_type') final String messageType,
+      @JsonKey(name: 'attachments') final Object? attachments,
+      @JsonKey(name: 'image_url') final String? imageUrl}) = _$MessageImpl;
 
   factory _Message.fromJson(Map<String, dynamic> json) = _$MessageImpl.fromJson;
 
@@ -723,6 +812,18 @@ abstract class _Message implements Message {
   @override
   @JsonKey(name: 'created_at')
   DateTime get createdAt;
+  @override
+  @JsonKey(name: 'deleted_at')
+  DateTime? get deletedAt;
+  @override
+  @JsonKey(name: 'message_type')
+  String get messageType;
+  @override
+  @JsonKey(name: 'attachments')
+  Object? get attachments;
+  @override
+  @JsonKey(name: 'image_url')
+  String? get imageUrl;
 
   /// Create a copy of Message
   /// with the given fields replaced by the non-null parameter values.

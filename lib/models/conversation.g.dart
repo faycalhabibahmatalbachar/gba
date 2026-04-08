@@ -52,6 +52,12 @@ _$MessageImpl _$$MessageImplFromJson(Map<String, dynamic> json) =>
       senderType: json['sender_type'] as String? ?? 'customer',
       isRead: json['is_read'] as bool,
       createdAt: DateTime.parse(json['created_at'] as String),
+      deletedAt: json['deleted_at'] == null
+          ? null
+          : DateTime.parse(json['deleted_at'] as String),
+      messageType: json['message_type'] as String? ?? 'text',
+      attachments: json['attachments'],
+      imageUrl: json['image_url'] as String?,
     );
 
 Map<String, dynamic> _$$MessageImplToJson(_$MessageImpl instance) =>
@@ -64,4 +70,8 @@ Map<String, dynamic> _$$MessageImplToJson(_$MessageImpl instance) =>
       'sender_type': instance.senderType,
       'is_read': instance.isRead,
       'created_at': instance.createdAt.toIso8601String(),
+      'deleted_at': instance.deletedAt?.toIso8601String(),
+      'message_type': instance.messageType,
+      'attachments': instance.attachments,
+      'image_url': instance.imageUrl,
     };

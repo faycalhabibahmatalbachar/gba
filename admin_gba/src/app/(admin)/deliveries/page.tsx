@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useQueryState, parseAsString, parseAsInteger } from 'nuqs';
 import {
@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/custom/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -31,20 +32,62 @@ const PAGE_SIZE = 20;
 
 const STATUSES = [
   { value: 'all', label: 'Tous' },
-  { value: 'confirmed', label: 'Confirmées' },
-  { value: 'processing', label: 'En cours' },
-  { value: 'shipped', label: 'Expédiées' },
-  { value: 'delivered', label: 'Livrées' },
-  { value: 'cancelled', label: 'Annulées' },
+  { value: 'pending', label: 'En attente' },
+  { value: 'payment_pending', label: 'Paiement en attente' },
+  { value: 'paid', label: 'Payée' },
+  { value: 'confirmed', label: 'Confirmée' },
+  { value: 'processing', label: 'En préparation' },
+  { value: 'packed', label: 'Emballée' },
+  { value: 'ready_to_ship', label: 'Prête à expédier' },
+  { value: 'shipped', label: 'En cours de livraison' },
+  { value: 'out_for_delivery', label: 'En livraison' },
+  { value: 'delivered', label: 'Livrée' },
+  { value: 'completed', label: 'Terminée' },
+  { value: 'cancelled', label: 'Annulée' },
+  { value: 'refunded', label: 'Remboursée' },
+  { value: 'returned', label: 'Retournée' },
+  { value: 'failed', label: 'Échec' },
 ];
+
+/** Label Français pour tout code de statut connu (sinon phrase lisible sans code brut anglais). */
+function deliveryStatusLabel(code: string | null | undefined): string {
+  const raw = String(code || '').trim();
+  if (!raw) return '—';
+  const k = raw.toLowerCase().replace(/[\s-]+/g, '_');
+  const map: Record<string, string> = {
+    pending: 'En attente',
+    payment_pending: 'Paiement en attente',
+    awaiting_payment: 'En attente de paiement',
+    unpaid: 'Non payée',
+    paid: 'Payée',
+    payment_failed: 'Paiement refusé',
+    confirmed: 'Confirmée',
+    processing: 'En préparation',
+    packed: 'Emballée',
+    ready_to_ship: 'Prête à expédier',
+    shipped: 'En cours de livraison',
+    out_for_delivery: 'En livraison',
+    in_transit: 'En transit',
+    delivered: 'Livrée',
+    completed: 'Terminée',
+    cancelled: 'Annulée',
+    canceled: 'Annulée',
+    refunded: 'Remboursée',
+    returned: 'Retournée',
+    failed: 'Échec',
+    on_hold: 'Mise en attente',
+    delayed: 'Retardée',
+  };
+  return map[k] || `Statut : ${raw}`;
+}
 
 function fmtDate(iso: string) {
   try { return format(new Date(iso), 'dd MMM HH:mm', { locale: fr }); } catch { return iso; }
 }
 
 async function fetchDrivers() {
-  const { data } = await supabase.from('profiles').select('id, full_name').eq('role', 'driver').order('full_name');
-  return (data || []) as { id: string; full_name: string | null }[];
+  const { data } = await supabase.from('profiles').select('id, full_name, phone').eq('role', 'driver').order('full_name');
+  return (data || []) as { id: string; full_name: string | null; phone?: string | null }[];
 }
 
 function DeliveriesContent() {
@@ -89,6 +132,7 @@ function DeliveriesContent() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const kpis = kpisQuery.data;
   const drivers = driversQuery.data || [];
+  const [assignForOrder, setAssignForOrder] = useState<DeliveryOrderRow | null>(null);
 
   return (
     <div className="space-y-5">
@@ -151,7 +195,7 @@ function DeliveriesContent() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">Client</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">Destination</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Statut</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground hidden lg:table-cell">Livreur</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Livreur</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground hidden xl:table-cell">Date</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
@@ -184,23 +228,21 @@ function DeliveriesContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={d.status || 'pending'} size="sm" />
+                      <StatusBadge status={d.status || 'pending'} customLabel={deliveryStatusLabel(d.status)} size="sm" />
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      <Select
-                        value={d.driver_id || 'none'}
-                        onValueChange={v => v && assignMut.mutate({ orderId: d.id, driverId: v === 'none' ? null : v })}
+                    <td className="px-4 py-3 max-w-[200px]">
+                      <button
+                        type="button"
+                        className="w-full text-left rounded-md border border-border bg-background px-2 py-1.5 text-xs hover:bg-muted/60 transition-colors"
+                        onClick={() => setAssignForOrder(d)}
                       >
-                        <SelectTrigger className="h-7 w-[140px] text-xs">
-                          <SelectValue placeholder="Assigner..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none" className="text-xs">— Non assigné</SelectItem>
-                          {drivers.map(dr => (
-                            <SelectItem key={dr.id} value={dr.id} className="text-xs">{dr.full_name || dr.id.slice(0, 8)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <span className="font-medium truncate block">
+                          {d.driver_name || (d.driver_id ? `Livreur ${d.driver_id.slice(0, 8)}…` : 'Cliquer pour assigner un livreur')}
+                        </span>
+                        {d.driver_phone ? (
+                          <span className="text-[10px] text-muted-foreground truncate block">{d.driver_phone}</span>
+                        ) : null}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden xl:table-cell">
                       {fmtDate(d.created_at)}
@@ -210,8 +252,8 @@ function DeliveriesContent() {
                         value={d.status || ''}
                         onValueChange={v => v && statusMut.mutate({ id: d.id, status: v })}
                       >
-                        <SelectTrigger className="h-7 w-[110px] text-xs">
-                          <SelectValue />
+                        <SelectTrigger className="h-7 min-w-[140px] text-xs">
+                          <SelectValue placeholder={deliveryStatusLabel(d.status)} />
                         </SelectTrigger>
                         <SelectContent>
                           {STATUSES.filter(s => s.value !== 'all').map(s => (
@@ -245,6 +287,61 @@ function DeliveriesContent() {
           </div>
         )}
       </Card>
+
+      <Dialog open={Boolean(assignForOrder)} onOpenChange={(o) => !o && setAssignForOrder(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assigner un livreur</DialogTitle>
+          </DialogHeader>
+          {assignForOrder ? (
+            <div className="space-y-3 text-sm">
+              <p className="text-muted-foreground text-xs">
+                Commande #{assignForOrder.order_number || assignForOrder.id.slice(0, 8)} · statut :{' '}
+                <span className="font-medium text-foreground">{deliveryStatusLabel(assignForOrder.status)}</span>
+              </p>
+              <div className="max-h-[320px] overflow-y-auto rounded-md border divide-y">
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60"
+                  onClick={() => {
+                    assignMut.mutate({ orderId: assignForOrder.id, driverId: null });
+                    setAssignForOrder(null);
+                  }}
+                  disabled={assignMut.isPending}
+                >
+                  <span className="font-medium">Aucun livreur</span>
+                  <span className="block text-muted-foreground">Retirer l&apos;assignation</span>
+                </button>
+                {drivers.map((dr) => (
+                  <button
+                    key={dr.id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60"
+                    onClick={() => {
+                      assignMut.mutate({ orderId: assignForOrder.id, driverId: dr.id });
+                      setAssignForOrder(null);
+                    }}
+                    disabled={assignMut.isPending}
+                  >
+                    <span className="font-medium">{dr.full_name || `Livreur ${dr.id.slice(0, 8)}…`}</span>
+                    {dr.phone ? <span className="block text-muted-foreground">{dr.phone}</span> : null}
+                  </button>
+                ))}
+              </div>
+              {!drivers.length ? (
+                <p className="text-xs text-amber-600">
+                  Aucun profil avec le rôle livreur trouvé. Créez ou mettez à jour des comptes livreurs.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAssignForOrder(null)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

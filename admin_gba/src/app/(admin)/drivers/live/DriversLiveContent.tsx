@@ -55,6 +55,7 @@ type ZoneRow = { id: string; name: string; color: string; geojson: unknown; is_a
 type ReplayDriver = { driver_id: string; label: string };
 
 const REFETCH_MS = 10_000;
+const shortId = (v: string | null | undefined) => (v ? `${v.slice(0, 8)}…` : '—');
 
 async function fetchLive(): Promise<LiveResponse> {
   const r = await fetch('/api/drivers/locations/live', { credentials: 'include' });
@@ -593,9 +594,19 @@ export default function DriversLiveContent() {
                 Lien direct (highlight)
               </Link>
               <a
-                href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${selected.lat},${selected.lng}`}
+                href={
+                  selected.lat != null && selected.lng != null
+                    ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${selected.lat},${selected.lng}`
+                    : '#'
+                }
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (selected.lat == null || selected.lng == null) {
+                    e.preventDefault();
+                    toast.error('Coordonnées GPS indisponibles pour ce livreur');
+                  }
+                }}
                 className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-md border border-primary/30 bg-primary/5 text-sm font-medium text-primary hover:bg-primary/10"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -670,7 +681,7 @@ export default function DriversLiveContent() {
           </div>
           {selected ? (
             <p className="text-[10px] text-muted-foreground font-mono">
-              user_id={selected.driver_id.slice(0, 8)}… · lat {selected.lat?.toFixed(5)} lng {selected.lng?.toFixed(5)}
+              user_id={shortId(selected.driver_id)} · lat {selected.lat?.toFixed(5) ?? '—'} lng {selected.lng?.toFixed(5) ?? '—'}
             </p>
           ) : (
             <p className="text-xs text-amber-600">Sélectionnez un livreur avant d’ouvrir le hub.</p>
@@ -705,7 +716,7 @@ export default function DriversLiveContent() {
               <option value="">— Choisir —</option>
               {(replayDriversQ.data || liveQ.data?.markers || []).map((m) => (
                 <option key={m.driver_id} value={m.driver_id}>
-                  {'label' in m ? m.label : m.display_name} ({m.driver_id.slice(0, 8)}…)
+                  {'label' in m ? m.label : m.display_name} ({shortId(m.driver_id)})
                 </option>
               ))}
             </select>

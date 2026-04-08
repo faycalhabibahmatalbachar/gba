@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
+import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,13 @@ export async function POST(req: Request) {
       entityName: 'chat_message',
       changes: { after: { conversation_id: parsed.data.conversation_id, message_type: parsed.data.message_type } },
       metadata: { conversation_id: parsed.data.conversation_id },
+    });
+    await emitAdminNotification({
+      type: 'message_created',
+      payload: { conversation_id: parsed.data.conversation_id, message_type: parsed.data.message_type },
+      actorUserId: auth.userId,
+      entityId: ins?.id || null,
+      priority: 'normal',
     });
 
     return NextResponse.json({ message: ins });

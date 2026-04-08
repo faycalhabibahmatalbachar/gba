@@ -74,6 +74,8 @@ type DriverRow = {
 };
 
 type DriversResponse = { drivers: DriverRow[]; nextCursor: string | null; total: number };
+const hasValidGps = (g: DriverRow['last_gps']) =>
+  Boolean(g && Number.isFinite(g.lat) && Number.isFinite(g.lng));
 
 function driverStatusLabel(row: DriverRow): string {
   if (row.is_active === false) return 'suspended';
@@ -311,20 +313,20 @@ export default function DriversAdminPage() {
   );
 
   const center = React.useMemo(() => {
-    const withGps = drivers.filter((d) => d.last_gps);
+    const withGps = drivers.filter((d) => hasValidGps(d.last_gps));
     if (!withGps.length) return { longitude: 15.0444, latitude: 12.1348, zoom: 11 };
-    const lat = withGps.reduce((s, d) => s + (d.last_gps?.lat || 0), 0) / withGps.length;
-    const lng = withGps.reduce((s, d) => s + (d.last_gps?.lng || 0), 0) / withGps.length;
+    const lat = withGps.reduce((s, d) => s + (d.last_gps?.lat ?? 0), 0) / withGps.length;
+    const lng = withGps.reduce((s, d) => s + (d.last_gps?.lng ?? 0), 0) / withGps.length;
     return { longitude: lng, latitude: lat, zoom: 12 };
   }, [drivers]);
 
   const splitMapMarkers = React.useMemo((): MapWrapperMarker[] => {
     return drivers
-      .filter((d) => d.last_gps)
+      .filter((d) => hasValidGps(d.last_gps))
       .map((d) => ({
         id: d.id,
-        lat: d.last_gps!.lat,
-        lng: d.last_gps!.lng,
+        lat: d.last_gps?.lat as number,
+        lng: d.last_gps?.lng as number,
         tone: driverTone(d),
         onClick: () => {
           setSelected(d);
@@ -446,6 +448,11 @@ export default function DriversAdminPage() {
               className="min-h-[360px]"
               markers={splitMapMarkers}
             />
+            <p className="mt-2 text-xs text-muted-foreground">
+              {splitMapMarkers.length > 0
+                ? `${splitMapMarkers.length} position(s) GPS valide(s) affichée(s).`
+                : 'Positions non encore reçues ou coordonnées invalides.'}
+            </p>
           </motion.div>
         </div>
       ) : (

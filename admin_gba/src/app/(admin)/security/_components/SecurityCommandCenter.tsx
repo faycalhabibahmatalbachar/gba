@@ -21,6 +21,7 @@ import {
   Skull,
   Sparkles,
   Video,
+  Send,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/ui/custom/PageHeader';
@@ -31,11 +32,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { ConfirmModal } from '@/components/shared/ConfirmModal';
 import { cn } from '@/lib/utils';
+import { parseApiJson } from '@/lib/fetch-api-json';
 import { SecurityAccessSection } from './SecurityAccessSection';
 import { SecurityChartsBlock } from './SecurityChartsBlock';
 import { SecurityAuditRealtime, type LiveAuditRow } from './SecurityAuditRealtime';
+import { SecurityMediaSection } from './SecurityMediaSection';
 
 type Overview = {
   active_sessions?: number;
@@ -86,7 +90,7 @@ type GeoPoint = {
 };
 
 async function j<T>(r: Response): Promise<T> {
-  const x = (await r.json()) as T & { error?: string };
+  const x = (await parseApiJson<T & { error?: string }>(r)) as T & { error?: string };
   if (!r.ok) throw new Error(typeof x.error === 'string' ? x.error : r.statusText);
   return x;
 }
@@ -106,6 +110,15 @@ export function SecurityCommandCenter() {
   const [emergencyReason, setEmergencyReason] = React.useState('');
   const [liveAudit, setLiveAudit] = React.useState<LiveAuditRow[]>([]);
   const [mapFilter, setMapFilter] = React.useState<'all' | 'normal' | 'blocked' | 'unusual'>('all');
+  const [alertDraft, setAlertDraft] = React.useState({
+    headline: '',
+    message: '',
+    media_urls: '',
+    severity: 'normal' as 'low' | 'normal' | 'high',
+    role: 'all',
+    country: '',
+    send_chat_broadcast: true,
+  });
 
   const appendLive = React.useCallback((row: LiveAuditRow) => {
     setLiveAudit((prev) => [...prev.slice(-60), row]);
@@ -209,7 +222,6 @@ export function SecurityCommandCenter() {
     },
     staleTime: 120_000,
   });
-
   const pwdPolQ = useQuery({
     queryKey: ['password-policy'],
     queryFn: async () => {
@@ -357,6 +369,39 @@ export function SecurityCommandCenter() {
     onSuccess: () => {
       toast.success('Politique de session enregistrée');
       void qc.invalidateQueries({ queryKey: ['security-session-policy'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const sendSecurityBroadcast = useMutation({
+    mutationFn: async () => {
+      const media = alertDraft.media_urls
+        .split('\n')
+        .map((x) => x.trim())
+        .filter(Boolean);
+      const r = await fetch('/api/security/alerts/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          headline: alertDraft.headline,
+          message: alertDraft.message,
+          severity: alertDraft.severity,
+          media_urls: media,
+          send_chat_broadcast: alertDraft.send_chat_broadcast,
+          filters: {
+            role: alertDraft.role === 'all' ? undefined : alertDraft.role,
+            country: alertDraft.country.trim() || undefined,
+          },
+        }),
+      });
+      return j<{ ok: boolean; email_sent: boolean; chat_created: number; recipient_count: number; email_reason?: string }>(r);
+    },
+    onSuccess: (res) => {
+      toast.success(
+        `Alerte envoyée — destinataires: ${res.recipient_count}, email: ${res.email_sent ? 'OK' : 'non'}, chats: ${res.chat_created}`,
+      );
+      setAlertDraft((p) => ({ ...p, headline: '', message: '', media_urls: '' }));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -758,6 +803,92 @@ export function SecurityCommandCenter() {
         <SecurityAccessSection />
       </section>
 
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Bell className="h-5 w-5" /> Alertes broadcast sécurité (premium)
+        </h2>
+        <Card className="p-4 space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>Titre alerte</Label>
+              <Input
+                value={alertDraft.headline}
+                onChange={(e) => setAlertDraft((p) => ({ ...p, headline: e.target.value }))}
+                placeholder="Ex: Incident sécurité en cours"
+              />
+            </div>
+            <div>
+              <Label>Gravité</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={alertDraft.severity}
+                onChange={(e) => setAlertDraft((p) => ({ ...p, severity: e.target.value as 'low' | 'normal' | 'high' }))}
+              >
+                <option value="low">Faible</option>
+                <option value="normal">Normale</option>
+                <option value="high">Critique</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <Label>Message</Label>
+              <Textarea
+                value={alertDraft.message}
+                onChange={(e) => setAlertDraft((p) => ({ ...p, message: e.target.value }))}
+                placeholder="Détail de l'alerte, actions à prendre..."
+                rows={4}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Médias (URLs, une par ligne)</Label>
+              <Textarea
+                value={alertDraft.media_urls}
+                onChange={(e) => setAlertDraft((p) => ({ ...p, media_urls: e.target.value }))}
+                placeholder="https://.../capture1.png"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label>Filtre rôle</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={alertDraft.role}
+                onChange={(e) => setAlertDraft((p) => ({ ...p, role: e.target.value }))}
+              >
+                <option value="all">Tous</option>
+                <option value="client">Clients</option>
+                <option value="driver">Livreurs</option>
+                <option value="admin">Admins</option>
+              </select>
+            </div>
+            <div>
+              <Label>Filtre pays (optionnel)</Label>
+              <Input
+                value={alertDraft.country}
+                onChange={(e) => setAlertDraft((p) => ({ ...p, country: e.target.value.toUpperCase() }))}
+                placeholder="TD"
+              />
+            </div>
+            <div className="md:col-span-2 flex items-center justify-between rounded-md border border-border p-3">
+              <span className="text-xs text-muted-foreground">Créer aussi un broadcast in-app (chat_conversations + chat_messages)</span>
+              <Switch
+                checked={alertDraft.send_chat_broadcast}
+                onCheckedChange={(v) => setAlertDraft((p) => ({ ...p, send_chat_broadcast: v }))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              onClick={() => sendSecurityBroadcast.mutate()}
+              disabled={!alertDraft.headline.trim() || !alertDraft.message.trim() || sendSecurityBroadcast.isPending}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Envoyer alerte broadcast
+            </Button>
+          </div>
+        </Card>
+      </section>
+
       {/* SECTION 4 — Surveillance */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -835,6 +966,11 @@ export function SecurityCommandCenter() {
           </Card>
         </div>
         <SecurityChartsBlock />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Médias & Documents de sécurité</h2>
+        <SecurityMediaSection />
       </section>
 
       <section className="space-y-3">

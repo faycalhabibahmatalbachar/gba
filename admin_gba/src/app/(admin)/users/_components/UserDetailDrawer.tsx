@@ -56,6 +56,10 @@ type Detail = {
   user_behaviors?: Record<string, unknown>[];
 };
 
+const ADMIN_PERMISSION_SCOPES = ['users', 'orders', 'products', 'categories', 'drivers', 'messages', 'notifications', 'security', 'settings', 'reports'] as const;
+const ADMIN_PERMISSION_ACTIONS = ['create', 'read', 'update', 'delete'] as const;
+type AdminPermissionMatrix = Record<string, Record<string, boolean>>;
+
 function displayName(p: Record<string, unknown>) {
   const a = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
   return a || String(p.email || '?');
@@ -340,6 +344,57 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
   const isSuperProfile = p?.role === 'superadmin' || p?.role === 'super_admin';
   const [newRole, setNewRole] = React.useState('client');
   const [roleReason, setRoleReason] = React.useState('');
+  const [permDraft, setPermDraft] = React.useState<AdminPermissionMatrix>({});
+  const isAdminLikeProfile = ['admin', 'superadmin', 'super_admin'].includes(
+    String((q.data?.profile as Record<string, unknown> | undefined)?.role || ''),
+  );
+
+  const adminPermQ = useQuery({
+    queryKey: ['admin-role-permissions', user?.id],
+    queryFn: async () => {
+      const r = await fetch('/api/admin/roles', { credentials: 'include' });
+      const x = (await r.json()) as {
+        admins?: Array<{ id: string; permissions?: AdminPermissionMatrix }>;
+        error?: string;
+      };
+      if (!r.ok) throw new Error(x.error || 'Permissions');
+      return x.admins || [];
+    },
+    enabled: open && !!user?.id && tabVal === 'role' && !!isAdminLikeProfile,
+    staleTime: 30_000,
+  });
+
+  React.useEffect(() => {
+    if (!user?.id || !adminPermQ.data) return;
+    const current = adminPermQ.data.find((a) => a.id === user.id)?.permissions || {};
+    const next: AdminPermissionMatrix = {};
+    for (const scope of ADMIN_PERMISSION_SCOPES) {
+      next[scope] = {};
+      for (const action of ADMIN_PERMISSION_ACTIONS) {
+        next[scope][action] = Boolean(current?.[scope]?.[action]);
+      }
+    }
+    setPermDraft(next);
+  }, [adminPermQ.data, user?.id]);
+
+  const savePermMut = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('Utilisateur manquant');
+      const r = await fetch('/api/admin/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_id: user.id, permissions: permDraft }),
+      });
+      const x = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(x.error || 'Sauvegarde permissions refusée');
+    },
+    onSuccess: () => {
+      toast.success('Permissions CRUD enregistrées');
+      void qc.invalidateQueries({ queryKey: ['admin-role-permissions', user?.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <>
@@ -716,6 +771,56 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
                     </div>
                   ))}
                 </div>
+                {isAdminLikeProfile ? (
+                  <div className="space-y-2 rounded-lg border border-border p-3">
+                    <p className="text-xs font-semibold text-muted-foreground">Permissions CRUD (plateforme)</p>
+                    {adminPermQ.isLoading ? (
+                      <Skeleton className="h-24 w-full" />
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b text-muted-foreground">
+                              <th className="py-1 pr-2 text-left">Scope</th>
+                              {ADMIN_PERMISSION_ACTIONS.map((a) => (
+                                <th key={a} className="py-1 px-2 text-center uppercase">{a}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ADMIN_PERMISSION_SCOPES.map((scope) => (
+                              <tr key={scope} className="border-b border-border/60">
+                                <td className="py-1 pr-2 font-medium">{scope}</td>
+                                {ADMIN_PERMISSION_ACTIONS.map((action) => (
+                                  <td key={`${scope}-${action}`} className="py-1 px-2 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(permDraft?.[scope]?.[action])}
+                                      onChange={(e) =>
+                                        setPermDraft((prev) => ({
+                                          ...prev,
+                                          [scope]: { ...(prev[scope] || {}), [action]: e.target.checked },
+                                        }))
+                                      }
+                                    />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <Button
+                      size="sm"
+                      type="button"
+                      onClick={() => savePermMut.mutate()}
+                      disabled={savePermMut.isPending || adminPermQ.isLoading}
+                    >
+                      Enregistrer permissions CRUD
+                    </Button>
+                  </div>
+                ) : null}
               </TabsContent>
               <TabsContent value="sec" className="pt-3 space-y-3">
                 <Button variant="destructive" size="sm" type="button" onClick={() => setRevokeOpen(true)}>

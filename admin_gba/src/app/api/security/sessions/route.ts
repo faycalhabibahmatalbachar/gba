@@ -56,6 +56,22 @@ export async function GET() {
 
   const users = data?.users ?? [];
   const now = Date.now();
+  const { data: loginRows } = await sb
+    .from('admin_login_history')
+    .select('user_id, email, ip_address, user_agent, created_at')
+    .order('created_at', { ascending: false })
+    .limit(2000);
+  const loginByUser = new Map<string, { ip: string | null; ua: string | null; at: string | null; email: string | null }>();
+  const loginByEmail = new Map<string, { ip: string | null; ua: string | null; at: string | null }>();
+  for (const row of loginRows || []) {
+    const userId = String((row as { user_id?: string | null }).user_id || '');
+    const email = String((row as { email?: string | null }).email || '').toLowerCase();
+    const ip = ((row as { ip_address?: string | null }).ip_address || null) as string | null;
+    const ua = ((row as { user_agent?: string | null }).user_agent || null) as string | null;
+    const at = ((row as { created_at?: string | null }).created_at || null) as string | null;
+    if (userId && !loginByUser.has(userId)) loginByUser.set(userId, { ip, ua, at, email: email || null });
+    if (email && !loginByEmail.has(email)) loginByEmail.set(email, { ip, ua, at });
+  }
 
   const activeSessions = users
     .filter((u) => {
@@ -67,14 +83,17 @@ export async function GET() {
       const lastSignIn = new Date(u.last_sign_in_at!).getTime();
       const hoursAgo = (now - lastSignIn) / 3600000;
       const meta = (u.user_metadata || {}) as Record<string, unknown>;
-      const ip = (meta.last_ip as string) || null;
-      const ua = (meta.last_ua as string) || null;
+      const byUser = loginByUser.get(u.id);
+      const byEmail = u.email ? loginByEmail.get(String(u.email).toLowerCase()) : undefined;
+      const ip = (meta.last_ip as string) || byUser?.ip || byEmail?.ip || null;
+      const ua = (meta.last_ua as string) || byUser?.ua || byEmail?.ua || null;
+      const startedAt = byUser?.at || byEmail?.at || u.last_sign_in_at;
       const { browser, os } = parseUa(ua);
       return {
         id: u.id,
         user_id: u.id,
         email: u.email,
-        started_at: u.last_sign_in_at,
+        started_at: startedAt,
         ended_at: null as string | null,
         last_active_at: u.last_sign_in_at,
         ip_address: ip,

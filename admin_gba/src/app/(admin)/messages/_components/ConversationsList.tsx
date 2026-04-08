@@ -31,7 +31,7 @@ import { AvatarWithInitials } from '@/components/ui/custom/AvatarWithInitials';
 import { cn } from '@/lib/utils';
 import { useMessagesContext } from './MessagesContext';
 import type { ConversationListItem } from './types';
-import { BroadcastDialog } from './BroadcastDialog';
+import { BroadcastInAppDialog } from './BroadcastInAppDialog';
 
 type FilterTab = 'all' | 'unread' | 'clients' | 'drivers' | 'admins' | 'broadcast';
 
@@ -253,7 +253,7 @@ export function ConversationsList() {
         </DialogContent>
       </Dialog>
 
-      <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
+      <BroadcastInAppDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
     </div>
   );
 }

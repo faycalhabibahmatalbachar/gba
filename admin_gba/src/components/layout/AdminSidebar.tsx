@@ -35,7 +35,6 @@ const NAV: NavItem[] = [
     label: 'Livraisons', icon: Truck,
     children: [
       { label: 'Toutes les livraisons', href: '/deliveries' },
-      { label: 'Suivi en direct', href: '/deliveries/tracking' },
     ],
   },
   {

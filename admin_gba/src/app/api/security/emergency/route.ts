@@ -4,6 +4,7 @@ import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { writeAuditLog } from '@/lib/audit/server-audit';
 import { renderEmailTemplate, sendEmail } from '@/lib/email/email.service';
+import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,7 +129,7 @@ export async function POST(req: Request) {
       if (!emails.length) {
         fullLockdownEmailNote = 'Aucun email superadmin en base — alerte email non envoyée.';
       } else if (!emailOutcome.success) {
-        fullLockdownEmailNote = `Alerte email non délivrée (${emailOutcome.error || 'voir journal email_logs / RESEND_API_KEY'}).`;
+        fullLockdownEmailNote = `Alerte email non délivrée (${emailOutcome.error || 'voir journal email_logs / SMTP'}).`;
       } else {
         fullLockdownEmailNote = 'Emails d’alerte envoyés aux superadmins.';
       }
@@ -142,6 +143,17 @@ export async function POST(req: Request) {
       description: `Urgence sécurité: ${parsed.data.action} — ${parsed.data.reason}`,
       status: 'success',
       metadata: { action: parsed.data.action },
+    });
+    await emitAdminNotification({
+      type: 'security_alert',
+      payload: {
+        headline: `Urgence sécurité: ${parsed.data.action}`,
+        detail: parsed.data.reason,
+        meta: `actor=${auth.email || auth.userId} at=${now}`,
+      },
+      actorUserId: auth.userId,
+      entityId: 'security_emergency',
+      priority: 'high',
     });
 
     return NextResponse.json({

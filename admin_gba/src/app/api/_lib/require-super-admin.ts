@@ -44,6 +44,10 @@ export async function requireSuperAdmin(): Promise<SuperAdminAuthResult> {
   } = await supabase.auth.getUser();
 
   if (authErr || !user) {
+    const msg = authErr?.message || 'Unauthorized';
+    if (/fetch failed|timeout|timed out|connect/i.test(msg)) {
+      return { ok: false, response: NextResponse.json({ error: 'Supabase indisponible', code: 'SUPABASE_CONNECTIVITY' }, { status: 503 }) };
+    }
     return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 

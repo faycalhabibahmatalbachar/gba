@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  audioplayers_windows
   connectivity_plus
   file_selector_windows
   firebase_core
@@ -11,6 +12,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   gal
   geolocator_windows
   permission_handler_windows
+  record_windows
   share_plus
   sqlite3_flutter_libs
   url_launcher_windows

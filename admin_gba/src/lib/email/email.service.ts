@@ -1,4 +1,5 @@
 import { getServiceSupabase } from '@/lib/supabase/service-role';
+import { getMailer } from '@/lib/email/mailer';
 
 export type EmailPriority = 'high' | 'normal' | 'low';
 
@@ -10,15 +11,21 @@ export type SendEmailInput = {
   priority?: EmailPriority;
   replyTo?: string;
   cc?: string | string[];
+  attachments?: { url: string; name?: string; type?: string }[];
   triggeredByAction?: string;
   triggeredByEntityId?: string;
   triggeredByActorId?: string | null;
 };
 
-const FROM =
-  process.env.EMAIL_FROM_NAME && process.env.EMAIL_FROM
-    ? `${process.env.EMAIL_FROM_NAME} <${process.env.EMAIL_FROM}>`
-    : process.env.EMAIL_FROM || 'GBA Admin <onboarding@resend.dev>';
+/** Resend gratuit sans domaine : `onboarding@resend.dev` (destinataires limités au compte Resend). */
+const DEFAULT_FROM_EMAIL = 'onboarding@resend.dev';
+const DEFAULT_FROM_NAME = 'GBA';
+
+export function buildEmailFromHeader(): string {
+  const addr = process.env.EMAIL_FROM?.trim() || DEFAULT_FROM_EMAIL;
+  const name = process.env.EMAIL_FROM_NAME?.trim() || DEFAULT_FROM_NAME;
+  return `${name} <${addr}>`;
+}
 
 function wrapBrandHtml(title: string, inner: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/></head>
@@ -73,9 +80,16 @@ export function renderEmailTemplate(
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  console.info('[email] route start', {
+    hasSmtp: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+    hasResend: Boolean(process.env.RESEND_API_KEY),
+  });
   const recipients = Array.isArray(input.to) ? input.to : [input.to];
   const primary = recipients[0];
   if (!primary) return { success: false, error: 'Destinataire manquant' };
+  const cc = input.cc ? (Array.isArray(input.cc) ? input.cc : [input.cc]) : undefined;
+  const attachments = Array.isArray(input.attachments) ? input.attachments : [];
+  const startedAt = Date.now();
 
   let logId: string | null = null;
   try {
@@ -86,10 +100,14 @@ export async function sendEmail(input: SendEmailInput): Promise<{ success: boole
         template_name: input.template,
         to_email: recipients.join(', '),
         subject: input.subject,
+        body_html: input.html,
+        attachments: attachments.length ? attachments : null,
         status: 'pending',
         triggered_by_action: input.triggeredByAction ?? null,
         triggered_by_entity_id: input.triggeredByEntityId ?? null,
         triggered_by_actor_id: input.triggeredByActorId ?? null,
+        provider: null,
+        retry_count: 0,
       })
       .select('id')
       .single();
@@ -98,36 +116,33 @@ export async function sendEmail(input: SendEmailInput): Promise<{ success: boole
     /* log table peut être absente avant migration */
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    if (logId) {
+  try {
+    const mailAttachments: { filename: string; content: Buffer; contentType?: string }[] = [];
+    for (const att of attachments) {
+      if (!att?.url) continue;
       try {
-        const sb = getServiceSupabase();
-        await sb
-          .from('email_logs')
-          .update({ status: 'failed', error_message: 'RESEND_API_KEY manquant', sent_at: new Date().toISOString() })
-          .eq('id', logId);
+        const r = await fetch(att.url);
+        if (!r.ok) continue;
+        const ab = await r.arrayBuffer();
+        mailAttachments.push({
+          filename: att.name?.trim() || 'piece-jointe',
+          content: Buffer.from(ab),
+          contentType: att.type || r.headers.get('content-type') || 'application/octet-stream',
+        });
       } catch {
-        /* ignore */
+        // Keep sending the email even if one attachment fails to fetch.
       }
     }
-    return { success: false, error: 'RESEND_API_KEY manquant' };
-  }
-
-  try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(apiKey);
-    const cc = input.cc ? (Array.isArray(input.cc) ? input.cc : [input.cc]) : undefined;
-    const { data, error } = await resend.emails.send({
-      from: FROM,
+    const mailer = getMailer();
+    const out = await mailer.send({
+      from: buildEmailFromHeader(),
       to: recipients,
       cc: cc && cc.length ? cc : undefined,
       replyTo: input.replyTo,
       subject: input.subject,
       html: input.html,
+      attachments: mailAttachments.length ? mailAttachments : undefined,
     });
-    if (error) throw new Error(error.message || 'Resend error');
-
     if (logId) {
       try {
         const sb = getServiceSupabase();
@@ -135,28 +150,39 @@ export async function sendEmail(input: SendEmailInput): Promise<{ success: boole
           .from('email_logs')
           .update({
             status: 'sent',
-            message_id: data?.id ?? null,
+            message_id: out.messageId ?? null,
+            provider: out.provider,
+            provider_message_id: out.messageId ?? null,
+            retry_count: 0,
+            retryable: false,
+            latency_ms: Date.now() - startedAt,
             sent_at: new Date().toISOString(),
           })
           .eq('id', logId);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     }
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: out.messageId };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const lastErr = e instanceof Error ? e.message : String(e);
+    const retryable = /timeout|timed out|econn|enotfound|fetch failed|connect/i.test(lastErr);
+    const failedProvider = process.env.RESEND_API_KEY ? 'resend' : 'smtp';
     if (logId) {
       try {
         const sb = getServiceSupabase();
         await sb
           .from('email_logs')
-          .update({ status: 'failed', error_message: msg, sent_at: new Date().toISOString() })
+          .update({
+            status: 'failed',
+            error_message: `${failedProvider}: ${lastErr}`,
+            provider: failedProvider,
+            retry_count: 1,
+            retryable,
+            latency_ms: Date.now() - startedAt,
+            sent_at: new Date().toISOString(),
+          })
           .eq('id', logId);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     }
-    return { success: false, error: msg };
+    return { success: false, error: lastErr };
   }
 }

@@ -6,8 +6,12 @@ import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
-const CAT_SELECT =
+const CAT_SELECT_WITH_COLOR =
   'id,name,slug,description,parent_id,sort_order,is_active,link_url,accent_color,icon_key,image_url';
+const CAT_SELECT_NO_COLOR =
+  'id,name,slug,description,parent_id,sort_order,is_active,link_url,icon_key,image_url';
+const CAT_SELECT_MIN =
+  'id,name,slug,description,parent_id,sort_order,is_active,link_url,image_url';
 
 const patchSchema = z
   .object({
@@ -69,7 +73,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   try {
-    const { data: before, error: e0 } = await sb.from('categories').select(CAT_SELECT).eq('id', id).maybeSingle();
+    let { data: before, error: e0 } = await sb
+      .from('categories')
+      .select(CAT_SELECT_WITH_COLOR)
+      .eq('id', id)
+      .maybeSingle();
+    if (e0 && /accent_color/i.test(e0.message || '')) {
+      const fallback = await sb.from('categories').select(CAT_SELECT_NO_COLOR).eq('id', id).maybeSingle();
+      before = fallback.data ? ({ ...fallback.data, accent_color: null } as typeof before) : before;
+      e0 = fallback.error;
+    }
+    if (e0 && /icon_key/i.test(e0.message || '')) {
+      const fallback = await sb.from('categories').select(CAT_SELECT_MIN).eq('id', id).maybeSingle();
+      before = fallback.data ? ({ ...fallback.data, accent_color: null, icon_key: null } as typeof before) : before;
+      e0 = fallback.error;
+    }
     if (e0 || !before) {
       return NextResponse.json({ error: 'Introuvable' }, { status: 404 });
     }
@@ -82,12 +100,34 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       }
     }
 
-    const { data: after, error } = await sb
+    let { data: after, error } = await sb
       .from('categories')
       .update(updates)
       .eq('id', id)
-      .select(CAT_SELECT)
+      .select(CAT_SELECT_WITH_COLOR)
       .single();
+    if (error && /accent_color/i.test(error.message || '')) {
+      const { accent_color, ...updatesNoColor } = updates;
+      const fallback = await sb
+        .from('categories')
+        .update(updatesNoColor)
+        .eq('id', id)
+        .select(CAT_SELECT_NO_COLOR)
+        .single();
+      after = fallback.data ? ({ ...fallback.data, accent_color: null } as typeof after) : after;
+      error = fallback.error;
+    }
+    if (error && /icon_key/i.test(error.message || '')) {
+      const { accent_color, icon_key, ...updatesMin } = updates;
+      const fallback = await sb
+        .from('categories')
+        .update(updatesMin)
+        .eq('id', id)
+        .select(CAT_SELECT_MIN)
+        .single();
+      after = fallback.data ? ({ ...fallback.data, accent_color: null, icon_key: null } as typeof after) : after;
+      error = fallback.error;
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -154,7 +194,21 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   }
 
   try {
-    const { data: before, error: e0 } = await sb.from('categories').select(CAT_SELECT).eq('id', id).maybeSingle();
+    let { data: before, error: e0 } = await sb
+      .from('categories')
+      .select(CAT_SELECT_WITH_COLOR)
+      .eq('id', id)
+      .maybeSingle();
+    if (e0 && /accent_color/i.test(e0.message || '')) {
+      const fallback = await sb.from('categories').select(CAT_SELECT_NO_COLOR).eq('id', id).maybeSingle();
+      before = fallback.data ? ({ ...fallback.data, accent_color: null } as typeof before) : before;
+      e0 = fallback.error;
+    }
+    if (e0 && /icon_key/i.test(e0.message || '')) {
+      const fallback = await sb.from('categories').select(CAT_SELECT_MIN).eq('id', id).maybeSingle();
+      before = fallback.data ? ({ ...fallback.data, accent_color: null, icon_key: null } as typeof before) : before;
+      e0 = fallback.error;
+    }
     if (e0 || !before) {
       return NextResponse.json({ error: 'Introuvable' }, { status: 404 });
     }

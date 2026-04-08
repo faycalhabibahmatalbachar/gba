@@ -9,8 +9,11 @@ const bodySchema = z.object({
   to: z.string().email(),
 });
 
-/** Test Resend / journal email_logs — superadmin uniquement. */
+/** Test SMTP / journal email_logs — superadmin uniquement. */
 export async function POST(req: Request) {
+  console.info('[email-logs.test-send] handler start', {
+    hasSmtp: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+  });
   const auth = await requireSuperAdmin();
   if (!auth.ok) return auth.response;
 

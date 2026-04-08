@@ -209,6 +209,8 @@ export async function evaluateAdminGate(opts: {
     const effectiveWhitelist = [...payload.whitelistCidrs, ...emergencyCidrs];
     if (effectiveWhitelist.length > 0) {
       if (!ip || !ipAllowedByList(ip, effectiveWhitelist)) {
+        const sup = await isSuperAdmin(sb, user);
+        if (sup) return { ok: true };
         return {
           ok: false,
           status: 403,

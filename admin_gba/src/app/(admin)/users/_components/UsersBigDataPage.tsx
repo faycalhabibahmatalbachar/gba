@@ -27,6 +27,7 @@ import {
   Lock,
   LogOut,
   Mail,
+  MessageSquare,
   MoreHorizontal,
   PieChart as PieChartIcon,
   RefreshCw,
@@ -150,6 +151,8 @@ export default function UsersBigDataPage() {
   const [blockTarget, setBlockTarget] = React.useState<Row | null>(null);
   const [blockReason, setBlockReason] = React.useState('');
   const [blockHours, setBlockHours] = React.useState<number | null>(null);
+  const [bulkBroadcastOpen, setBulkBroadcastOpen] = React.useState(false);
+  const [bulkMsg, setBulkMsg] = React.useState('');
   const [mainTab, setMainTab] = React.useState<'users' | 'admins'>('users');
 
   const meQ = useQuery({
@@ -459,6 +462,31 @@ export default function UsersBigDataPage() {
   };
 
   const loading = inf.isLoading && !flat.length;
+  const bulkBroadcastMut = useMutation({
+    mutationFn: async () => {
+      const ids = flat.map((r) => r.id).slice(0, 1000);
+      const r = await fetch('/api/messages/broadcast-inapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          target: 'specific',
+          user_ids: ids,
+          message: { body: bulkMsg.trim(), message_type: 'text', attachments: [] },
+          send_push: false,
+        }),
+      });
+      const x = await r.json();
+      if (!r.ok) throw new Error(x.error || 'Broadcast échoué');
+      return x as { sent_count: number };
+    },
+    onSuccess: (x) => {
+      toast.success(`Broadcast in-app envoyé à ${x.sent_count} utilisateurs`);
+      setBulkBroadcastOpen(false);
+      setBulkMsg('');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
@@ -474,6 +502,10 @@ export default function UsersBigDataPage() {
             <Button variant="outline" size="sm" onClick={exportCsv} disabled={!flat.length}>
               <Download className="h-3.5 w-3.5 mr-1" />
               Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setBulkBroadcastOpen(true)} disabled={!flat.length}>
+              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+              Broadcast In-App
             </Button>
             <Button variant="outline" size="sm" type="button" onClick={() => setShowRolePie((v) => !v)}>
               <PieChartIcon className="h-3.5 w-3.5 mr-1" />
@@ -901,6 +933,29 @@ export default function UsersBigDataPage() {
               }}
             >
               Confirmer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkBroadcastOpen} onOpenChange={setBulkBroadcastOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Broadcast In-App (liste filtrée)</DialogTitle>
+            <DialogDescription>
+              Envoi vers les utilisateurs actuellement chargés ({Math.min(flat.length, 1000)} max par envoi).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Message</Label>
+            <Textarea rows={4} value={bulkMsg} onChange={(e) => setBulkMsg(e.target.value)} placeholder="Message in-app..." />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setBulkBroadcastOpen(false)}>
+              Annuler
+            </Button>
+            <Button type="button" disabled={!bulkMsg.trim() || bulkBroadcastMut.isPending} onClick={() => bulkBroadcastMut.mutate()}>
+              Envoyer
             </Button>
           </DialogFooter>
         </DialogContent>

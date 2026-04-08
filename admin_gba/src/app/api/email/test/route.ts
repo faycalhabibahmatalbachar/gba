@@ -6,6 +6,9 @@ import { renderEmailTemplate, sendEmail } from '@/lib/email/email.service';
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
+  console.info('[email.test] handler start', {
+    hasSmtp: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+  });
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 

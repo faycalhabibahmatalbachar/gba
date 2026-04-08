@@ -13,10 +13,13 @@ export async function GET(req: Request) {
   const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10) || 0);
   const status = searchParams.get('status')?.trim();
   const template = searchParams.get('template')?.trim();
-  const toEmail = searchParams.get('to')?.trim();
+  const toEmail = searchParams.get('toEmail')?.trim() || searchParams.get('to')?.trim();
   const qSubj = searchParams.get('q')?.trim();
+  const provider = searchParams.get('provider')?.trim();
+  const retryable = searchParams.get('retryable')?.trim();
   const fromIso = searchParams.get('from')?.trim();
-  const toIso = searchParams.get('to')?.trim();
+  const toIso = searchParams.get('toDate')?.trim();
+  const mode = searchParams.get('mode')?.trim();
 
   let sb: ReturnType<typeof getServiceSupabase>;
   try {
@@ -26,6 +29,27 @@ export async function GET(req: Request) {
   }
 
   try {
+    if (mode === 'stats') {
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const since = monthStart.toISOString();
+      const [all, sent, failed, pending] = await Promise.all([
+        sb.from('email_logs').select('id', { count: 'exact', head: true }).gte('created_at', since),
+        sb.from('email_logs').select('id', { count: 'exact', head: true }).eq('status', 'sent').gte('created_at', since),
+        sb.from('email_logs').select('id', { count: 'exact', head: true }).eq('status', 'failed').gte('created_at', since),
+        sb.from('email_logs').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('created_at', since),
+      ]);
+      const total = all.count || 0;
+      const success = sent.count || 0;
+      return NextResponse.json({
+        total_month: total,
+        success_rate: total ? Math.round((success / total) * 100) : 0,
+        failed_month: failed.count || 0,
+        pending_month: pending.count || 0,
+      });
+    }
+
     let q = sb.from('email_logs').select('*', { count: 'exact' }).order('created_at', { ascending: false });
     if (status && ['pending', 'sent', 'failed'].includes(status)) {
       q = q.eq('status', status);
@@ -40,6 +64,11 @@ export async function GET(req: Request) {
       const safe = qSubj.replace(/[%*,]/g, '').slice(0, 120);
       if (safe) q = q.or(`subject.ilike.%${safe}%,error_message.ilike.%${safe}%`);
     }
+    if (provider && ['smtp', 'resend'].includes(provider)) {
+      q = q.eq('provider', provider);
+    }
+    if (retryable === 'true') q = q.eq('retryable', true);
+    if (retryable === 'false') q = q.eq('retryable', false);
     if (fromIso) {
       q = q.gte('created_at', fromIso);
     }
@@ -55,6 +84,8 @@ export async function GET(req: Request) {
       offset,
       limit,
       resend_configured: Boolean(process.env.RESEND_API_KEY),
+      smtp_configured: Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS),
+      provider_mode: process.env.EMAIL_PROVIDER || 'auto',
     });
   } catch (e) {
     const msg = String((e as Error).message);

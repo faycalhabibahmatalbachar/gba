@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
+import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,6 +109,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         after: { driver_id: userId, drivers_row_id: driverTableId },
       },
       description: 'Assignation commande → livreur',
+    });
+    await emitAdminNotification({
+      type: 'order_status_changed',
+      payload: {
+        order_number: (order as { order_number?: string }).order_number || parsed.data.order_id,
+        status: 'driver_assigned',
+        driver_user_id: userId,
+      },
+      actorUserId: auth.userId,
+      entityId: parsed.data.order_id,
+      priority: 'normal',
     });
 
     return NextResponse.json({ ok: true, order_id: parsed.data.order_id, driver_user_id: userId });

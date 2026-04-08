@@ -18,7 +18,6 @@ const ROUTE_LABELS: Record<string, string> = {
   products: 'Produits',
   categories: 'Catégories',
   deliveries: 'Livraisons',
-  tracking: 'Suivi en direct',
   drivers: 'Livreurs',
   users: 'Utilisateurs',
   messages: 'Messages',

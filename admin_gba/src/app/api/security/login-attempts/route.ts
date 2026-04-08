@@ -60,7 +60,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ data: rows, source: hist.data?.length ? 'admin_login_history' : 'audit_logs' });
   } catch (e) {
-    return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });
+    const msg = String((e as Error).message);
+    const isNet = /fetch failed|timeout|timed out|connect/i.test(msg);
+    return NextResponse.json({ error: msg, code: isNet ? 'SUPABASE_CONNECTIVITY' : 'INTERNAL' }, { status: isNet ? 503 : 500 });
   }
 }
 
@@ -111,6 +113,10 @@ export async function POST(req: Request) {
     user_id: userId,
   });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    const msg = error.message || 'Erreur';
+    const isNet = /timeout|timed out|connect|fetch failed/i.test(msg);
+    return NextResponse.json({ error: msg, code: isNet ? 'SUPABASE_CONNECTIVITY' : 'DB_ERROR' }, { status: isNet ? 503 : 500 });
+  }
   return NextResponse.json({ ok: true, reason: body.reason ?? null });
 }

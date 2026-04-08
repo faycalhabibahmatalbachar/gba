@@ -43,6 +43,11 @@ export async function requireAdmin(): Promise<AdminAuthResult> {
   } = await supabase.auth.getUser();
 
   if (authErr || !user) {
+    const msg = authErr?.message || 'Unauthorized';
+    const isNet = /fetch failed|timeout|timed out|connect/i.test(msg);
+    if (isNet) {
+      return { ok: false, response: NextResponse.json({ error: 'Supabase indisponible', code: 'SUPABASE_CONNECTIVITY' }, { status: 503 }) };
+    }
     return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
@@ -63,6 +68,9 @@ export async function requireAdmin(): Promise<AdminAuthResult> {
   const r = profile?.role;
   const allowed = r === 'admin' || r === 'superadmin' || r === 'super_admin';
   if (profErr || !allowed) {
+    if (profErr && /fetch failed|timeout|timed out|connect/i.test(profErr.message || '')) {
+      return { ok: false, response: NextResponse.json({ error: 'Supabase indisponible', code: 'SUPABASE_CONNECTIVITY' }, { status: 503 }) };
+    }
     return { ok: false, response: NextResponse.json({ error: 'Forbidden: admin only' }, { status: 403 }) };
   }
 
