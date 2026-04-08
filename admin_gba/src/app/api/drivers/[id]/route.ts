@@ -159,14 +159,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             suspended_by: null,
           })
           .eq('id', uid);
-      } else if (reason !== undefined) {
+      } else if (updates.is_active === false) {
+        const r = reason != null && String(reason).trim().length > 0 ? String(reason).trim() : null;
         await sb
           .from('profiles')
           .update({
-            is_suspended: Boolean(reason && String(reason).length > 0),
-            suspension_reason: reason ? String(reason) : null,
-            suspended_at: reason ? new Date().toISOString() : null,
-            suspended_by: reason ? auth.userId : null,
+            is_suspended: true,
+            suspension_reason: r || 'Suspension administrative',
+            suspended_at: new Date().toISOString(),
+            suspended_by: auth.userId,
           })
           .eq('id', uid);
       }

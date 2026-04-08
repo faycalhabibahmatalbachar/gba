@@ -17,6 +17,7 @@ export type LiveMarker = {
   driver_row_id: string | null;
   delivery_address: string | null;
   stale_position: boolean;
+  source?: 'live' | 'db_fallback';
 };
 
 export type LiveStats = {
@@ -99,16 +100,56 @@ export async function buildLiveMarkers(sb: SupabaseClient): Promise<{ markers: L
       .select('id', { count: 'exact', head: true })
       .in('status', ['confirmed', 'processing', 'shipped']);
 
+    const markers: LiveMarker[] = [];
+    const { data: rosterOnly } = await sb
+      .from('drivers')
+      .select(
+        'id, user_id, name, phone, is_active, current_lat, current_lng, last_location_at, vehicle_plate',
+      )
+      .eq('is_active', true)
+      .not('user_id', 'is', null)
+      .limit(500);
+
+    for (const d of rosterOnly || []) {
+      const row = d as Record<string, unknown>;
+      const uid = String(row.user_id || '');
+      const lat = Number(row.current_lat);
+      const lng = Number(row.current_lng);
+      if (!uid || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const atRaw = (row.last_location_at as string) || new Date(0).toISOString();
+      const inactiveMinutes = Math.max(0, Math.round((Date.now() - new Date(atRaw).getTime()) / 60000));
+      markers.push({
+        driver_id: uid,
+        lat,
+        lng,
+        order_id: null,
+        at: atRaw,
+        display_name: String(row.name || 'Livreur'),
+        avatar_url: null,
+        phone: (row.phone as string | null) ?? null,
+        status: 'inactive',
+        inactive_minutes: inactiveMinutes,
+        speed_kmh: null,
+        heading: null,
+        battery_level: null,
+        driver_row_id: String(row.id),
+        delivery_address: null,
+        stale_position: true,
+        source: 'db_fallback',
+      });
+    }
+
+    const activeDeliveries = markers.filter((m) => m.order_id).length;
     return {
-      markers: [],
+      markers,
       stats: {
         online: 0,
         delivering: 0,
-        idle: 0,
-        offline: activeDrivers ?? 0,
+        idle: markers.length,
+        offline: Math.max(0, (activeDrivers ?? 0) - markers.length),
         orders_active: oa ?? 0,
-        drivers_on_map: 0,
-        active_deliveries: 0,
+        drivers_on_map: markers.length,
+        active_deliveries: activeDeliveries,
         updated_at: new Date().toISOString(),
       },
     };
@@ -191,8 +232,50 @@ export async function buildLiveMarkers(sb: SupabaseClient): Promise<{ markers: L
       driver_row_id: idByUser.get(loc.driver_id) ?? null,
       delivery_address: loc.order_id ? orderAddr.get(loc.order_id) ?? null : null,
       stale_position,
+      source: 'live',
     };
   });
+
+  const coveredAuthIds = new Set(markers.map((m) => m.driver_id));
+  const { data: rosterDrivers } = await sb
+    .from('drivers')
+    .select(
+      'id, user_id, name, phone, is_active, is_online, is_available, current_lat, current_lng, last_location_at, vehicle_plate',
+    )
+    .eq('is_active', true)
+    .not('user_id', 'is', null)
+    .limit(500);
+
+  for (const d of rosterDrivers || []) {
+    const row = d as Record<string, unknown>;
+    const uid = String(row.user_id || '');
+    if (!uid || coveredAuthIds.has(uid)) continue;
+    const lat = Number(row.current_lat);
+    const lng = Number(row.current_lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    coveredAuthIds.add(uid);
+    const atRaw = (row.last_location_at as string) || new Date(0).toISOString();
+    const inactiveMinutes = Math.max(0, Math.round((Date.now() - new Date(atRaw).getTime()) / 60000));
+    markers.push({
+      driver_id: uid,
+      lat,
+      lng,
+      order_id: null,
+      at: atRaw,
+      display_name: String(row.name || 'Livreur'),
+      avatar_url: null,
+      phone: (row.phone as string | null) ?? null,
+      status: 'inactive',
+      inactive_minutes: inactiveMinutes,
+      speed_kmh: null,
+      heading: null,
+      battery_level: null,
+      driver_row_id: String(row.id),
+      delivery_address: null,
+      stale_position: true,
+      source: 'db_fallback',
+    });
+  }
 
   const activeDeliveries = markers.filter((m) => m.order_id).length;
   const online = markers.filter((m) => m.status === 'online').length;

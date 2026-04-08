@@ -389,11 +389,27 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
   }
 
   String? _audioUrl(Map<String, dynamic> msg) {
-    if ((msg['message_type'] ?? '') != 'audio') return null;
+    final type = (msg['message_type'] ?? '').toString().toLowerCase();
     final at = _extractAttachments(msg);
-    if (at.isNotEmpty && at.first['url'] is String) return at.first['url'] as String;
+    if (at.isNotEmpty && at.first['url'] is String) {
+      final u = (at.first['url'] as String).trim();
+      final ct = (at.first['type'] ?? '').toString().toLowerCase();
+      if (type == 'audio' || ct.startsWith('audio/') || _looksLikeAudioUrl(u)) return u;
+    }
     final body = (msg['message'] ?? '').toString().trim();
-    return body.startsWith('http') ? body : null;
+    if (type == 'audio' && body.startsWith('http')) return body;
+    if (body.startsWith('http') && _looksLikeAudioUrl(body)) return body;
+    return null;
+  }
+
+  bool _looksLikeAudioUrl(String u) {
+    final lower = u.toLowerCase();
+    return lower.endsWith('.m4a') ||
+        lower.endsWith('.aac') ||
+        lower.endsWith('.mp3') ||
+        lower.endsWith('.ogg') ||
+        lower.contains('/audio') ||
+        lower.contains('voice');
   }
 
   int? _audioDuration(Map<String, dynamic> msg) {
@@ -658,8 +674,17 @@ class _MessageBubble extends StatelessWidget {
   });
 
   bool get _isImage {
+    if (messageType == 'audio') return false;
     if (imageUrl != null && imageUrl!.isNotEmpty) return true;
-    final t = text.trim();
+    final t = text.trim().toLowerCase();
+    if (t.endsWith('.m4a') ||
+        t.endsWith('.aac') ||
+        t.endsWith('.mp3') ||
+        t.endsWith('.ogg') ||
+        t.endsWith('.wav') ||
+        t.contains('audio/')) {
+      return false;
+    }
     return t.startsWith('http') &&
         (t.contains('/storage/v1/object/public/chat/') ||
             t.endsWith('.jpg') ||
@@ -672,8 +697,8 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isImg = messageType == 'image' || _isImage;
     final isAudio = messageType == 'audio' && audioUrl != null && audioUrl!.isNotEmpty;
+    final isImg = !isAudio && (messageType == 'image' || _isImage);
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(18),
       topRight: const Radius.circular(18),

@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 
 import '../providers/auth_provider.dart';
 import '../localization/app_localizations.dart';
+import '../utils/auth_errors.dart';
 import '../widgets/language_picker_button.dart';
 
 const _g1 = Color(0xFF667eea);
@@ -57,7 +58,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   }
 
   String _authErrorMessage(AppLocalizations l10n, String raw, String? code) {
-    if (code == 'email_address_invalid') return l10n.translate('auth_error_email_invalid');
+    if (code == 'email_address_invalid' || code == 'validation_failed') {
+      return l10n.translate('auth_error_email_invalid');
+    }
     if (code == 'unexpected_failure') return l10n.translate('auth_error_server_db');
     if (raw.contains('Database error') || raw.contains('500')) return l10n.translate('auth_error_server_db');
     return raw;
@@ -181,8 +184,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                                 icon: Icons.email_outlined,
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return localizations.translate('enter_your_email');
-                                  if (!v.trim().contains('@')) return localizations.translate('invalid_email');
+                                  if (v == null || v.trim().isEmpty) {
+                                    return localizations.translate('enter_your_email');
+                                  }
+                                  final fmt = validateSignupEmail(v);
+                                  if (fmt != null) return fmt;
                                   return null;
                                 },
                                 animDelay: 420.ms,

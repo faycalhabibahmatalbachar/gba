@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/supabase_service.dart';
 import '../routes/navigation_keys.dart';
+import '../utils/auth_errors.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier();
@@ -185,20 +186,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } catch (e) {
       _log('signIn error: $e');
-      String message = e.toString();
       String? code;
 
       if (e is AuthApiException) {
         code = e.code;
         _log('signIn AuthApiException: statusCode=${e.statusCode}, code=${e.code}, message=${e.message}');
-        if (e.code == 'invalid_credentials') {
-          message =
-              'Connexion refusée. Vérifie le mot de passe OU confirme ton email (regarde ta boîte mail).';
-        }
-        if (e.code == 'email_address_invalid') {
-          message =
-              'Email invalide. Retape l\'email (sans espaces/caractères invisibles) et réessaie.';
-        }
+      }
+
+      String message = localizeAuthError(e);
+      if (e is AuthApiException && e.code == 'invalid_credentials') {
+        message =
+            'Connexion refusée. Vérifiez le mot de passe ou confirmez votre e-mail (lien dans la boîte de réception).';
       }
 
       state = state.copyWith(isLoading: false, error: message, errorCode: code);
@@ -256,17 +254,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _loadProfile();
     } catch (e) {
       _log('signUp error: $e');
-      String message = e.toString();
       String? code;
 
       if (e is AuthApiException) {
         code = e.code;
         _log('signUp AuthApiException: statusCode=${e.statusCode}, code=${e.code}, message=${e.message}');
-        if (e.code == 'email_address_invalid') {
-          message =
-              'Email invalide. Retape l\'email (sans espaces/caractères invisibles) et réessaie.';
-        }
       }
+
+      final message = localizeAuthError(
+        e,
+        fallback: 'Inscription impossible pour le moment. Réessayez plus tard.',
+      );
 
       state = state.copyWith(isLoading: false, error: message, errorCode: code);
     }

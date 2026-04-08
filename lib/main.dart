@@ -207,9 +207,8 @@ class _AppBootstrapState extends ConsumerState<AppBootstrap> with WidgetsBinding
   }
 
   Future<void> _handleUri(Uri uri) async {
-    if (uri.scheme != 'com.gba.ecommerce_client' || uri.host != 'login-callback') {
-      return;
-    }
+    if (uri.host != 'login-callback') return;
+    if (!uri.scheme.startsWith('com.gba.ecommerce_client')) return;
 
     final link = uri.toString();
     if (_lastHandledLink == link) return;

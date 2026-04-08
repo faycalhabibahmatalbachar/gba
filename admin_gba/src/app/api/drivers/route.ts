@@ -19,15 +19,43 @@ function decodeCursor(s: string | null): { c: string; i: string } | null {
   return null;
 }
 
-const postSchema = z.object({
-  user_id: z.string().uuid().optional().nullable(),
-  name: z.string().min(1).max(200),
-  phone: z.string().max(50).optional().nullable(),
-  vehicle_type: z.string().max(80).optional().nullable(),
-  vehicle_plate: z.string().max(40).optional().nullable(),
-  vehicle_color: z.string().max(80).optional().nullable(),
-  documents: z.unknown().optional(),
-});
+const postSchema = z
+  .object({
+    user_id: z.string().uuid().optional().nullable(),
+    name: z.string().min(1).max(200),
+    phone: z.string().max(50).optional().nullable(),
+    vehicle_type: z.string().max(80).optional().nullable(),
+    vehicle_plate: z.string().max(40).optional().nullable(),
+    vehicle_color: z.string().max(80).optional().nullable(),
+    documents: z.unknown().optional(),
+    /** Crée un compte Supabase Auth (e-mail + mot de passe) et lie user_id — sans user_id existant */
+    invite_email: z.string().email().optional().nullable(),
+    invite_password: z.string().min(8).max(128).optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const hasInvite = Boolean(data.invite_email?.trim()) || Boolean(data.invite_password);
+    if (!hasInvite) return;
+    if (!data.invite_email?.trim() || !data.invite_password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'invite_email et invite_password (8+ caractères) sont requis ensemble',
+      });
+    }
+    if (data.user_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Retirez user_id si vous créez un compte avec invite_email',
+      });
+    }
+  });
+
+function splitDriverDisplayName(name: string): { first: string | null; last: string | null } {
+  const n = name.trim().replace(/\s+/g, ' ');
+  if (!n) return { first: null, last: null };
+  const parts = n.split(' ');
+  if (parts.length === 1) return { first: parts[0], last: null };
+  return { first: parts[0], last: parts.slice(1).join(' ') };
+}
 
 export async function GET(req: Request) {
   const auth = await requireAdmin();
@@ -314,7 +342,43 @@ export async function POST(req: Request) {
   }
 
   try {
-    const uid = parsed.data.user_id;
+    let uid: string | null | undefined = parsed.data.user_id;
+
+    const inviteEmail = parsed.data.invite_email?.trim().toLowerCase();
+    const invitePassword = parsed.data.invite_password;
+    if (inviteEmail && invitePassword) {
+      const { data: authData, error: authErr } = await sb.auth.admin.createUser({
+        email: inviteEmail,
+        password: invitePassword,
+        email_confirm: true,
+        user_metadata: { full_name: parsed.data.name },
+      });
+      if (authErr) {
+        const msg = authErr.message || 'Création du compte impossible';
+        const st = msg.toLowerCase().includes('already') ? 409 : 400;
+        return NextResponse.json({ error: msg }, { status: st });
+      }
+      const newId = authData.user?.id;
+      if (!newId) {
+        return NextResponse.json({ error: 'Compte créé mais UUID manquant' }, { status: 500 });
+      }
+      uid = newId;
+      const nm = splitDriverDisplayName(parsed.data.name);
+      const { error: profErr } = await sb.from('profiles').upsert(
+        {
+          id: newId,
+          email: inviteEmail,
+          first_name: nm.first,
+          last_name: nm.last,
+          role: 'driver',
+        },
+        { onConflict: 'id' },
+      );
+      if (profErr) {
+        return NextResponse.json({ error: profErr.message }, { status: 500 });
+      }
+    }
+
     if (uid) {
       const { data: existing } = await sb.from('drivers').select('id').eq('user_id', uid).maybeSingle();
       if (existing) {

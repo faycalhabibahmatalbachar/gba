@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/app_config.dart';
 import '../../localization/app_localizations.dart';
+import '../../utils/auth_errors.dart';
 
 const _g1 = Color(0xFF667eea);
 const _g2 = Color(0xFF764ba2);
@@ -48,18 +50,39 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final email = _emailController.text.trim();
+      final email = _emailController.text
+          .trim()
+          .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+          .toLowerCase();
+
       final baseUrl = AppConfig.siteUrl.trim();
-      final normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-      final redirectTo = kIsWeb
-          ? '$normalizedBaseUrl/reset-password'
-          : 'com.gba.ecommerce_client://login-callback';
-      await Supabase.instance.client.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
+      final normalizedBaseUrl =
+          baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+
+      final String redirectTo;
+      if (kIsWeb) {
+        redirectTo = '$normalizedBaseUrl/reset-password';
+      } else {
+        final pkg = await PackageInfo.fromPlatform();
+        redirectTo = '${pkg.packageName}://login-callback';
+      }
+
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: redirectTo,
+      );
       if (!mounted) return;
       setState(() { _sent = true; _loading = false; });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = localizeAuthError(
+          e,
+          fallback:
+              'Impossible d’envoyer l’e-mail. Vérifiez l’adresse, votre connexion, et que l’URL de retour est autorisée dans Supabase (Authentication → URL configuration).',
+        );
+        _loading = false;
+      });
     }
   }
 
@@ -164,9 +187,7 @@ class _FormView extends StatelessWidget {
         const SizedBox(height: 22),
         if (error != null) ...[
           _ErrorBanner(
-            message: error!.contains('Exception') || error!.contains('500')
-                ? localizations.translate('auth_error_generic')
-                : error!,
+            message: error!,
             onClose: onClearError,
           ).animate().fadeIn(duration: 300.ms),
           const SizedBox(height: 12),
@@ -183,9 +204,10 @@ class _FormView extends StatelessWidget {
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return localizations.translate('auth_enter_email');
-                    if (!v.trim().contains('@')) return localizations.translate('auth_invalid_email_format');
-                    return null;
+                    if (v == null || v.trim().isEmpty) {
+                      return localizations.translate('auth_enter_email');
+                    }
+                    return validateSignupEmail(v);
                   },
                   animDelay: 350.ms,
                 ),

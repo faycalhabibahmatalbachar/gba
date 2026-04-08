@@ -10,6 +10,10 @@
 - Production Branch: usually `main`. Confirm the deployed commit SHA on Vercel matches GitHub `main` after each release.
 - Prefer **one** Vercel project as canonical production admin; duplicate projects (`*.vercel.app`) often drift on Root Directory or env vars—delete or use the second only for previews.
 
+## Backend Vercel supprimé par erreur
+
+Un projet Vercel effacé n’est pas récupérable tel quel. Recréez un projet (**Add New… → Project**), pointez vers le même dépôt, réglez le **Root Directory** sur le dossier du backend (ex. `backend` dans ce monorepo si c’est ce qui était déployé), recopiez les variables d’environnement, puis mettez à jour toutes les URLs clientes (`BACKEND_URL`, webhooks, etc.) vers le nouveau domaine `*.vercel.app`.
+
 ## Required environment variables (Production + Preview)
 
 - `NEXT_PUBLIC_SUPABASE_URL`

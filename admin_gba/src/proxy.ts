@@ -41,8 +41,9 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === LOGIN || pathname.startsWith(`${LOGIN}/`);
+  const isRecoveryPage = pathname === '/reset-password' || pathname.startsWith('/reset-password/');
   const isApi = pathname.startsWith('/api/');
-  const isPublic = isLoginPage || pathname.startsWith('/_next') || isApi;
+  const isPublic = isLoginPage || isRecoveryPage || pathname.startsWith('/_next') || isApi;
 
   if (!user && !isPublic) {
     const u = request.nextUrl.clone();
@@ -56,6 +57,11 @@ export async function proxy(request: NextRequest) {
     if (!gateErr) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
+    return supabaseResponse;
+  }
+
+  /* Page mot de passe oublié (clients / deep link web) — pas de gate admin */
+  if (isRecoveryPage) {
     return supabaseResponse;
   }
 

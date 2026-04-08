@@ -180,22 +180,47 @@ class _DriverRootState extends State<_DriverRoot> {
   bool _checkingRole = false;
   bool _roleVerified = false;
   String? _roleError;
+  bool _suspended = false;
+  String? _suspensionReason;
 
   Future<void> _verifyDriverRole(String userId) async {
     if (_checkingRole) return;
     setState(() {
       _checkingRole = true;
       _roleError = null;
+      _suspended = false;
+      _suspensionReason = null;
     });
     try {
       final response = await Supabase.instance.client
           .from('profiles')
-          .select('role')
+          .select('role, is_suspended, is_blocked, suspension_reason')
           .eq('id', userId)
           .maybeSingle();
       final role = response?['role']?.toString().toLowerCase();
       if (role == 'driver') {
-        if (mounted) setState(() { _roleVerified = true; _checkingRole = false; });
+        final driverRow = await Supabase.instance.client
+            .from('drivers')
+            .select('is_active')
+            .eq('user_id', userId)
+            .maybeSingle();
+        final profSuspended =
+            response?['is_suspended'] == true || response?['is_blocked'] == true;
+        final driverInactive = driverRow != null && driverRow['is_active'] == false;
+        final suspended = profSuspended || driverInactive;
+        final reason = (response?['suspension_reason'] as String?)?.trim();
+        if (mounted) {
+          setState(() {
+            _roleVerified = true;
+            _checkingRole = false;
+            _suspended = suspended;
+            _suspensionReason = reason?.isNotEmpty == true
+                ? reason
+                : (driverInactive
+                    ? 'Votre fiche livreur est désactivée. Contactez l’administration.'
+                    : 'Votre compte est suspendu. Contactez l’administration.');
+          });
+        }
       } else {
         // Not a driver — sign out
         await Supabase.instance.client.auth.signOut();
@@ -269,11 +294,81 @@ class _DriverRootState extends State<_DriverRoot> {
           return _DriverLoginScreen(roleError: _roleError);
         }
 
+        if (_suspended) {
+          LocationBackgroundService.instance.clearDriverId();
+          return _DriverSuspendedGate(reason: _suspensionReason);
+        }
+
         // Associate driverId so background tracking writes into driver_locations.
         // This is safe: in background service we clear userId when driverId is set.
         LocationBackgroundService.instance.setDriverId(session.user.id);
         return const DriverHomeScreen();
       },
+    );
+  }
+}
+
+// ─── Suspension (aligné comportement client) ───────────────────────────────────
+
+class _DriverSuspendedGate extends StatelessWidget {
+  final String? reason;
+  const _DriverSuspendedGate({this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.pause_circle_filled, size: 72, color: Colors.white),
+                const SizedBox(height: 20),
+                Text(
+                  'Compte suspendu',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  reason ??
+                      'Votre accès livreur est temporairement indisponible. Contactez l’administration GBA.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF667eea),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  ),
+                  onPressed: () => Supabase.instance.client.auth.signOut(),
+                  child: const Text('Se déconnecter'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
