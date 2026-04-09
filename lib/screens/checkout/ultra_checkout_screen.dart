@@ -46,6 +46,8 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
   late Animation<double> _fadeAnim;
   
   bool _isProcessing = false;
+  /// After a successful API order, block duplicate submissions even if the cart UI lags.
+  bool _checkoutSuccess = false;
   String _paymentMethod = 'cash_on_delivery';
 
   void _applyProfilePrefill(app_auth.AuthState authState) {
@@ -248,7 +250,18 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
   }
 
   Future<void> _submitOrder() async {
+    if (_checkoutSuccess || _isProcessing) return;
     if (!_formKey.currentState!.validate()) return;
+
+    final cartEarly = provider.Provider.of<CartProvider>(context, listen: false);
+    if (cartEarly.items.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Panier vide')),
+        );
+      }
+      return;
+    }
 
     // VALIDATION GPS OBLIGATOIRE
     final gpsValid = await MandatoryLocationService().validateForCheckout(context);
@@ -329,7 +342,25 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
 
       // Payment is cash on delivery - no payment processing needed
 
+      if (!mounted) return;
+      setState(() => _checkoutSuccess = true);
+
       await cart.clearCart();
+
+      if (!mounted) return;
+      setState(() {});
+
+      if (cart.items.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Commande enregistrée. Le panier n\'a pas pu être vidé (réseau) — vérifiez Mes commandes.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
 
       if (mounted) {
         showDialog(
@@ -339,6 +370,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
         );
       }
     } catch (e) {
+      if (!mounted) return;
       final localizations = AppLocalizations.of(context);
       final sanitizedError = ErrorHandler.getLocalizedError(e, localizations.locale.languageCode);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -350,7 +382,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
         ),
       );
     } finally {
-      setState(() => _isProcessing = false);
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
@@ -360,6 +392,34 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     final cart = provider.Provider.of<CartProvider>(context);
     final cartItems = cart.items;
     final subtotalFcfa = cart.totalAmount;
+
+    if (cartItems.isEmpty && !_checkoutSuccess) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(FontAwesomeIcons.cartShopping, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Panier vide',
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => context.go('/cart'),
+                    child: const Text('Retour au panier'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     
     return Scaffold(
       body: Container(
@@ -464,7 +524,9 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(theme, subtotalFcfa),
+      bottomNavigationBar: _checkoutSuccess
+          ? null
+          : _buildBottomBar(theme, subtotalFcfa, cartItems.isEmpty),
     );
   }
 
@@ -645,7 +707,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     );
   }
 
-  Widget _buildBottomBar(ThemeData theme, double subtotalFcfa) {
+  Widget _buildBottomBar(ThemeData theme, double subtotalFcfa, bool cartEmpty) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -661,7 +723,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
               ],
       ),
       child: ElevatedButton(
-        onPressed: _isProcessing ? null : _submitOrder,
+        onPressed: (_isProcessing || _checkoutSuccess || cartEmpty) ? null : _submitOrder,
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: Colors.white,

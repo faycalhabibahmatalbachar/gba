@@ -140,6 +140,10 @@ function mapOrderRow(order: OrderEmbedRow) {
   };
 }
 
+/** PostgREST OR group: matches mobile "special" heuristics (order_number + notes + raw metadata text). */
+const SPECIAL_ORDER_OR_FILTERS =
+  'order_number.ilike.sp-%,notes.ilike.%special%,notes.ilike.%devis%,notes.ilike.%quote%,notes.ilike.%quotation%,metadata.ilike.%special%,metadata.ilike.%quote%,metadata.ilike.%devis%';
+
 const SELECT_FULL = `
   id,
   order_number,
@@ -151,6 +155,7 @@ const SELECT_FULL = `
   total_amount,
   shipping_address,
   notes,
+  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -178,6 +183,7 @@ const SELECT_NO_DRIVER = `
   total_amount,
   shipping_address,
   notes,
+  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -204,6 +210,7 @@ const SELECT_NO_PRODUCTS = `
   total_amount,
   shipping_address,
   notes,
+  metadata,
   driver_id,
   customer_name,
   customer_phone,
@@ -229,6 +236,7 @@ const SELECT_MIN_SAFE = `
   total_amount,
   shipping_address,
   notes,
+  metadata,
   driver_id,
   customer_name,
   customer_phone
@@ -247,13 +255,36 @@ type ListFilterParams = {
   kind?: 'all' | 'special_mobile' | 'standard';
 };
 
+function applyKindFilter<
+  Q extends {
+    or: (f: string) => Q;
+    not: (column: string, operator: string, value: unknown) => Q;
+  },
+>(q: Q, kind: ListFilterParams['kind']): Q {
+  if (kind === 'special_mobile') {
+    return q.or(SPECIAL_ORDER_OR_FILTERS);
+  }
+  if (kind === 'standard') {
+    // NOT (special heuristics), null-safe on notes/metadata (avoids SQL UNKNOWN wiping rows).
+    let qq = q.not('order_number', 'ilike', 'sp%');
+    qq = qq.or(
+      'notes.is.null,and(notes.not.ilike.%special%,notes.not.ilike.%devis%,notes.not.ilike.%quote%,notes.not.ilike.%quotation%)',
+    );
+    qq = qq.or(
+      'metadata.is.null,and(metadata.not.ilike.%special%,metadata.not.ilike.%quote%,metadata.not.ilike.%devis%)',
+    );
+    return qq;
+  }
+  return q;
+}
+
 function applyListFilters<
   Q extends {
     eq: (c: string, v: string) => Q;
     gte: (c: string, v: string | number) => Q;
     lte: (c: string, v: string | number) => Q;
     or: (f: string) => Q;
-    not: (column: string, operator: string, value: string) => Q;
+    not: (column: string, operator: string, value: unknown) => Q;
   },
 >(q: Q, params: ListFilterParams): Q {
   let qq = q;
@@ -267,15 +298,7 @@ function applyListFilters<
     const s = params.search.trim();
     qq = qq.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`);
   }
-  if (params.kind === 'special_mobile') {
-    qq = qq.or(
-      'notes.ilike.%special%,notes.ilike.%mobile%,notes.ilike.%devis%,notes.ilike.%quote%,order_number.ilike.SP-%',
-    );
-  }
-  if (params.kind === 'standard') {
-    qq = qq.not('order_number', 'ilike', 'SP-%').not('notes', 'ilike', '%special%');
-  }
-  return qq;
+  return applyKindFilter(qq, params.kind ?? 'all');
 }
 
 export async function GET(req: Request) {

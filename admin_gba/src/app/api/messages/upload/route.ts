@@ -25,15 +25,24 @@ export async function POST(req: Request) {
   const buf = Buffer.from(await file.arrayBuffer());
   const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(0, 180);
   const path = `${auth.userId}/${Date.now()}-${safeName}`;
-  const buckets = ['chat-attachments', 'gba-chat', 'admin-uploads', 'public'] as const;
+  // `chat` matches mobile Supabase paths (/storage/v1/object/public/chat/...).
+  const buckets = ['chat', 'chat-attachments', 'gba-chat', 'admin-uploads', 'public'] as const;
   const contentType = file.type || 'application/octet-stream';
 
   let lastErr: Error | null = null;
   for (const bucket of buckets) {
-    const { error: upErr } = await sb.storage.from(bucket).upload(path, buf, {
+    let { error: upErr } = await sb.storage.from(bucket).upload(path, buf, {
       contentType,
       upsert: false,
     });
+    if (upErr && /bucket.*not found/i.test(upErr.message)) {
+      await sb.storage.createBucket(bucket, { public: true }).catch(() => null);
+      const retry = await sb.storage.from(bucket).upload(path, buf, {
+        contentType,
+        upsert: false,
+      });
+      upErr = retry.error;
+    }
     if (!upErr) {
       const { data: pub } = sb.storage.from(bucket).getPublicUrl(path);
       return NextResponse.json({
@@ -50,7 +59,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       error: lastErr ? String(lastErr.message) : 'Upload impossible',
-      hint: 'Appliquez la migration storage « chat-attachments » ou créez un bucket public.',
+      hint: 'Créez au moins un bucket public parmi: chat, chat-attachments, gba-chat, admin-uploads.',
     },
     { status: 500 },
   );
