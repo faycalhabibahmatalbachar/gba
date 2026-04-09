@@ -42,13 +42,12 @@ class ContactScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
-      canPop: true, // allow natural back when pushed on stack; PopScope handles edge cases
+      canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) {
         if (didPop) return;
         if (!context.mounted) return;
-        // Fallback: if nothing to pop in GoRouter, navigate to home
-        if (GoRouter.of(context).canPop()) {
-          GoRouter.of(context).pop();
+        if (context.canPop()) {
+          context.pop();
         } else {
           context.go('/home');
         }

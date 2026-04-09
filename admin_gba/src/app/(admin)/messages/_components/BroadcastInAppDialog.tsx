@@ -7,8 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { formatApiError } from '@/lib/format-api-error';
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function BroadcastInAppDialog({ open, onOpenChange }: Props) {
   const [step, setStep] = React.useState(1);
@@ -22,14 +25,23 @@ export function BroadcastInAppDialog({ open, onOpenChange }: Props) {
 
   const mut = useMutation({
     mutationFn: async () => {
-      const parsedIds = userIds.split(',').map((x) => x.trim()).filter(Boolean);
+      const parsedIds = userIds.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+      if (target === 'specific') {
+        if (parsedIds.length === 0) throw new Error('Saisissez au moins un UUID utilisateur');
+        const invalid = parsedIds.filter((id) => !UUID_RE.test(id));
+        if (invalid.length) {
+          throw new Error(
+            `UUID invalides : ${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '…' : ''}`,
+          );
+        }
+      }
       const r = await fetch('/api/messages/broadcast-inapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           target,
-          user_ids: parsedIds,
+          user_ids: target === 'specific' ? parsedIds : [],
           filters: { country: country || undefined },
           message: { body, message_type: 'text', attachments: [] },
           send_push: sendPush,
@@ -37,8 +49,8 @@ export function BroadcastInAppDialog({ open, onOpenChange }: Props) {
           push_body: pushBody || undefined,
         }),
       });
-      const x = await r.json();
-      if (!r.ok) throw new Error(x.error || 'Echec broadcast');
+      const x = (await r.json().catch(() => ({}))) as unknown;
+      if (!r.ok) throw new Error(formatApiError(x, 'Échec broadcast'));
       return x as { sent_count: number };
     },
     onSuccess: (x) => {

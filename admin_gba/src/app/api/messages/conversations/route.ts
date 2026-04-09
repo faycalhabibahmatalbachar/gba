@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       const { data: rp } = await sb.from('profiles').select('id').in('role', ['client', 'customer', 'user']);
       roleUserIds = (rp || []).map((r: { id: string }) => r.id);
     } else if (filter === 'drivers') {
-      const { data: rp } = await sb.from('profiles').select('id').eq('role', 'driver');
+      const { data: rp } = await sb.from('profiles').select('id').in('role', ['driver']);
       roleUserIds = (rp || []).map((r: { id: string }) => r.id);
     } else if (filter === 'admins') {
       const { data: rp } = await sb.from('profiles').select('id').in('role', ['admin', 'superadmin', 'super_admin']);
@@ -226,8 +226,22 @@ export async function POST(req: Request) {
   }
 
   try {
+    const uid = parsed.data.participant_id;
+    const existing = await sb
+      .from('chat_conversations')
+      .select('id')
+      .eq('user_id', uid)
+      .eq('type', 'direct')
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data?.id) {
+      return NextResponse.json({ conversation: { id: existing.data.id }, reused: true });
+    }
+
     const insert = {
-      user_id: parsed.data.participant_id,
+      user_id: uid,
       title: null as string | null,
       type: 'direct',
       status: 'active',
@@ -237,7 +251,7 @@ export async function POST(req: Request) {
 
     const { data, error } = await sb.from('chat_conversations').insert(insert).select('id').single();
     if (error) throw error;
-    return NextResponse.json({ conversation: data });
+    return NextResponse.json({ conversation: data, reused: false });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });
   }

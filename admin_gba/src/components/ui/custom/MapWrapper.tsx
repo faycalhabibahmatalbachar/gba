@@ -61,6 +61,13 @@ export function MapWrapper({
       }).addTo(map);
       mapRef.current = map;
       leafletRef.current = L;
+      requestAnimationFrame(() => {
+        try {
+          map.invalidateSize();
+        } catch {
+          /* ignore */
+        }
+      });
     });
 
     return () => {
@@ -124,7 +131,29 @@ export function MapWrapper({
         /* ignore */
       }
     }
-  }, [markers]);
+    requestAnimationFrame(() => {
+      try {
+        map.invalidateSize();
+      } catch {
+        /* ignore */
+      }
+    });
+  }, [markers, height]);
+
+  React.useEffect(() => {
+    const node = containerRef.current;
+    const map = mapRef.current;
+    if (!node || !map) return;
+    const ro = new ResizeObserver(() => {
+      try {
+        map.invalidateSize();
+      } catch {
+        /* ignore */
+      }
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [markers, height]);
 
   return (
     <div className="relative z-0 isolate">

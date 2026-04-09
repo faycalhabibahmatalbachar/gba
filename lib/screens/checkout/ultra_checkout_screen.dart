@@ -117,6 +117,15 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     super.dispose();
   }
 
+  void _handleCheckoutBack() {
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/cart');
+    }
+  }
+
   Future<void> _autoCaptureGPS() async {
     if (!mounted) return;
     setState(() => _isGettingLocation = true);
@@ -394,34 +403,47 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
     final subtotalFcfa = cart.totalAmount;
 
     if (cartItems.isEmpty && !_checkoutSuccess) {
-      return Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(FontAwesomeIcons.cartShopping, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Panier vide',
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => context.go('/cart'),
-                    child: const Text('Retour au panier'),
-                  ),
-                ],
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _handleCheckoutBack();
+        },
+        child: Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(FontAwesomeIcons.cartShopping, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Panier vide',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () => context.go('/cart'),
+                      child: const Text('Retour au panier'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       );
     }
-    
-    return Scaffold(
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleCheckoutBack();
+      },
+      child: Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -527,6 +549,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
       bottomNavigationBar: _checkoutSuccess
           ? null
           : _buildBottomBar(theme, subtotalFcfa, cartItems.isEmpty),
+    ),
     );
   }
 
@@ -536,13 +559,7 @@ class _UltraCheckoutScreenState extends ConsumerState<UltraCheckoutScreen>
       child: Row(
         children: [
           IconButton(
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/cart');
-              }
-            },
+            onPressed: _handleCheckoutBack,
             icon: const Icon(FontAwesomeIcons.arrowLeft),
             style: IconButton.styleFrom(
               backgroundColor: theme.colorScheme.surface,

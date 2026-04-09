@@ -113,7 +113,7 @@ export function SecurityCommandCenter() {
   const [alertDraft, setAlertDraft] = React.useState({
     headline: '',
     message: '',
-    media_urls: '',
+    selected_media_urls: [] as string[],
     severity: 'normal' as 'low' | 'normal' | 'high',
     role: 'all',
     country: '',
@@ -156,6 +156,17 @@ export function SecurityCommandCenter() {
       return x.data ?? [];
     },
     refetchInterval: 60_000,
+  });
+
+  const securityMediaPickQ = useQuery({
+    queryKey: ['security-media'],
+    queryFn: async () => {
+      const r = await fetch('/api/security/media', { credentials: 'include' });
+      const x = await parseApiJson<{ data?: { path: string; name: string; url: string | null; size?: number }[]; error?: string }>(r);
+      if (!r.ok) throw new Error(x.error || 'Médias');
+      return x.data ?? [];
+    },
+    staleTime: 30_000,
   });
 
   const geoQ = useQuery({
@@ -375,10 +386,7 @@ export function SecurityCommandCenter() {
 
   const sendSecurityBroadcast = useMutation({
     mutationFn: async () => {
-      const media = alertDraft.media_urls
-        .split('\n')
-        .map((x) => x.trim())
-        .filter(Boolean);
+      const media = alertDraft.selected_media_urls.filter(Boolean);
       const r = await fetch('/api/security/alerts/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -401,7 +409,7 @@ export function SecurityCommandCenter() {
       toast.success(
         `Alerte envoyée — destinataires: ${res.recipient_count}, email: ${res.email_sent ? 'OK' : 'non'}, chats: ${res.chat_created}`,
       );
-      setAlertDraft((p) => ({ ...p, headline: '', message: '', media_urls: '' }));
+      setAlertDraft((p) => ({ ...p, headline: '', message: '', selected_media_urls: [] }));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -838,14 +846,48 @@ export function SecurityCommandCenter() {
                 rows={4}
               />
             </div>
-            <div className="md:col-span-2">
-              <Label>Médias (URLs, une par ligne)</Label>
-              <Textarea
-                value={alertDraft.media_urls}
-                onChange={(e) => setAlertDraft((p) => ({ ...p, media_urls: e.target.value }))}
-                placeholder="https://.../capture1.png"
-                rows={3}
-              />
+            <div className="md:col-span-2 space-y-2">
+              <Label>Médias (fichiers déjà uploadés)</Label>
+              <p className="text-xs text-muted-foreground">
+                Uploadez dans « Documents &amp; Médias de sécurité » ci-dessous, puis sélectionnez les pièces à joindre à l&apos;alerte.
+              </p>
+              {securityMediaPickQ.isLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : (
+                <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-md border border-border p-2">
+                  {(securityMediaPickQ.data || []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Aucun média enregistré pour le moment.</p>
+                  ) : (
+                    (securityMediaPickQ.data || []).map((m) => {
+                      const v = m.url || '';
+                      if (!v) {
+                        return (
+                          <p key={m.path} className="text-xs text-amber-600">
+                            {m.name} — URL non disponible (bucket privé ?)
+                          </p>
+                        );
+                      }
+                      return (
+                        <label key={m.path} className="flex cursor-pointer items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={alertDraft.selected_media_urls.includes(v)}
+                            onChange={(e) =>
+                              setAlertDraft((p) => ({
+                                ...p,
+                                selected_media_urls: e.target.checked
+                                  ? [...p.selected_media_urls, v]
+                                  : p.selected_media_urls.filter((x) => x !== v),
+                              }))
+                            }
+                          />
+                          <span className="truncate">{m.name}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <Label>Filtre rôle</Label>

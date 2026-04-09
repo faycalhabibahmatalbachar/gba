@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     to,
     subject: tpl.subject,
     html: tpl.html,
+    text: tpl.text,
     template: `test_${tplName}`,
     triggeredByAction: 'admin_test_email',
     triggeredByActorId: auth.userId,

@@ -19,6 +19,18 @@ function fmtBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+async function downloadMediaFile(url: string, filename: string) {
+  const res = await fetch(url, { credentials: 'omit' });
+  if (!res.ok) throw new Error('Téléchargement échoué');
+  const blob = await res.blob();
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename || 'document';
+  a.click();
+  URL.revokeObjectURL(href);
+}
+
 export function SecurityMediaSection() {
   const copyText = React.useCallback(async (value: string) => {
     if (!value) return;
@@ -163,7 +175,13 @@ export function SecurityMediaSection() {
                   </Button>
                 ) : null}
                 {m.url ? (
-                  <Button size="sm" variant="outline" onClick={() => window.open(m.url || '', '_blank')}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      void downloadMediaFile(m.url!, m.name).catch(() => toast.error('Téléchargement échoué'))
+                    }
+                  >
                     Télécharger
                   </Button>
                 ) : null}
@@ -178,7 +196,15 @@ export function SecurityMediaSection() {
                 <div className="mt-1 flex gap-1">
                   {m.url ? <Button size="sm" variant="outline" onClick={() => window.open(m.url || '', '_blank')}>Voir</Button> : null}
                   {m.url ? (
-                    <Button size="sm" variant="outline" onClick={() => window.open(m.url || '', '_blank')}>Télécharger</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        void downloadMediaFile(m.url!, m.name).catch(() => toast.error('Téléchargement échoué'))
+                      }
+                    >
+                      Télécharger
+                    </Button>
                   ) : null}
                   <Button size="sm" variant="outline" onClick={() => void copyText(m.url || '')}>Copier URL</Button>
                   <Button size="sm" variant="destructive" onClick={() => deleteMut.mutate(m.path)}>×</Button>

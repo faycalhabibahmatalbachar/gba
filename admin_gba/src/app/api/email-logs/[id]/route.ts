@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
-import { sendEmail } from '@/lib/email/email.service';
+import { htmlToPlainText, sendEmail } from '@/lib/email/email.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +23,12 @@ export async function POST(_: Request, ctx: { params: Promise<{ id: string }> })
   const sb = getServiceSupabase();
   const { data, error } = await sb.from('email_logs').select('*').eq('id', id).maybeSingle();
   if (error || !data) return NextResponse.json({ error: error?.message || 'Not found' }, { status: 404 });
+  const html = String(data.body_html || data.html || '<p>Email</p>');
   const sent = await sendEmail({
     to: String(data.to_email || '').split(',').map((x) => x.trim()).filter(Boolean),
     subject: String(data.subject || 'Email'),
-    html: String(data.body_html || data.html || '<p>Email</p>'),
+    html,
+    text: htmlToPlainText(html),
     attachments: Array.isArray(data.attachments)
       ? (data.attachments as { url?: string; name?: string; type?: string }[])
           .filter((a) => typeof a?.url === 'string')

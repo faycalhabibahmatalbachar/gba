@@ -26,7 +26,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Aucun email cible (ADMIN_NOTIFICATION_EMAIL ou préférences).' }, { status: 422 });
   }
 
-  const { subject, html } = renderEmailTemplate('generic', {
+  const { subject, html, text } = renderEmailTemplate('generic', {
     subject: 'Test GBA Admin',
     title: 'Email de test',
     body: `Bonjour,<br/><br/>Ceci est un message de test envoyé depuis l’admin GBA (${new Date().toISOString()}).`,
@@ -36,6 +36,7 @@ export async function POST() {
     to: adminEmail,
     subject,
     html,
+    text,
     template: 'test',
     priority: 'low',
     triggeredByAction: 'email.test',

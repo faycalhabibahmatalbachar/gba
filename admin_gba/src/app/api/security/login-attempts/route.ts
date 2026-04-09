@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,5 +119,20 @@ export async function POST(req: Request) {
     const isNet = /timeout|timed out|connect|fetch failed/i.test(msg);
     return NextResponse.json({ error: msg, code: isNet ? 'SUPABASE_CONNECTIVITY' : 'DB_ERROR' }, { status: isNet ? 503 : 500 });
   }
+
+  if (!success && email) {
+    const at = new Date().toISOString();
+    void emitAdminNotification({
+      type: 'security_alert',
+      entityId: `login_fail:${email}:${ip || 'unknown'}`,
+      payload: {
+        headline: 'Échec de connexion admin',
+        detail: `Tentative pour ${email}.`,
+        meta: `IP: ${ip || '—'} · UA: ${userAgent || '—'} · ${at}`,
+      },
+      priority: 'normal',
+    });
+  }
+
   return NextResponse.json({ ok: true, reason: body.reason ?? null });
 }

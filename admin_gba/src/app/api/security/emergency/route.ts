@@ -118,6 +118,7 @@ export async function POST(req: Request) {
           to: emails,
           subject: tpl.subject,
           html: tpl.html,
+          text: tpl.text,
           template: 'security_alert',
           triggeredByAction: 'full_lockdown',
           triggeredByEntityId: 'security_emergency',

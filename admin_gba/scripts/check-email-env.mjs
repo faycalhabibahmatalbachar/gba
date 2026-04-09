@@ -22,6 +22,11 @@ const pass =
   process.env.SMTP_PASS?.trim() || process.env.BREVO_SMTP_PASS?.trim() || '';
 const provider = (process.env.EMAIL_PROVIDER || 'auto').trim();
 
+const outbound = String(process.env.ENABLE_OUTBOUND_EMAIL || '').trim().toLowerCase() === 'true';
+const orderHook = process.env.ORDER_WEBHOOK_SECRET?.trim();
+
+console.log('ENABLE_OUTBOUND_EMAIL:', outbound ? 'true (envoi réel activé)' : 'false ou absent (sendEmail ne part pas)');
+console.log('ORDER_WEBHOOK_SECRET:', orderHook ? mask(orderHook) : '(vide → webhook commandes désactivé)');
 console.log('EMAIL_PROVIDER:', provider);
 console.log('RESEND_API_KEY:', mask(resend || ''));
 console.log('SMTP_HOST:', host);
@@ -39,6 +44,9 @@ else if (provider === 'auto' && (hasResend || hasSmtp)) ready = true;
 console.log('');
 if (ready) {
   console.log('OK: au moins un canal (Resend ou SMTP) est configurable pour getMailer().');
+  if (!outbound) {
+    console.log('Note: tant que ENABLE_OUTBOUND_EMAIL≠true, aucun email ne sera envoyé par l’API.');
+  }
   process.exit(0);
 }
 console.error(

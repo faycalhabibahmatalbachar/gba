@@ -1,0 +1,40 @@
+---
+description: Standards GBA (admin Next.js + Flutter) — périmètre, sécurité, qualité, i18n, erreurs API
+globs:
+alwaysApply: true
+---
+
+# Règles strictes GBA
+
+## Périmètre
+
+- Modifier uniquement les fichiers nécessaires à la tâche. Pas de refactor opportuniste ni de « nettoyage » hors scope.
+- Respecter les conventions existantes du fichier (imports, nommage, patterns React/Next ou Flutter).
+
+## Sécurité
+
+- Aucun secret (clés API, mots de passe, service role) dans le code versionné. Utiliser des variables d’environnement et documenter dans `.env.example`.
+- Valider les entrées des routes API avec Zod (ou équivalent déjà en place).
+- Ne pas exposer plus que l’anon key Supabase côté client (déjà publique par design).
+
+## Qualité (obligatoire après changements)
+
+- **admin_gba** : `npx tsc --noEmit` et `npm run build` depuis `admin_gba/`.
+- **Flutter** : `dart analyze` ou `flutter analyze` sur les chemins modifiés.
+
+## UX erreurs (admin et mobile)
+
+- Ne jamais afficher `String(object)` ou `[object Object]` pour les erreurs API. Normaliser : chaîne plate, ou `JSON.stringify` des `fieldErrors` Zod, ou message serveur `error` string.
+- Côté mobile : ne pas montrer d’URL techniques (Supabase, stack traces) à l’utilisateur final. Utiliser les widgets dédiés hors-ligne / erreur.
+
+## Internationalisation (Flutter)
+
+- Textes visibles par l’utilisateur : FR / EN / AR via les ARB / `AppLocalizations`. Pas de clés i18n brutes à l’écran.
+
+## Réseau
+
+- Coupure réseau / WebSocket : gérer avec retry ou messages non bloquants ; ce n’est pas un « bug serveur » à corriger côté API.
+
+## Référence
+
+- Backlog détaillé : `docs/full-execution-prompt.md`.

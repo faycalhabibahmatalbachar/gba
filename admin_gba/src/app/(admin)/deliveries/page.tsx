@@ -89,7 +89,7 @@ async function fetchDrivers() {
   const primary = await supabase
     .from('profiles')
     .select('id, full_name, first_name, last_name, phone')
-    .or('role.eq.driver,role.eq.livreur')
+    .in('role', ['driver'])
     .eq('is_active', true)
     .limit(300);
   let err = primary.error;
@@ -99,7 +99,7 @@ async function fetchDrivers() {
     const fallbackNoFullName = await supabase
       .from('profiles')
       .select('id, first_name, last_name, phone')
-      .or('role.eq.driver,role.eq.livreur')
+      .in('role', ['driver'])
       .eq('is_active', true)
       .limit(300);
     err = fallbackNoFullName.error;
@@ -110,7 +110,7 @@ async function fetchDrivers() {
     const fallbackNoActive = await supabase
       .from('profiles')
       .select('id, full_name, first_name, last_name, phone')
-      .or('role.eq.driver,role.eq.livreur')
+      .in('role', ['driver'])
       .limit(300);
     err = fallbackNoActive.error;
     data = (fallbackNoActive.data || []) as unknown[];

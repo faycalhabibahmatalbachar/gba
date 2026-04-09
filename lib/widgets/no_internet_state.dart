@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../localization/app_localizations.dart';
+
 class NoInternetState extends StatelessWidget {
   final String title;
   final String message;
   final VoidCallback? onRetry;
+  final String? retryLabel;
 
   const NoInternetState({
     super.key,
     this.title = 'Pas de connexion internet',
     this.message = 'Vérifiez votre connexion puis réessayez.',
     this.onRetry,
+    this.retryLabel,
   });
 
   @override
@@ -42,7 +46,9 @@ class NoInternetState extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Réessayer'),
+                label: Text(
+                  retryLabel ?? AppLocalizations.of(context).translate('retry'),
+                ),
               ),
             ],
           ],

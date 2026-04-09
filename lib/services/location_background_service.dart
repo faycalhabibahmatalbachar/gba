@@ -12,7 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const _kNotifChannelId = 'gba_background_services';
-const _kNotifChannelName = 'GBA — Services en cours';
+const _kNotifChannelName = 'GBA — Localisation';
 const _kNotifId = 1001;
 const _kMinIntervalSeconds = 10;
 
@@ -157,7 +157,7 @@ Future<void> _onBackgroundStart(ServiceInstance service) async {
             // Aucun détail GPS explicite n'est affiché à l'utilisateur.
             await service.setForegroundNotificationInfo(
               title: 'GBA',
-              content: 'Services en cours',
+              content: '\u200b',
             );
           }
         } catch (e) {
@@ -207,8 +207,8 @@ class LocationBackgroundService {
     const channel = AndroidNotificationChannel(
       _kNotifChannelId,
       _kNotifChannelName,
-      description: 'Services GBA en arrière-plan pour une livraison précise',
-      importance: Importance.low,
+      description: 'Suivi de position en arrière-plan',
+      importance: Importance.min,
       playSound: false,
       enableVibration: false,
     );
@@ -227,7 +227,7 @@ class LocationBackgroundService {
         isForegroundMode: true,
         notificationChannelId: _kNotifChannelId,
         initialNotificationTitle: 'GBA',
-        initialNotificationContent: 'Services en cours',
+        initialNotificationContent: '\u200b',
         foregroundServiceNotificationId: _kNotifId,
         foregroundServiceTypes: [AndroidForegroundType.location],
       ),

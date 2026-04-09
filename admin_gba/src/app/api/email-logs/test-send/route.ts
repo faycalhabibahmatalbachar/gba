@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     to: parsed.data.to,
     subject: tpl.subject,
     html: tpl.html,
+    text: tpl.text,
     template: 'email_test',
     triggeredByAction: 'admin_test_send',
     triggeredByEntityId: 'email_logs',

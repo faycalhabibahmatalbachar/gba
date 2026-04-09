@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
@@ -16,7 +16,15 @@ function MobileChrome({ children }: { children: React.ReactNode }) {
 
 function HubInner() {
   const isMobile = useMediaQuery('(max-width: 767px)');
-  const { mobilePanel, setMobilePanel, selectedConversationId } = useMessagesContext();
+  const {
+    mobilePanel,
+    setMobilePanel,
+    selectedConversationId,
+    showConversationList,
+    setShowConversationList,
+    showContactPanel,
+    setShowContactPanel,
+  } = useMessagesContext();
   const [adminUserId, setAdminUserId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -59,10 +67,54 @@ function HubInner() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden">
-      <ConversationsList />
-      <MessageThread adminUserId={adminUserId} />
-      <ContactDetailPanel />
+    <div className="flex h-[calc(100vh-64px)] w-full flex-col overflow-hidden">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-muted/20 px-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setShowConversationList(!showConversationList)}
+        >
+          {showConversationList ? 'Masquer liste' : 'Afficher liste'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setShowContactPanel(!showContactPanel)}
+        >
+          {showContactPanel ? 'Masquer fiche' : 'Afficher fiche'}
+        </Button>
+      </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {showConversationList ? (
+          <ConversationsList />
+        ) : (
+          <button
+            type="button"
+            className="flex w-10 shrink-0 flex-col items-center border-r border-border bg-background py-3 text-muted-foreground hover:bg-muted/50"
+            onClick={() => setShowConversationList(true)}
+            title="Afficher la liste des conversations"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+        <MessageThread adminUserId={adminUserId} />
+        {showContactPanel ? (
+          <ContactDetailPanel />
+        ) : (
+          <button
+            type="button"
+            className="flex w-10 shrink-0 flex-col items-center border-l border-border bg-background py-3 text-muted-foreground hover:bg-muted/50"
+            onClick={() => setShowContactPanel(true)}
+            title="Afficher la fiche contact"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

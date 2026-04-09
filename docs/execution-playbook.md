@@ -32,8 +32,9 @@ Ce playbook orchestre la stabilisation mobile (`client`, `driver`) et web (`admi
 # Flutter
 flutter pub get
 dart analyze
-flutter build apk --flavor client -t lib/main.dart --dart-define-from-file=dart_defines.json
+powershell -ExecutionPolicy Bypass -File .\scripts\build_client_release.ps1 -DefinesFile dart_defines.json
 powershell -ExecutionPolicy Bypass -File .\scripts\build_driver_release.ps1 -DefinesFile dart_defines.json
+# Équivalent manuel client : flutter build apk --flavor client -t lib/main.dart --dart-define-from-file=dart_defines.json
 
 # Admin
 cd admin_gba

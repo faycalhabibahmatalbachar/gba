@@ -166,7 +166,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     final localizations = AppLocalizations.of(context);
 
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (!mounted) return;

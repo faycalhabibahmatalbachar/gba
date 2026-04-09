@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/command';
 import { AvatarWithInitials } from '@/components/ui/custom/AvatarWithInitials';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase/client';
 import { useMessagesContext } from './MessagesContext';
 import type { ConversationListItem } from './types';
 import { BroadcastInAppDialog } from './BroadcastInAppDialog';
@@ -101,6 +102,22 @@ export function ConversationsList() {
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) void infinite.fetchNextPage();
   }, [infinite]);
 
+  React.useEffect(() => {
+    const ch = supabase
+      .channel('gba-msg-conversations-refresh')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_messages' },
+        () => {
+          void qc.invalidateQueries({ queryKey: ['msg-conversations'] });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, [qc]);
+
   const searchProfiles = React.useCallback(async (q: string) => {
     if (q.length < 2) return [];
     const u = new URL('/api/users', window.location.origin);
@@ -121,10 +138,10 @@ export function ConversationsList() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ participant_id: participantId }),
       });
-      const j = await res.json();
+      const j = (await res.json()) as { error?: string; conversation?: { id: string }; reused?: boolean };
       if (!res.ok) throw new Error(j.error || 'Échec');
       const id = j.conversation?.id as string;
-      toast.success('Conversation créée');
+      toast.success(j.reused ? 'Conversation existante ouverte' : 'Conversation créée');
       setNewOpen(false);
       await qc.invalidateQueries({ queryKey: ['msg-conversations'] });
       setSelectedConversationId(id);

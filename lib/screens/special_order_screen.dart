@@ -365,9 +365,16 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
     }
 
     if (_currentStep == 2) {
-      final ok = _deliveryFormKey.currentState?.validate() ?? false;
+      final ok = _deliveryFormKey.currentState?.validate() ?? true;
       if (!ok) {
         _showSnack(AppLocalizations.of(context).translate('special_order_check_required_fields'));
+        return;
+      }
+      if (_deliveryLat == null || _deliveryLng == null) {
+        _showSnack(
+          AppLocalizations.of(context).translate('special_order_gps_required_before_continue'),
+          backgroundColor: Colors.orange.shade800,
+        );
         return;
       }
     }
@@ -1060,18 +1067,20 @@ class _SpecialOrderScreenState extends State<SpecialOrderScreen> {
   }
 
   Future<void> _submitSpecialOrder() async {
-    final detailsOk = _detailsFormKey.currentState?.validate() ?? false;
-    final deliveryOk = _deliveryFormKey.currentState?.validate() ?? false;
-    if (!detailsOk || !deliveryOk) {
-      _showSnack(AppLocalizations.of(context).translate('special_order_check_required_fields'));
+    final loc = AppLocalizations.of(context);
+    final name = _productNameController.text.trim();
+    final desc = _descriptionController.text.trim();
+    final qty = int.tryParse(_quantityController.text.trim());
+    if (name.isEmpty || desc.isEmpty || qty == null || qty <= 0) {
+      _showSnack(loc.translate('special_order_check_required_fields'));
+      return;
+    }
+    if (_deliveryLat == null || _deliveryLng == null) {
+      _showSnack(loc.translate('special_order_gps_required_submit'), backgroundColor: Colors.red);
       return;
     }
 
-    final quantity = int.tryParse(_quantityController.text.trim());
-    if (quantity == null || quantity <= 0) {
-      _showSnack(AppLocalizations.of(context).translate('special_order_invalid_quantity'));
-      return;
-    }
+    final quantity = qty;
 
     setState(() {
       _isSubmitting = true;

@@ -16,6 +16,30 @@ import '../config/app_config.dart';
 import '../localization/app_localizations.dart';
 import '../providers/notification_preferences_provider.dart';
 
+/// Replaces raw URLs (e.g. Supabase storage) in notification body with a short media label.
+String sanitizeNotificationBodyForTray(
+  String? rawBody,
+  Map<String, dynamic> data,
+  AppLocalizations? loc,
+) {
+  final b = rawBody?.trim() ?? '';
+  if (b.isEmpty) return '';
+  final lower = b.toLowerCase();
+  final looksLikeUrl = lower.startsWith('http://') ||
+      lower.startsWith('https://') ||
+      lower.contains('supabase.co');
+  if (!looksLikeUrl) return b;
+
+  final mt = '${data['message_type'] ?? data['type'] ?? ''}'.toLowerCase();
+  if (mt.contains('audio')) {
+    return loc?.translate('notification_body_audio_message') ?? 'Voice message';
+  }
+  if (mt.contains('image')) {
+    return loc?.translate('notification_body_image_message') ?? 'Image';
+  }
+  return loc?.translate('notification_body_new_message') ?? 'New message';
+}
+
 /// Android notification channel – must match the channel_id sent by the Edge Function.
 const String _kChannelId = 'high_importance_channel';
 const String _kChannelName = 'GBA Notifications';
@@ -105,7 +129,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Build title/body from notification payload or data payload
   final notification = message.notification;
   final title = notification?.title ?? message.data['title']?.toString() ?? 'GBA';
-  final body = notification?.body ?? message.data['body']?.toString() ?? '';
+  final rawBody = notification?.body ?? message.data['body']?.toString() ?? '';
+  final body = sanitizeNotificationBodyForTray(rawBody, message.data, null);
 
   debugPrint('[FCM][BG] showing local notification: title="$title" body="$body"');
 
@@ -239,7 +264,8 @@ class NotificationService {
       // Also show a system-level local notification so it appears in the tray
       final notification = message.notification;
       final fgTitle = notification?.title ?? message.data['title']?.toString() ?? resolved.$1;
-      final fgBody = notification?.body ?? message.data['body']?.toString() ?? resolved.$2;
+      final fgRaw = notification?.body ?? message.data['body']?.toString() ?? resolved.$2;
+      final fgBody = sanitizeNotificationBodyForTray(fgRaw, message.data, _localizations());
 
       if (!kIsWeb) {
         try {
@@ -506,10 +532,11 @@ class NotificationService {
     final localizations = _localizations();
     final notification = message.notification;
     final title = notification?.title ?? _templateTitle(message.data);
-    final body = notification?.body ?? _templateBody(message.data);
+    final rawBody = notification?.body ?? _templateBody(message.data);
+    final body = sanitizeNotificationBodyForTray(rawBody, message.data, localizations);
     return (
       title ?? (localizations?.translate('notification_default_title') ?? 'Notification'),
-      body ?? '',
+      body,
     );
   }
 

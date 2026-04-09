@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { PhoneNotifPreview } from '@/components/ui/custom/PhoneNotifPreview';
+import { formatApiError } from '@/lib/format-api-error';
 import {
   Select,
   SelectContent,
@@ -427,8 +428,8 @@ export function NotifComposerTab({ draftFromTemplate, onConsumeDraft }: Props) {
             send_push: false,
           }),
         }).then(async (r) => {
-          const x = await r.json();
-          if (!r.ok) throw new Error(x.error || 'In-app échec');
+          const x = (await r.json().catch(() => ({}))) as unknown;
+          if (!r.ok) throw new Error(formatApiError(x, 'In-app échec'));
           toast.success('Message in-app envoyé');
         }).catch((e: Error) => toast.error(e.message));
       }
@@ -451,9 +452,10 @@ export function NotifComposerTab({ draftFromTemplate, onConsumeDraft }: Props) {
           send_push: false,
         }),
       }).then(async (r) => {
-        const x = await r.json();
-        if (!r.ok) throw new Error(x.error || 'Broadcast in-app échec');
-        toast.success(`Broadcast in-app envoyé (${x.sent_count || 0})`);
+        const x = (await r.json().catch(() => ({}))) as unknown;
+        if (!r.ok) throw new Error(formatApiError(x, 'Broadcast in-app échec'));
+        const sc = (x as { sent_count?: number }).sent_count || 0;
+        toast.success(`Broadcast in-app envoyé (${sc})`);
       }).catch((e: Error) => toast.error(e.message));
     }
   };

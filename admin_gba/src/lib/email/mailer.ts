@@ -10,6 +10,7 @@ export type MailSendInput = {
   replyTo?: string;
   subject: string;
   html: string;
+  text?: string;
   attachments?: { filename: string; content: Buffer; contentType?: string }[];
 };
 
@@ -56,6 +57,7 @@ export function getMailer() {
           replyTo: input.replyTo,
           subject: input.subject,
           html: input.html,
+          ...(input.text?.trim() ? { text: input.text } : {}),
           attachments:
             input.attachments && input.attachments.length
               ? input.attachments.map((a) => ({
@@ -104,6 +106,7 @@ export function getMailer() {
         replyTo: input.replyTo,
         subject: input.subject,
         html: input.html,
+        ...(input.text?.trim() ? { text: input.text } : {}),
         attachments:
           input.attachments && input.attachments.length
             ? input.attachments.map((a) => ({

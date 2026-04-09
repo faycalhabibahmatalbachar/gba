@@ -69,6 +69,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { formatApiError } from '@/lib/format-api-error';
 
 import { UserDetailDrawer } from './UserDetailDrawer';
 import { UsersAdminSection } from './UsersAdminSection';
@@ -476,8 +477,8 @@ export default function UsersBigDataPage() {
           send_push: false,
         }),
       });
-      const x = await r.json();
-      if (!r.ok) throw new Error(x.error || 'Broadcast échoué');
+      const x = (await r.json().catch(() => ({}))) as unknown;
+      if (!r.ok) throw new Error(formatApiError(x, 'Broadcast échoué'));
       return x as { sent_count: number };
     },
     onSuccess: (x) => {

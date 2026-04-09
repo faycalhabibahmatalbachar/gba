@@ -79,9 +79,16 @@ export async function POST(req: Request) {
       changes: { after: { conversation_id: parsed.data.conversation_id, message_type: parsed.data.message_type } },
       metadata: { conversation_id: parsed.data.conversation_id },
     });
+    const preview =
+      parsed.data.body.trim().slice(0, 400) ||
+      (parsed.data.attachments.length ? '[Pièce jointe]' : '—');
     await emitAdminNotification({
       type: 'message_created',
-      payload: { conversation_id: parsed.data.conversation_id, message_type: parsed.data.message_type },
+      payload: {
+        conversation_id: parsed.data.conversation_id,
+        message_type: parsed.data.message_type,
+        preview,
+      },
       actorUserId: auth.userId,
       entityId: ins?.id || null,
       priority: 'normal',

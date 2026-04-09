@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
-import { sendEmail } from '@/lib/email/email.service';
+import { htmlToPlainText, sendEmail } from '@/lib/email/email.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     to: parsed.data.to,
     subject: parsed.data.subject,
     html: parsed.data.body_html,
+    text: htmlToPlainText(parsed.data.body_html),
     attachments: parsed.data.attachments.map((a) => ({ url: a.url, name: a.name })),
     template: 'manual_admin',
     triggeredByAction: 'admin_send_email',

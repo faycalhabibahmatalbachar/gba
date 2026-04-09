@@ -97,12 +97,12 @@ class _SettingsScreenPremiumState extends State<SettingsScreenPremium>
     final localizations = AppLocalizations.of(context);
 
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) {
         if (didPop) return;
         if (!context.mounted) return;
-        if (GoRouter.of(context).canPop()) {
-          GoRouter.of(context).pop();
+        if (context.canPop()) {
+          context.pop();
         } else {
           context.go('/home');
         }

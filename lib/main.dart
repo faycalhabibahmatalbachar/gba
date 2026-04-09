@@ -18,6 +18,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'localization/app_localizations.dart';
 import 'config/app_config.dart';
 import 'routes/app_routes.dart';
+import 'widgets/offline_gate.dart';
 import 'routes/navigation_keys.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
@@ -265,7 +266,9 @@ class MyApp extends StatelessWidget {
             return I18nAuditOverlay(
               navigatorKey: NavigationKeys.rootNavigatorKey,
               router: AppRoutes.router,
-              child: child ?? const SizedBox.shrink(),
+              child: OfflineGate(
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
           locale: languageProvider.locale,

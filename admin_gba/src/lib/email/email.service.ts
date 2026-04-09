@@ -7,6 +7,8 @@ export type SendEmailInput = {
   to: string | string[];
   subject: string;
   html: string;
+  /** Plain-text part (multipart/alternative). Derived from HTML when omitted. */
+  text?: string;
   template: string;
   priority?: EmailPriority;
   replyTo?: string;
@@ -25,6 +27,24 @@ export function buildEmailFromHeader(): string {
   const addr = process.env.EMAIL_FROM?.trim() || DEFAULT_FROM_EMAIL;
   const name = process.env.EMAIL_FROM_NAME?.trim() || DEFAULT_FROM_NAME;
   return `${name} <${addr}>`;
+}
+
+/** When false, `sendEmail` returns immediately without contacting SMTP/Resend (safe default in dev). */
+export function isOutboundEmailEnabled(): boolean {
+  return String(process.env.ENABLE_OUTBOUND_EMAIL || '').trim().toLowerCase() === 'true';
+}
+
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function wrapBrandHtml(title: string, inner: string): string {
@@ -52,39 +72,67 @@ GBA · ${new Date().getFullYear()} · Notification automatique
 export function renderEmailTemplate(
   template: string,
   data: Record<string, string | number | undefined | null>,
-): { subject: string; html: string } {
+): { subject: string; html: string; text: string } {
   const safe = (k: string) => String(data[k] ?? '—');
+  const pack = (subject: string, title: string, innerHtml: string) => {
+    const html = wrapBrandHtml(title, innerHtml);
+    return { subject, html, text: htmlToPlainText(`${title}\n\n${innerHtml.replace(/<[^>]+>/g, ' ')}`) };
+  };
   switch (template) {
     case 'security_alert':
-      return {
-        subject: `[GBA Sécurité] ${safe('headline')}`,
-        html: wrapBrandHtml(
-          'Alerte sécurité',
-          `<p><strong>${safe('headline')}</strong></p><p>${safe('detail')}</p><p style="font-size:12px;color:#71717a;">${safe('meta')}</p>`,
-        ),
-      };
+      return pack(
+        `[GBA Sécurité] ${safe('headline')}`,
+        'Alerte sécurité',
+        `<p><strong>${safe('headline')}</strong></p><p>${safe('detail')}</p><p style="font-size:12px;color:#71717a;">${safe('meta')}</p>`,
+      );
     case 'new_order_placed':
-      return {
-        subject: `Nouvelle commande ${safe('order_ref')}`,
-        html: wrapBrandHtml(
-          'Nouvelle commande',
-          `<p>Commande <strong>${safe('order_ref')}</strong></p><p>Client : ${safe('customer')}</p><p>Montant : <strong>${safe('amount')}</strong> XOF</p>`,
-        ),
-      };
+      return pack(
+        `Nouvelle commande ${safe('order_ref')}`,
+        'Nouvelle commande',
+        `<p>Commande <strong>${safe('order_ref')}</strong></p><p>Client : ${safe('customer')}</p><p>Montant : <strong>${safe('amount')}</strong> XOF</p>`,
+      );
+    case 'special_order_placed':
+      return pack(
+        `[GBA] Commande spéciale ${safe('order_ref')}`,
+        'Commande spéciale (mobile)',
+        `<p>Réf. <strong>${safe('order_ref')}</strong></p><p>Client : ${safe('customer')}</p><p>Montant : <strong>${safe('amount')}</strong> XOF</p><p style="font-size:13px;">${safe('notes_hint')}</p>`,
+      );
+    case 'new_chat_message': {
+      const esc = (v: string) =>
+        v
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      const conv = esc(safe('conversation_id'));
+      const typ = esc(safe('message_type'));
+      const prev = esc(safe('preview'));
+      return pack(
+        '[GBA] Nouveau message',
+        'Nouveau message',
+        `<p>Conversation : <code style="font-size:12px;">${conv}</code></p><p>Type : ${typ}</p><p style="white-space:pre-wrap;">${prev}</p>`,
+      );
+    }
     default:
-      return {
-        subject: safe('subject') || 'Notification GBA',
-        html: wrapBrandHtml(safe('title') || 'Notification', `<p>${safe('body')}</p>`),
-      };
+      return pack(
+        safe('subject') || 'Notification GBA',
+        safe('title') || 'Notification',
+        `<p>${safe('body')}</p>`,
+      );
   }
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  if (!isOutboundEmailEnabled()) {
+    console.info('[email] skipped: set ENABLE_OUTBOUND_EMAIL=true to send');
+    return { success: false, error: 'outbound_email_disabled' };
+  }
   console.info('[email] route start', {
     hasSmtp: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
     hasResend: Boolean(process.env.RESEND_API_KEY),
   });
   const recipients = Array.isArray(input.to) ? input.to : [input.to];
+  const textBody = (input.text?.trim() && input.text) || htmlToPlainText(input.html);
   const primary = recipients[0];
   if (!primary) return { success: false, error: 'Destinataire manquant' };
   const cc = input.cc ? (Array.isArray(input.cc) ? input.cc : [input.cc]) : undefined;
@@ -141,6 +189,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ success: boole
       replyTo: input.replyTo,
       subject: input.subject,
       html: input.html,
+      text: textBody,
       attachments: mailAttachments.length ? mailAttachments : undefined,
     });
     if (logId) {

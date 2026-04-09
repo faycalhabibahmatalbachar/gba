@@ -6,19 +6,43 @@ import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
-const schema = z.object({
-  target: z.enum(['specific', 'segment', 'all']),
-  user_ids: z.array(z.string().uuid()).optional().default([]),
-  filters: z.record(z.string(), z.unknown()).optional().default({}),
-  message: z.object({
-    body: z.string().min(1).max(500),
-    message_type: z.enum(['text', 'image', 'system']).default('text'),
-    attachments: z.array(z.record(z.string(), z.unknown())).optional().default([]),
-  }),
-  send_push: z.boolean().optional().default(false),
-  push_title: z.string().optional(),
-  push_body: z.string().optional(),
-});
+const schema = z
+  .object({
+    target: z.enum(['specific', 'segment', 'all']),
+    user_ids: z.array(z.string().uuid()).optional().default([]),
+    filters: z.record(z.string(), z.unknown()).optional().default({}),
+    message: z.object({
+      body: z.string().min(1).max(500),
+      message_type: z.enum(['text', 'image', 'system']).default('text'),
+      attachments: z.array(z.record(z.string(), z.unknown())).optional().default([]),
+    }),
+    send_push: z.boolean().optional().default(false),
+    push_title: z.string().optional(),
+    push_body: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.target === 'specific' && data.user_ids.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Au moins un UUID valide est requis pour le ciblage « utilisateurs spécifiques »',
+        path: ['user_ids'],
+      });
+    }
+  });
+
+function zodErrorMessage(err: z.ZodError): string {
+  const f = err.flatten();
+  const formErrors = Array.isArray(f.formErrors) ? f.formErrors : [];
+  const rawField = f.fieldErrors as Record<string, string[] | undefined> | undefined;
+  const fieldErrors = rawField && typeof rawField === 'object' ? rawField : {};
+  const parts = [
+    ...formErrors.filter(Boolean),
+    ...Object.entries(fieldErrors).flatMap(([k, msgs]) =>
+      (Array.isArray(msgs) ? msgs : []).map((m) => `${k}: ${m}`),
+    ),
+  ];
+  return parts.join(' · ') || 'Données invalides';
+}
 
 const BATCH = 50;
 
@@ -32,7 +56,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'JSON invalide' }, { status: 400 });
   }
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: zodErrorMessage(parsed.error), details: parsed.error.flatten() },
+      { status: 422 },
+    );
+  }
   const sb = getServiceSupabase();
   const p = parsed.data;
 

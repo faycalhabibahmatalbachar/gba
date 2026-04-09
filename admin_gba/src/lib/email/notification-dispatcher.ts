@@ -119,11 +119,19 @@ export async function emitAdminNotification(input: EmitInput): Promise<{ sent: b
   }
 
   const map = (() => {
-    if (input.type === 'order_created' || input.type === 'order_special_created') {
+    if (input.type === 'order_created') {
       return renderEmailTemplate('new_order_placed', {
         order_ref: String(input.payload.order_number || input.entityId || 'N/A'),
         customer: String(input.payload.customer_name || 'Client'),
         amount: String(input.payload.total_amount || '0'),
+      });
+    }
+    if (input.type === 'order_special_created') {
+      return renderEmailTemplate('special_order_placed', {
+        order_ref: String(input.payload.order_number || input.entityId || 'N/A'),
+        customer: String(input.payload.customer_name || 'Client'),
+        amount: String(input.payload.total_amount || '0'),
+        notes_hint: String(input.payload.notes_hint || 'Voir détails dans l’admin (commandes).'),
       });
     }
     if (input.type === 'order_status_changed') {
@@ -141,10 +149,10 @@ export async function emitAdminNotification(input: EmitInput): Promise<{ sent: b
       });
     }
     if (input.type === 'message_created') {
-      return renderEmailTemplate('generic', {
-        subject: '[GBA] Nouveau message',
-        title: 'Nouveau message reçu',
-        body: `Conversation ${String(input.payload.conversation_id || '')}.`,
+      return renderEmailTemplate('new_chat_message', {
+        conversation_id: String(input.payload.conversation_id || '—'),
+        message_type: String(input.payload.message_type || 'text'),
+        preview: String(input.payload.preview || '—'),
       });
     }
     if (input.type === 'security_alert') {
@@ -167,6 +175,7 @@ export async function emitAdminNotification(input: EmitInput): Promise<{ sent: b
     cc,
     subject: map.subject,
     html: map.html,
+    text: map.text,
     template: `event_${input.type}`,
     priority: input.priority || 'normal',
     triggeredByAction: dedupKey(input.type, input.entityId),

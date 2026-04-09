@@ -9,7 +9,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Image from 'next/image';
 import {
-  Archive,
   Check,
   CheckCheck,
   Copy,
@@ -18,7 +17,6 @@ import {
   FileText,
   ImageIcon,
   MessageSquare,
-  MoreVertical,
   Mic,
   Paperclip,
   Reply,
@@ -612,33 +610,6 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
     }
   };
 
-  const archiveConv = async () => {
-    if (!selectedConversationId) return;
-    const res = await fetch(`/api/messages/conversations/${selectedConversationId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'archived' }),
-    });
-    if (res.ok) toast.success('Archivé');
-    else toast.error('Échec');
-  };
-
-  const exportPdf = async () => {
-    if (!selectedConversationId) return;
-    const res = await fetch(`/api/messages/conversations/${selectedConversationId}/export`, { method: 'POST' });
-    if (!res.ok) {
-      toast.error('Export PDF échoué');
-      return;
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'conversation.pdf';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   if (!selectedConversationId) {
     return (
       <div className="flex min-w-0 flex-1 items-center justify-center bg-muted/10">
@@ -657,17 +628,6 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
             {(participant?.role as string) || '—'} ·{' '}
             {participant?.is_online ? 'En ligne' : 'Hors ligne'}
           </p>
-        </div>
-        <div className="ml-auto flex gap-1">
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => void archiveConv()}>
-            <Archive className="h-4 w-4" />
-          </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => void exportPdf()}>
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
