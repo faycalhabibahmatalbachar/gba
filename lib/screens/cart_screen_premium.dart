@@ -16,6 +16,7 @@ import '../widgets/adaptive_scaffold.dart';
 import '../animations/app_animations.dart';
 import '../widgets/app_animation.dart';
 import '../utils/error_handler.dart';
+import '../widgets/no_internet_state.dart';
 
 class CartScreenPremium extends StatefulWidget {
   const CartScreenPremium({super.key});
@@ -122,7 +123,18 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
 
     final appBar = _buildAppBar(context, localizations);
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (!mounted) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
       appBar: appBar,
       extendBodyBehindAppBar: true,
       body: Stack(
@@ -198,6 +210,7 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -235,6 +248,13 @@ class _CartScreenPremiumState extends State<CartScreenPremium>
   }
 
   Widget _buildErrorState(String error, AppLocalizations localizations, CartProvider cartProvider) {
+    if (ErrorHandler.isNetworkError(error)) {
+      return NoInternetState(
+        title: localizations.translate('no_internet'),
+        message: localizations.translate('check_your_connection'),
+        onRetry: () => cartProvider.loadCart(),
+      );
+    }
     final sanitizedError = ErrorHandler.getLocalizedError(error, localizations.locale.languageCode);
     return Center(
       child: Padding(

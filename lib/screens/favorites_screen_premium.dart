@@ -18,6 +18,8 @@ import '../widgets/adaptive_scaffold.dart';
 import '../widgets/app_state_view.dart';
 import '../widgets/app_animation.dart';
 import 'product/product_detail_screen.dart';
+import '../widgets/no_internet_state.dart';
+import '../utils/error_handler.dart';
 
 class FavoritesScreenPremium extends ConsumerStatefulWidget {
   const FavoritesScreenPremium({super.key});
@@ -163,7 +165,18 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context);
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (!mounted) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context, localizations),
       body: Stack(
@@ -179,6 +192,16 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
                 }
 
                 if (productsProvider.error != null && productsProvider.products.isEmpty) {
+                  if (ErrorHandler.isNetworkError(productsProvider.error)) {
+                    return NoInternetState(
+                      title: 'Pas de connexion internet',
+                      message: 'Impossible de charger vos favoris hors ligne.',
+                      onRetry: () {
+                        HapticFeedback.lightImpact();
+                        productsProvider.loadProducts(force: true);
+                      },
+                    );
+                  }
                   return AppStateView(
                     state: AppViewState.error,
                     title: localizations.translate('error_loading'),
@@ -212,6 +235,7 @@ class _FavoritesScreenPremiumState extends ConsumerState<FavoritesScreenPremium>
             ),
           ),
         ],
+      ),
       ),
     );
   }

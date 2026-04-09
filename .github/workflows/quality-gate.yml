@@ -1,0 +1,39 @@
+name: quality-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  admin-gba:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin_gba
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: admin_gba/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx tsc --noEmit
+
+  flutter-client-driver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - name: Validate dart defines template
+        run: test -f dart_defines.example.json
+      - name: Build client APK (debug smoke)
+        run: flutter build apk --debug --flavor client -t lib/main.dart --dart-define=SUPABASE_URL=https://example.supabase.co --dart-define=SUPABASE_ANON_KEY=dummy
+      - name: Build driver APK (debug smoke)
+        run: flutter build apk --debug --flavor driver -t lib/main_driver.dart --dart-define=SUPABASE_URL=https://example.supabase.co --dart-define=SUPABASE_ANON_KEY=dummy

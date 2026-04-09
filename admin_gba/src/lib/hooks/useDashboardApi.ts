@@ -17,7 +17,7 @@ export type DashboardApiPayload = {
   revenueSeries: { date: string; revenue: number }[];
   ordersByStatus: { status: string; statusLabel?: string; count: number }[];
   orderHourHeatmap: { hour: string; count: number }[];
-  topProducts: { name: string; sales: number }[];
+  topProducts: { id?: string | null; name: string; fullName?: string; sales: number }[];
   funnel: { name: string; value: number }[];
   geoSales: { country: string; orders: number }[];
   bigData: { avgLtv: number; repeatPurchaseRate: number; cohortNote: string };

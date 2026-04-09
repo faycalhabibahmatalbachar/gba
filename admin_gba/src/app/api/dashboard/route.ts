@@ -148,17 +148,22 @@ export async function GET(req: Request) {
 
     const heatmapData = heatHours.map((count, hour) => ({ hour: `${hour}h`, count }));
 
-    const productAgg: Record<string, { name: string; qty: number }> = {};
+    const productAgg: Record<string, { name: string; qty: number; product_id: string | null }> = {};
     for (const it of items) {
       const key = it.product_id || it.product_name || 'unknown';
       const name = it.product_name || key;
-      if (!productAgg[key]) productAgg[key] = { name, qty: 0 };
+      if (!productAgg[key]) productAgg[key] = { name, qty: 0, product_id: it.product_id || null };
       productAgg[key].qty += Number(it.quantity || 1);
     }
     const topProducts = Object.values(productAgg)
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 10)
-      .map((p) => ({ name: p.name.length > 28 ? p.name.slice(0, 26) + '…' : p.name, sales: p.qty }));
+      .map((p) => ({
+        id: p.product_id,
+        name: p.name.length > 28 ? p.name.slice(0, 26) + '…' : p.name,
+        fullName: p.name,
+        sales: p.qty,
+      }));
 
     const totalO = ordersWindow.length;
     const pending = ordersWindow.filter((o) => o.status === 'pending').length;

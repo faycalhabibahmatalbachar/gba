@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import '../models/category.dart';
 import '../services/supabase_service.dart';
+import '../utils/error_handler.dart';
 
 final categoriesProvider = FutureProvider<List<Category>>((ref) async {
   return SupabaseService.getCategories();
@@ -151,7 +152,7 @@ class CategoriesProvider extends ChangeNotifier {
         _lastSyncedAt,
       );
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorHandler.sanitizeError(e, fallbackMessage: 'Erreur de chargement des catégories.');
       print('Erreur chargement catégories: $e');
     } finally {
       _isLoading = false;

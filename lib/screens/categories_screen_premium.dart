@@ -5,9 +5,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/categories_provider.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/app_state_view.dart';
+import '../widgets/no_internet_state.dart';
+import '../utils/error_handler.dart';
 import '../localization/app_localizations.dart';
 import 'products_by_category_screen.dart';
 
@@ -113,7 +116,18 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
             return n.contains(_searchQuery) || d.contains(_searchQuery);
           }).toList();
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (!mounted) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
+        }
+      },
+      child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0f0f1a) : const Color(0xFFF5F6FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -170,6 +184,7 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
                           ],
                         ),
                 ),
+      ),
     );
   }
 
@@ -379,6 +394,13 @@ class _CategoriesScreenPremiumState extends State<CategoriesScreenPremium> {
   }
 
   Widget _buildErrorState(String error, AppLocalizations l, CategoriesProvider prov) {
+    if (ErrorHandler.isNetworkError(error)) {
+      return NoInternetState(
+        title: 'Pas de connexion internet',
+        message: 'Impossible de charger les categories hors ligne.',
+        onRetry: () => prov.loadCategories(force: true),
+      );
+    }
     return AppStateView(
       state: AppViewState.error,
       title: l.translate('error_loading'),

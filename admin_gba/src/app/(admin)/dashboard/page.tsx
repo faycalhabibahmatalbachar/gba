@@ -25,6 +25,14 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 type AlertItem = { id: string; type: 'warning' | 'error' | 'info'; message: string; link?: string };
+type BehaviorEvent = {
+  id: string;
+  user_id: string | null;
+  product_id: string | null;
+  action: string | null;
+  source: string | null;
+  created_at: string;
+};
 
 async function fetchDashboardAlerts(): Promise<AlertItem[]> {
   const alerts: AlertItem[] = [];
@@ -67,6 +75,21 @@ async function fetchLiveStats() {
   };
 }
 
+async function fetchBehaviorInsights(): Promise<{
+  user_behavior_last_7d_count: number;
+  user_behavior_sample: BehaviorEvent[];
+}> {
+  const r = await fetch('/api/security/behavior-insights', { credentials: 'include' });
+  if (!r.ok) return { user_behavior_last_7d_count: 0, user_behavior_sample: [] };
+  const j = (await r.json()) as {
+    data?: { user_behavior_last_7d_count?: number; user_behavior_sample?: BehaviorEvent[] };
+  };
+  return {
+    user_behavior_last_7d_count: j.data?.user_behavior_last_7d_count ?? 0,
+    user_behavior_sample: j.data?.user_behavior_sample ?? [],
+  };
+}
+
 const FUNNEL_COLORS = ['#6366F1', '#8B5CF6', '#F59E0B', '#10B981'];
 const BAR_COL = '#6366F1';
 
@@ -99,6 +122,12 @@ export default function DashboardPage() {
     refetchInterval: 60_000,
   });
   const liveQuery = useQuery({ queryKey: ['dash-live'], queryFn: fetchLiveStats, staleTime: 15_000, refetchInterval: 20_000 });
+  const behaviorQuery = useQuery({
+    queryKey: ['dash-behavior-insights'],
+    queryFn: fetchBehaviorInsights,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
   const apiAlerts = data?.alerts;
   const mergedAlerts: AlertItem[] = [
@@ -339,6 +368,60 @@ export default function DashboardPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Evenements (user_behavior)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="text-xs text-muted-foreground">
+              7 derniers jours: <span className="font-semibold text-foreground">{behaviorQuery.data?.user_behavior_last_7d_count ?? 0}</span>
+            </div>
+            <ul className="divide-y divide-border max-h-64 overflow-y-auto">
+              {(behaviorQuery.data?.user_behavior_sample ?? []).map((ev) => (
+                <li key={ev.id} className="py-2 text-xs flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{ev.action || 'event'}</div>
+                    <div className="text-muted-foreground truncate">{ev.source || 'app'} · {fmtDate(ev.created_at)}</div>
+                  </div>
+                  {ev.product_id ? (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => router.push(`/products?product=${ev.product_id}`)}>
+                      Ouvrir produit
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+              {(behaviorQuery.data?.user_behavior_sample ?? []).length === 0 && (
+                <li className="py-8 text-center text-xs text-muted-foreground">Aucune entree (migration ou tracking app requis).</li>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Top 10 produits (90j) — Ouverture rapide</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {(data?.topProducts ?? []).map((p) => (
+              <button
+                type="button"
+                key={`${p.name}-${p.id ?? 'na'}`}
+                className="w-full text-left rounded-md border border-border px-2.5 py-2 hover:bg-muted/60 transition text-xs flex items-center justify-between"
+                onClick={() => (p.id ? router.push(`/products?product=${p.id}`) : undefined)}
+                disabled={!p.id}
+              >
+                <span className="truncate">{p.fullName || p.name}</span>
+                <span className="font-semibold tabular-nums">{p.sales}</span>
+              </button>
+            ))}
+            {(data?.topProducts ?? []).length === 0 && (
+              <div className="py-8 text-center text-xs text-muted-foreground">Pas de données</div>
             )}
           </CardContent>
         </Card>

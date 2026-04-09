@@ -64,6 +64,9 @@ Les flavors sont définis dans `android/app/build.gradle.kts` (`client` / `drive
 1. Copier [`dart_defines.example.json`](../dart_defines.example.json) vers `dart_defines.json` à la racine du dépôt (fichier ignoré par git) et renseigner les clés.
 2. **APK client** : `flutter build apk --flavor client -t lib/main.dart --dart-define-from-file=dart_defines.json`
 3. **APK livreur** : `flutter build apk --flavor driver -t lib/main_driver.dart --dart-define-from-file=dart_defines.json`
+4. En cas d'erreur `PathExistsException` sur `driverRelease`, utilisez le script robuste:
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\build_driver_release.ps1 -DefinesFile dart_defines.json`
+   - Le script nettoie les artefacts `driverRelease`, relance `flutter clean`, puis reconstruit avec la bonne cible `lib/main_driver.dart`.
 
 Les sorties se trouvent sous `build/app/outputs/flutter-apk/`.
 

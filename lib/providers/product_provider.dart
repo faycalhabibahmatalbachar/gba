@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/product.dart';
+import '../utils/error_handler.dart';
 
 class ProductProvider extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
@@ -220,7 +221,7 @@ class ProductProvider extends ChangeNotifier {
       _lastLoadedAt = now;
       await _persistToCache(_products, now);
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorHandler.sanitizeError(e, fallbackMessage: 'Erreur de chargement des produits.');
       print('Erreur chargement produits: $e');
     } finally {
       _isLoading = false;
