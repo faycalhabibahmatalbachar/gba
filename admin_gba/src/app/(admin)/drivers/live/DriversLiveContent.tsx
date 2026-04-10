@@ -427,8 +427,8 @@ export default function DriversLiveContent() {
 
       <div
         className={cn(
-          'relative flex min-h-0 flex-1 gap-3',
-          mapFullscreen && 'fixed inset-0 z-[200] flex-col bg-background p-2 sm:p-3',
+          'relative grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]',
+          mapFullscreen && 'fixed inset-0 z-[200] grid-cols-1 bg-background p-2 sm:p-3',
         )}
       >
         <motion.div
@@ -522,7 +522,7 @@ export default function DriversLiveContent() {
 
         <Card
           className={cn(
-            'flex w-full max-w-[340px] shrink-0 flex-col gap-3 overflow-y-auto border-border p-4',
+            'flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto border-border p-4',
             mapFullscreen && 'hidden',
           )}
         >

@@ -105,6 +105,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       .order('created_at', { ascending: false })
       .limit(200);
 
+    const mapActivityToBehavior = (actionType: string | null | undefined): string => {
+      const t = String(actionType || '').toLowerCase();
+      if (t === 'product_view') return 'view';
+      if (t === 'cart_add') return 'add_to_cart';
+      if (t === 'order_created') return 'purchase';
+      if (t === 'favorite_add' || t === 'fav_add') return 'wishlist';
+      return t || 'view';
+    };
+
     let last_sign_in_at: string | null = null;
     try {
       const { data: au } = await sb.auth.admin.getUserById(id);
@@ -130,7 +139,26 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     }
     const monthly_spending = [...monthMap.entries()].map(([month, amount]) => ({ month, amount }));
 
-    const behaviorList = ubRes.error ? [] : ubRes.data || [];
+    let behaviorList = ubRes.error ? [] : ubRes.data || [];
+    if (behaviorList.length === 0 && (activities?.length ?? 0) > 0) {
+      behaviorList = (activities || []).slice(0, 120).map((a) => {
+        const row = a as {
+          id: string;
+          entity_id?: string | null;
+          action_type?: string | null;
+          created_at: string;
+        };
+        const act = mapActivityToBehavior(row.action_type);
+        return {
+          id: row.id,
+          product_id: row.entity_id,
+          action: act,
+          duration_seconds: null as number | null,
+          source: 'user_activities',
+          created_at: row.created_at,
+        };
+      });
+    }
     const behavior_counts = { view: 0, add_to_cart: 0, purchase: 0, wishlist: 0, share: 0 };
     for (const b of behaviorList) {
       const a = String((b as { action?: string }).action || '');

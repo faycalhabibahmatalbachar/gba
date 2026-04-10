@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { parseApiJson } from '@/lib/fetch-api-json';
+import { formatOutboundEmailError } from '@/lib/email/format-outbound-error';
 
 type Row = {
   id: string;
@@ -143,7 +144,7 @@ export function EmailLogsPage() {
       toast.success('Email test envoyé');
       void logs.refetch();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatOutboundEmailError(e.message)),
   });
 
   const resend = useMutation({
@@ -157,7 +158,7 @@ export function EmailLogsPage() {
       toast.success('Email renvoyé');
       void logs.refetch();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatOutboundEmailError(e.message)),
   });
 
   const sendManual = useMutation({
@@ -193,7 +194,7 @@ export function EmailLogsPage() {
       setAttachments([]);
       void logs.refetch();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatOutboundEmailError(e.message)),
   });
 
   const upload = useMutation({

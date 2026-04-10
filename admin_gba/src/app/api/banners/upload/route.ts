@@ -1,0 +1,50 @@
+import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { getServiceSupabase } from '@/lib/supabase/service-role';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+
+  let sb: ReturnType<typeof getServiceSupabase>;
+  try {
+    sb = getServiceSupabase();
+  } catch {
+    return NextResponse.json({ error: 'Service role manquant' }, { status: 503 });
+  }
+
+  const form = await req.formData().catch(() => null);
+  if (!form) return NextResponse.json({ error: 'Multipart requis' }, { status: 400 });
+  const file = form.get('file');
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: 'Champ file manquant' }, { status: 400 });
+  }
+
+  const buf = Buffer.from(await file.arrayBuffer());
+  const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(0, 120);
+  const path = `${auth.userId}/${Date.now()}-${safeName}`;
+  const contentType = file.type || 'application/octet-stream';
+
+  let { error: upErr } = await sb.storage.from('banners').upload(path, buf, {
+    contentType,
+    upsert: false,
+  });
+  if (upErr && /bucket.*not found/i.test(upErr.message)) {
+    await sb.storage.createBucket('banners', { public: true }).catch(() => null);
+    const retry = await sb.storage.from('banners').upload(path, buf, { contentType, upsert: false });
+    upErr = retry.error;
+  }
+  if (upErr) {
+    return NextResponse.json({ error: upErr.message }, { status: 400 });
+  }
+
+  const { data: pub } = sb.storage.from('banners').getPublicUrl(path);
+  return NextResponse.json({
+    url: pub.publicUrl,
+    path,
+    name: file.name,
+    type: contentType,
+  });
+}

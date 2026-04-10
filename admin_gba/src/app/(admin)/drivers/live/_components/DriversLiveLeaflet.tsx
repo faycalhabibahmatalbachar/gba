@@ -62,6 +62,7 @@ export function DriversLiveLeaflet({
   const mapRef = React.useRef<import('leaflet').Map | null>(null);
   const clusterRef = React.useRef<import('leaflet').LayerGroup | null>(null);
   const zonesRef = React.useRef<import('leaflet').LayerGroup | null>(null);
+  const companionRef = React.useRef<import('leaflet').LayerGroup | null>(null);
   const heatRef = React.useRef<import('leaflet').Layer | null>(null);
   const replayRef = React.useRef<import('leaflet').Polyline | null>(null);
   const didFitRef = React.useRef(false);
@@ -140,6 +141,9 @@ export function DriversLiveLeaflet({
       const zg = L.layerGroup();
       map.addLayer(zg);
       zonesRef.current = zg;
+      const cg = L.layerGroup();
+      map.addLayer(cg);
+      companionRef.current = cg;
 
       mapRef.current = map;
       setReady(true);
@@ -153,6 +157,7 @@ export function DriversLiveLeaflet({
       heatRef.current = null;
       clusterRef.current = null;
       zonesRef.current = null;
+      companionRef.current = null;
       mapRef.current = null;
       markerByDriverRef.current.clear();
       map?.remove();
@@ -182,6 +187,7 @@ export function DriversLiveLeaflet({
     cluster.clearLayers();
     markerByDriverRef.current.clear();
 
+    companionRef.current?.clearLayers();
     for (const m of markers) {
       const color = statusRing(m.status);
       const selected = selectedId === m.driver_id;
@@ -232,9 +238,8 @@ export function DriversLiveLeaflet({
         parts.push(`<div style="font-size:11px;margin-top:4px;max-width:220px">${escapeHtml(m.delivery_address)}</div>`);
       }
       if (m.stale_position) parts.push(`<div style="font-size:11px;color:#b45309">Position &gt; 10 min</div>`);
-      parts.push(
-        `<div style="margin-top:8px"><a style="font-size:12px;color:#6C47FF;font-weight:600" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${m.lat},${m.lng}" target="_blank" rel="noopener">Vue immersive (Street View)</a></div>`,
-      );
+      const mapsStreetViewUrl = `https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}&layer=c`;
+      parts.push(`<div style="margin-top:8px"><a style="font-size:12px;color:#6C47FF;font-weight:600" href="${mapsStreetViewUrl}" target="_blank" rel="noopener">Vue immersive (Street View)</a></div>`);
 
       marker.bindPopup(`<div style="min-width:180px">${parts.join('')}</div>`);
       marker.on('click', (e) => {
@@ -243,6 +248,29 @@ export function DriversLiveLeaflet({
       });
       cluster.addLayer(marker);
       markerByDriverRef.current.set(m.driver_id, marker);
+
+      if (m.companion && companionRef.current) {
+        const companionIcon = L.divIcon({
+          className: 'gba-client-marker',
+          html: `<div style="width:18px;height:18px;border-radius:50%;border:2px solid #ffffff;background:#ef4444;box-shadow:0 2px 8px rgba(0,0,0,.28)"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        });
+        const companionMarker = L.marker([m.companion.lat, m.companion.lng], { icon: companionIcon });
+        companionMarker.bindPopup(
+          `<div style="min-width:160px"><strong>${escapeHtml(m.companion.label)}</strong><div style="font-size:12px;margin-top:4px">Source : ${escapeHtml(m.companion.source)}</div></div>`,
+        );
+        companionRef.current.addLayer(companionMarker);
+
+        const link = L.polyline(
+          [
+            [m.lat, m.lng],
+            [m.companion.lat, m.companion.lng],
+          ],
+          { color: '#ef4444', weight: 2, opacity: 0.8, dashArray: '5 4' },
+        );
+        companionRef.current.addLayer(link);
+      }
     }
 
     if (markers.length > 0 && mapRef.current && !didFitRef.current) {

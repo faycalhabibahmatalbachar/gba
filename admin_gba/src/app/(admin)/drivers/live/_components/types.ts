@@ -17,6 +17,13 @@ export type LiveMapMarker = {
   stale_position?: boolean;
   /** Position issue de drivers.current_lat/lng (pas de point GPS récent) */
   source?: 'live' | 'db_fallback';
+  marker_kind?: 'driver' | 'client';
+  companion?: {
+    lat: number;
+    lng: number;
+    label: string;
+    source: 'order_delivery' | 'user_current_location';
+  } | null;
 };
 
 export type LiveStats = {

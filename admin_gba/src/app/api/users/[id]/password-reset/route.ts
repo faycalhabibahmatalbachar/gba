@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
+import { isOutboundEmailEnabled, renderEmailTemplate, sendEmail } from '@/lib/email/email.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,9 +49,31 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     /* optional */
   }
 
+  const actionLink = data.properties?.action_link ?? null;
+
+  let email_sent = false;
+  let email_error: string | null = null;
+  if (actionLink && isOutboundEmailEnabled()) {
+    const email = String(profile.email || '').trim();
+    const tpl = renderEmailTemplate('password_recovery', { recovery_link: actionLink });
+    const sent = await sendEmail({
+      to: email,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
+      template: 'password_recovery',
+      triggeredByAction: 'user_password_reset',
+      triggeredByEntityId: id,
+      triggeredByActorId: auth.userId,
+    });
+    email_sent = sent.success;
+    email_error = sent.error ?? null;
+  }
+
   return NextResponse.json({
     ok: true,
-    /** Lien à transmettre au client par un canal sécurisé (email manuel, etc.) */
-    action_link: data.properties?.action_link ?? null,
+    action_link: actionLink,
+    email_sent,
+    email_error,
   });
 }

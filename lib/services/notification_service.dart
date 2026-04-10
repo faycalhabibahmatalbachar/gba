@@ -194,6 +194,7 @@ class NotificationService {
 
   static const Set<String> _allowedRoutePrefixes = <String>{
     '/home',
+    '/blocked',
     '/cart',
     '/favorites',
     '/orders',
@@ -512,6 +513,8 @@ class NotificationService {
       case 'delivery_completed':
       case 'driver_assigned':
         return 'orders';
+      case 'account_status':
+        return null;
       default:
         return null;
     }
@@ -550,6 +553,8 @@ class NotificationService {
         return localizations?.translate('push_title_cart_abandoned') ?? 'Cart reminder';
       case 'promotion':
         return localizations?.translate('push_title_promotion') ?? 'Promotion';
+      case 'account_status':
+        return localizations?.translate('push_title_account_status') ?? 'Account';
       default:
         return null;
     }
@@ -597,6 +602,14 @@ class NotificationService {
         final promo = data['promo']?.toString();
         if (promo != null && promo.isNotEmpty) return promo;
         return localizations?.translate('push_body_promotion') ?? 'Discover our offers.';
+      case 'account_status':
+        final st = data['account_status']?.toString().toLowerCase();
+        if (st == 'active') {
+          return localizations?.translate('push_body_account_active') ??
+              'Your account is active again.';
+        }
+        return localizations?.translate('push_body_account_suspended') ??
+            'Your access has been restricted. Open the app for more information.';
       default:
         return null;
     }

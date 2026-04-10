@@ -538,54 +538,89 @@ export function AuditLogViewer({ showFilters = true }: AuditLogViewerProps) {
       <AdminDrawer
         open={!!selected}
         onOpenChange={(o) => !o && setSelected(null)}
-        title={selected ? `Audit ${selected.action_type}` : 'Détail'}
+        title={selected ? 'Détail audit' : 'Détail'}
         description={selected?.created_at ? format(new Date(selected.created_at), 'PPpp', { locale: fr }) : undefined}
-        className="sm:max-w-[560px]"
+        className="sm:max-w-[580px]"
       >
         {selected ? (
-          <div className="space-y-4 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Qui</p>
-              <p className="font-medium">{selected.user_email || '—'}</p>
-              <p className="text-xs text-muted-foreground">{selected.user_role}</p>
+          <div className="space-y-5 text-sm">
+            <div className="relative rounded-xl border border-border bg-gradient-to-br from-muted/40 to-transparent p-4">
+              <div className="flex flex-wrap items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  {getStatusIcon(selected.status)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="text-xs">{ACTION_LABELS[selected.action_type] || selected.action_type}</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {ENTITY_LABELS[selected.entity_type] || selected.entity_type}
+                    </Badge>
+                    {selected.status ? (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{selected.status}</span>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Référence entité</p>
+                  <p className="font-mono text-[11px] break-all">{selected.entity_id || '—'}</p>
+                  {entityAdminHref(selected.entity_type, selected.entity_id) ? (
+                    <Link
+                      href={entityAdminHref(selected.entity_type, selected.entity_id)!}
+                      className={cn(buttonVariants({ variant: 'link' }), 'h-auto p-0 mt-2 inline-flex text-sm')}
+                    >
+                      Ouvrir dans l&apos;admin
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Quoi</p>
-              <p>
-                {ACTION_LABELS[selected.action_type] || selected.action_type} ·{' '}
-                {ENTITY_LABELS[selected.entity_type] || selected.entity_type}
-              </p>
-              <p className="text-xs font-mono mt-1 break-all">{selected.entity_id || '—'}</p>
-              {entityAdminHref(selected.entity_type, selected.entity_id) ? (
-                <Link
-                  href={entityAdminHref(selected.entity_type, selected.entity_id)!}
-                  className={cn(buttonVariants({ variant: 'link' }), 'h-auto p-0 mt-1 inline-flex')}
-                >
-                  Ouvrir la section admin
-                </Link>
+
+            <div className="relative space-y-0 pl-1">
+              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" aria-hidden />
+              <div className="relative flex gap-3 pb-4">
+                <span className="z-[1] mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-primary ring-4 ring-background" />
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Acteur</p>
+                  <p className="font-medium">{selected.user_email || 'Système'}</p>
+                  <p className="text-xs text-muted-foreground">{selected.user_role || '—'}</p>
+                </div>
+              </div>
+              <div className="relative flex gap-3 pb-4">
+                <span className="z-[1] mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-background" />
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Horodatage</p>
+                  <p className="tabular-nums">
+                    {selected.created_at ? format(new Date(selected.created_at), 'EEEE d MMMM yyyy · HH:mm:ss', { locale: fr }) : '—'}
+                  </p>
+                </div>
+              </div>
+              {selected.action_description ? (
+                <div className="relative flex gap-3">
+                  <span className="z-[1] mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-background" />
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Description</p>
+                    <p className="text-sm leading-relaxed">{selected.action_description}</p>
+                  </div>
+                </div>
               ) : null}
             </div>
-            {selected.action_description ? (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Description</p>
-                <p className="text-sm">{selected.action_description}</p>
-              </div>
-            ) : null}
+
             {nearbyQ.isFetching ? (
               <Skeleton className="h-16 w-full" />
             ) : (nearbyQ.data?.length ?? 0) > 0 ? (
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Contexte (±5 min, même acteur / entité)</p>
-                <ul className="space-y-1 max-h-40 overflow-y-auto text-xs border rounded-md p-2 bg-muted/20">
+              <details className="group rounded-lg border border-border bg-card open:shadow-sm">
+                <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium flex items-center justify-between">
+                  Contexte proche (±5 min)
+                  <span className="text-xs text-muted-foreground group-open:rotate-0">▼</span>
+                </summary>
+                <ul className="space-y-1 max-h-44 overflow-y-auto border-t px-3 py-2 text-xs bg-muted/15">
                   {(nearbyQ.data || []).map((row) => (
                     <li
                       key={String(row.id)}
                       className={cn(
-                        'flex flex-wrap gap-x-2 gap-y-0.5 border-b border-border/40 pb-1 last:border-0',
+                        'flex flex-wrap gap-x-2 gap-y-0.5 border-b border-border/40 pb-1.5 last:border-0',
                         row.id === selected.id && 'font-medium text-primary',
                       )}
                     >
-                      <span className="text-muted-foreground whitespace-nowrap">
+                      <span className="text-muted-foreground whitespace-nowrap tabular-nums">
                         {row.created_at ? format(new Date(row.created_at), 'HH:mm:ss', { locale: fr }) : '—'}
                       </span>
                       <span>{ACTION_LABELS[row.action_type] || row.action_type}</span>
@@ -593,22 +628,29 @@ export function AuditLogViewer({ showFilters = true }: AuditLogViewerProps) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </details>
             ) : null}
+
             {meta && Object.keys(meta).length > 0 ? (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Contexte (metadata)</p>
-                <pre className="text-xs bg-muted/50 rounded-md p-2 overflow-auto max-h-40">
-                  {JSON.stringify(meta, null, 2)}
-                </pre>
-              </div>
+              <details className="group rounded-lg border border-border bg-card">
+                <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium border-b bg-muted/20">
+                  Métadonnées (JSON)
+                </summary>
+                <pre className="text-xs p-3 overflow-auto max-h-48 bg-muted/30">{JSON.stringify(meta, null, 2)}</pre>
+              </details>
             ) : null}
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">Modifications (avant / après)</p>
-              <JsonDiffViewer before={beforeDiff} after={afterDiff} />
-            </div>
+
+            <details className="group rounded-lg border border-border bg-card" open>
+              <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium border-b bg-muted/20">
+                Modifications avant / après
+              </summary>
+              <div className="p-2 max-h-[min(50vh,360px)] overflow-auto">
+                <JsonDiffViewer before={beforeDiff} after={afterDiff} />
+              </div>
+            </details>
+
             {selected.error_message ? (
-              <p className="text-destructive text-xs">{selected.error_message}</p>
+              <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive text-xs">{selected.error_message}</p>
             ) : null}
           </div>
         ) : null}

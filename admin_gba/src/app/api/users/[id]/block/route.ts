@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
+import { sendAccountStatusPush } from '@/lib/push/send-account-status-push';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +74,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       metadata: { duration_hours: hours },
     }).catch(() => null);
 
+    void sendAccountStatusPush(id, 'suspended');
+
     return NextResponse.json({
       data: after,
       message: 'Compte bloqué',
@@ -109,6 +112,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     entityId: id,
     description: 'Déblocage compte',
   }).catch(() => null);
+
+  void sendAccountStatusPush(id, 'active');
 
   return NextResponse.json({
     data: after,

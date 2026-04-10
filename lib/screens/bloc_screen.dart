@@ -14,6 +14,7 @@ class BlocScreen extends StatefulWidget {
 class _BlocScreenState extends State<BlocScreen> with TickerProviderStateMixin {
   final supabase = Supabase.instance.client;
   StreamSubscription? _profileSubscription;
+  Timer? _pollTimer;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   late AnimationController _slideController;
@@ -85,24 +86,42 @@ class _BlocScreenState extends State<BlocScreen> with TickerProviderStateMixin {
     ));
   }
   
+  bool _profileStillRestricted(Map<String, dynamic> profile) {
+    final b = profile['is_blocked'] == true;
+    final s = profile['is_suspended'] == true;
+    return b || s;
+  }
+
+  Future<void> _checkUnblockedFromServer() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null || !mounted) return;
+    try {
+      final row = await supabase
+          .from('profiles')
+          .select('is_blocked, is_suspended')
+          .eq('id', userId)
+          .maybeSingle();
+      if (row == null || !mounted) return;
+      if (!_profileStillRestricted(Map<String, dynamic>.from(row))) {
+        context.go('/home');
+      }
+    } catch (_) {}
+  }
+
   void _setupRealtimeListener() {
     final userId = supabase.auth.currentUser?.id;
     if (userId != null) {
-      // Écouter les changements du profil en temps réel
+      _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _checkUnblockedFromServer());
+
       _profileSubscription = supabase
           .from('profiles')
           .stream(primaryKey: ['id'])
           .eq('id', userId)
           .listen((List<Map<String, dynamic>> data) {
-        if (data.isNotEmpty) {
-          final profile = data.first;
-          final isBlocked = profile['is_blocked'] ?? false;
-          
-          // Si l'utilisateur n'est plus bloqué, rediriger vers home
-          if (!isBlocked && mounted) {
-            print('✅ Utilisateur débloqué - redirection vers home');
-            context.go('/home');
-          }
+        if (data.isEmpty || !mounted) return;
+        final profile = data.first;
+        if (!_profileStillRestricted(profile)) {
+          context.go('/home');
         }
       });
     }
@@ -110,6 +129,7 @@ class _BlocScreenState extends State<BlocScreen> with TickerProviderStateMixin {
   
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _profileSubscription?.cancel();
     _pulseController.dispose();
     _slideController.dispose();

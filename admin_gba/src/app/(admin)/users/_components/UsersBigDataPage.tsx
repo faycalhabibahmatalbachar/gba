@@ -70,6 +70,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { formatApiError } from '@/lib/format-api-error';
+import { formatOutboundEmailError } from '@/lib/email/format-outbound-error';
 
 import { UserDetailDrawer } from './UserDetailDrawer';
 import { UsersAdminSection } from './UsersAdminSection';
@@ -155,6 +156,11 @@ export default function UsersBigDataPage() {
   const [bulkBroadcastOpen, setBulkBroadcastOpen] = React.useState(false);
   const [bulkMsg, setBulkMsg] = React.useState('');
   const [mainTab, setMainTab] = React.useState<'users' | 'admins'>('users');
+  const [pwdResetDialog, setPwdResetDialog] = React.useState<{
+    link: string;
+    emailSent: boolean;
+    emailError?: string | null;
+  } | null>(null);
 
   const meQ = useQuery({
     queryKey: ['admin-me'],
@@ -218,11 +224,36 @@ export default function UsersBigDataPage() {
   const pwdResetMut = useMutation({
     mutationFn: async (id: string) => {
       const r = await fetch(`/api/users/${id}/password-reset`, { method: 'POST', credentials: 'include' });
-      const j = await r.json();
+      const j = (await r.json()) as {
+        ok?: boolean;
+        error?: string;
+        action_link?: string | null;
+        email_sent?: boolean;
+        email_error?: string | null;
+      };
       if (!r.ok) throw new Error(j.error || 'Échec');
       return j;
     },
-    onSuccess: () => toast.success('Email de réinitialisation envoyé'),
+    onSuccess: (d) => {
+      const link = d.action_link;
+      if (link) {
+        setPwdResetDialog({
+          link,
+          emailSent: Boolean(d.email_sent),
+          emailError: d.email_error ?? null,
+        });
+      }
+      if (d.email_sent) {
+        toast.success('Email de réinitialisation envoyé à l’utilisateur.');
+      } else if (link) {
+        toast.message('Lien de réinitialisation généré', {
+          description:
+            'Copiez le lien ci-dessous ou activez ENABLE_OUTBOUND_EMAIL avec SMTP/Resend pour l’envoi automatique.',
+        });
+      } else {
+        toast.warning('Aucun lien retourné par Supabase.');
+      }
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -684,26 +715,30 @@ export default function UsersBigDataPage() {
               animate={{ opacity: 1, y: 0 }}
             >
               <ChartWrapper title="Nouveaux utilisateurs / jour (30j)" isLoading={loading}>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={charts.signup_series_30d}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis width={32} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="count" stroke="var(--brand)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className="h-[220px] w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <LineChart data={charts.signup_series_30d}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis width={32} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="count" stroke="var(--brand)" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </ChartWrapper>
               <ChartWrapper title="Top 10 pays" isLoading={loading}>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart layout="vertical" data={charts.top_countries} margin={{ left: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis type="number" />
-                    <YAxis type="category" dataKey="country" width={80} tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="var(--brand)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="h-[220px] w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <BarChart layout="vertical" data={charts.top_countries} margin={{ left: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis type="number" />
+                      <YAxis type="category" dataKey="country" width={80} tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="var(--brand)" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </ChartWrapper>
               <ChartWrapper title="Histogramme dépenses (échantillon)" isLoading={loading}>
                 <div className="h-[220px] w-full min-h-[220px] min-w-0">
@@ -883,6 +918,50 @@ export default function UsersBigDataPage() {
         onOpenChange={setCreateOpen}
         onSuccess={() => void inf.refetch()}
       />
+
+      <Dialog
+        open={Boolean(pwdResetDialog)}
+        onOpenChange={(o) => {
+          if (!o) setPwdResetDialog(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Réinitialisation du mot de passe</DialogTitle>
+            <DialogDescription>
+              {pwdResetDialog?.emailSent
+                ? 'Un email avec le lien a été envoyé (si la boîte du destinataire accepte l’expéditeur).'
+                : 'Transmettez ce lien à l’utilisateur par un canal sécurisé, ou activez ENABLE_OUTBOUND_EMAIL + SMTP/Resend pour l’envoi automatique.'}
+            </DialogDescription>
+          </DialogHeader>
+          {pwdResetDialog?.emailError ? (
+            <p className="text-sm text-destructive">{formatOutboundEmailError(pwdResetDialog.emailError)}</p>
+          ) : null}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Lien (copier-coller)</Label>
+            <Textarea readOnly rows={4} value={pwdResetDialog?.link || ''} className="font-mono text-[11px]" />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setPwdResetDialog(null)}>
+              Fermer
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!pwdResetDialog?.link) return;
+                try {
+                  await navigator.clipboard.writeText(pwdResetDialog.link);
+                  toast.success('Lien copié');
+                } catch {
+                  toast.error('Copie impossible');
+                }
+              }}
+            >
+              Copier le lien
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={blockOpen} onOpenChange={setBlockOpen}>
         <DialogContent>

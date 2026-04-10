@@ -158,11 +158,11 @@ class AppRoutes {
           if (userId != null) {
             final response = await supabase
                 .from('profiles')
-                .select('is_blocked')
+                .select('is_blocked, is_suspended')
                 .eq('id', userId)
                 .single();
-            
-            if (response['is_blocked'] == true) {
+
+            if (response['is_blocked'] == true || response['is_suspended'] == true) {
               return '/blocked';
             }
           }

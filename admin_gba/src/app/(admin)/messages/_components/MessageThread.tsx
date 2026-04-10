@@ -579,7 +579,22 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
       }),
     });
     if (!res.ok) {
-      toast.error('Envoi échoué');
+      let msg = 'Envoi échoué';
+      try {
+        const j = (await res.json()) as { error?: unknown };
+        if (typeof j.error === 'string') msg = j.error;
+        else if (j.error && typeof j.error === 'object' && 'formErrors' in (j.error as object)) {
+          const flat = j.error as { formErrors?: string[]; fieldErrors?: Record<string, string[]> };
+          const parts = [...(flat.formErrors || []).filter(Boolean)];
+          for (const [k, v] of Object.entries(flat.fieldErrors || {})) {
+            (v || []).forEach((m) => parts.push(`${k}: ${m}`));
+          }
+          if (parts.length) msg = parts.join(' · ');
+        }
+      } catch {
+        /* ignore */
+      }
+      toast.error(msg);
       return;
     }
     setDraft('');
@@ -768,11 +783,23 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
           </div>
         ) : null}
         {pendingFiles.length > 0 ? (
-          <div className="mb-2 flex flex-wrap gap-2">
+          <div className="mb-2 flex flex-col gap-2">
             {pendingFiles.map((f) => (
-              <div key={f.url} className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs">
-                <span className="max-w-[100px] truncate">{f.name}</span>
-                <button type="button" className="text-destructive" onClick={() => setPendingFiles((p) => p.filter((x) => x.url !== f.url))}>
+              <div key={f.url} className="flex flex-wrap items-center gap-2 rounded border border-border px-2 py-2 text-xs">
+                {f.type.startsWith('audio/') ? (
+                  <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center">
+                    <span className="max-w-[140px] truncate text-muted-foreground">{f.name}</span>
+                    <audio controls src={f.url} className="h-8 max-w-full flex-1 min-w-[160px]" preload="metadata" />
+                  </div>
+                ) : (
+                  <span className="max-w-[180px] truncate">{f.name}</span>
+                )}
+                <button
+                  type="button"
+                  className="ml-auto shrink-0 text-destructive"
+                  aria-label="Retirer"
+                  onClick={() => setPendingFiles((p) => p.filter((x) => x.url !== f.url))}
+                >
                   ×
                 </button>
               </div>

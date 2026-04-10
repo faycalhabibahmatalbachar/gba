@@ -97,6 +97,16 @@ export function renderEmailTemplate(
         'Commande spéciale (mobile)',
         `<p>Réf. <strong>${safe('order_ref')}</strong></p><p>Client : ${safe('customer')}</p><p>Montant : <strong>${safe('amount')}</strong> XOF</p><p style="font-size:13px;">${safe('notes_hint')}</p>`,
       );
+    case 'password_recovery': {
+      const raw = String(data.recovery_link ?? '').trim();
+      const href =
+        /^https?:\/\//i.test(raw) ? raw.replace(/&/g, '&amp;').replace(/"/g, '&quot;') : '#';
+      return pack(
+        '[GBA] Réinitialisation du mot de passe',
+        'Réinitialisez votre mot de passe',
+        `<p>Bonjour,</p><p><a href="${href}">Réinitialiser mon mot de passe</a></p><p style="font-size:12px;color:#71717a;">Si vous n&apos;avez pas demandé cette réinitialisation, ignorez ce message.</p>`,
+      );
+    }
     case 'new_chat_message': {
       const esc = (v: string) =>
         v

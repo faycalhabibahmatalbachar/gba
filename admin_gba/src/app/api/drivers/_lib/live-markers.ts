@@ -18,6 +18,13 @@ export type LiveMarker = {
   delivery_address: string | null;
   stale_position: boolean;
   source?: 'live' | 'db_fallback';
+  marker_kind?: 'driver' | 'client';
+  companion?: {
+    lat: number;
+    lng: number;
+    label: string;
+    source: 'order_delivery' | 'user_current_location';
+  } | null;
 };
 
 export type LiveStats = {
@@ -183,11 +190,41 @@ export async function buildLiveMarkers(sb: SupabaseClient): Promise<{ markers: L
 
   const orderIds = [...new Set([...byUser.values()].map((l) => l.order_id).filter(Boolean))] as string[];
   const orderAddr = new Map<string, string | null>();
+  const orderClient = new Map<string, { user_id: string | null; delivery_lat: number | null; delivery_lng: number | null }>();
+  const clientCurrent = new Map<string, { latitude: number; longitude: number }>();
   if (orderIds.length) {
-    const { data: ords } = await sb.from('orders').select('id, delivery_address').in('id', orderIds);
+    const { data: ords } = await sb
+      .from('orders')
+      .select('id, user_id, delivery_address, delivery_lat, delivery_lng')
+      .in('id', orderIds);
     for (const o of ords || []) {
-      const row = o as { id: string; delivery_address: string | null };
+      const row = o as {
+        id: string;
+        user_id: string | null;
+        delivery_address: string | null;
+        delivery_lat: number | null;
+        delivery_lng: number | null;
+      };
       orderAddr.set(row.id, row.delivery_address ?? null);
+      orderClient.set(row.id, {
+        user_id: row.user_id ?? null,
+        delivery_lat: row.delivery_lat != null ? Number(row.delivery_lat) : null,
+        delivery_lng: row.delivery_lng != null ? Number(row.delivery_lng) : null,
+      });
+    }
+
+    const userIds = [...new Set((ords || []).map((o) => (o as { user_id?: string | null }).user_id).filter(Boolean))] as string[];
+    if (userIds.length) {
+      const { data: uclRows } = await sb
+        .from('user_current_location')
+        .select('user_id, latitude, longitude, updated_at')
+        .in('user_id', userIds);
+
+      for (const ucl of uclRows || []) {
+        const row = ucl as { user_id: string; latitude: number; longitude: number };
+        if (!Number.isFinite(Number(row.latitude)) || !Number.isFinite(Number(row.longitude))) continue;
+        clientCurrent.set(row.user_id, { latitude: Number(row.latitude), longitude: Number(row.longitude) });
+      }
     }
   }
 
@@ -233,6 +270,30 @@ export async function buildLiveMarkers(sb: SupabaseClient): Promise<{ markers: L
       delivery_address: loc.order_id ? orderAddr.get(loc.order_id) ?? null : null,
       stale_position,
       source: 'live',
+      marker_kind: 'driver',
+      companion: (() => {
+        if (!loc.order_id) return null;
+        const oc = orderClient.get(loc.order_id);
+        if (!oc) return null;
+        const live = oc.user_id ? clientCurrent.get(oc.user_id) : null;
+        if (live && Number.isFinite(live.latitude) && Number.isFinite(live.longitude)) {
+          return {
+            lat: live.latitude,
+            lng: live.longitude,
+            label: 'Client (temps réel)',
+            source: 'user_current_location' as const,
+          };
+        }
+        if (oc.delivery_lat != null && oc.delivery_lng != null) {
+          return {
+            lat: oc.delivery_lat,
+            lng: oc.delivery_lng,
+            label: 'Client (adresse livraison)',
+            source: 'order_delivery' as const,
+          };
+        }
+        return null;
+      })(),
     };
   });
 
@@ -274,6 +335,8 @@ export async function buildLiveMarkers(sb: SupabaseClient): Promise<{ markers: L
       delivery_address: null,
       stale_position: true,
       source: 'db_fallback',
+      marker_kind: 'driver',
+      companion: null,
     });
   }
 
