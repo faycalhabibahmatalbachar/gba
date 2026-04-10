@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
@@ -38,7 +38,7 @@ const deleteSchema = z.object({
 });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('categories', 'update');
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;
@@ -156,7 +156,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('categories', 'delete');
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;

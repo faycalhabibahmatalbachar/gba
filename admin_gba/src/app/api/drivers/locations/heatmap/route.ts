@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ const qSchema = z.object({
  * Points agrégés par grille ~0,01° pour leaflet.heat : [lat, lng, intensity]
  */
 export async function GET(req: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'read');
   if (!auth.ok) return auth.response;
 
   let sb: ReturnType<typeof getServiceSupabase>;

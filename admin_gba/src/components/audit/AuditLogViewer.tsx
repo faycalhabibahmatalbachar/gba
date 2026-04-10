@@ -174,23 +174,36 @@ function entityAdminHref(entityType: string, entityId?: string | null): string |
 
 interface AuditLogViewerProps {
   showFilters?: boolean;
+  initialEntityType?: string;
+  initialEntityId?: string;
 }
 
-export function AuditLogViewer({ showFilters = true }: AuditLogViewerProps) {
+export function AuditLogViewer({
+  showFilters = true,
+  initialEntityType,
+  initialEntityId,
+}: AuditLogViewerProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [startDate, setStartDate] = React.useState<Date | undefined>();
   const [endDate, setEndDate] = React.useState<Date | undefined>();
   const [actorId, setActorId] = React.useState('');
   const [ipFilter, setIpFilter] = React.useState('');
-  const [entityType, setEntityType] = React.useState<string>('');
+  const [entityType, setEntityType] = React.useState<string>(initialEntityType || '');
+  const [entityIdFilter, setEntityIdFilter] = React.useState<string>(initialEntityId || '');
   const [actionType, setActionType] = React.useState<string>('');
   const [status, setStatus] = React.useState<string>('');
   const [selected, setSelected] = React.useState<AuditLogEntry | null>(null);
   const [exporting, setExporting] = React.useState(false);
 
+  React.useEffect(() => {
+    if (initialEntityType != null) setEntityType(initialEntityType);
+    if (initialEntityId != null) setEntityIdFilter(initialEntityId);
+  }, [initialEntityType, initialEntityId]);
+
   const streamFilters = React.useMemo<AuditStreamFilters>(
     () => ({
       entityType: entityType || undefined,
+      entityId: entityIdFilter.trim() || undefined,
       actionType: actionType || undefined,
       status: status || undefined,
       actorId: actorId.trim() || undefined,
@@ -198,7 +211,7 @@ export function AuditLogViewer({ showFilters = true }: AuditLogViewerProps) {
       startDate,
       endDate,
     }),
-    [entityType, actionType, status, actorId, ipFilter, startDate, endDate],
+    [entityType, entityIdFilter, actionType, status, actorId, ipFilter, startDate, endDate],
   );
 
   const inf = useInfiniteQuery({
@@ -402,6 +415,13 @@ export function AuditLogViewer({ showFilters = true }: AuditLogViewerProps) {
                     ))}
                   </SelectContent>
                 </Select>
+
+                <Input
+                  placeholder="ID entité (référence exacte)"
+                  value={entityIdFilter}
+                  onChange={(e) => setEntityIdFilter(e.target.value)}
+                  className="font-mono text-xs"
+                />
 
                 <Select value={status || 'all'} onValueChange={(v) => setStatus(!v || v === 'all' ? '' : v)}>
                   <SelectTrigger>

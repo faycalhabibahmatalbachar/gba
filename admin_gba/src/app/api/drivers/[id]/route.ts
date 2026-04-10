@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
@@ -20,7 +20,7 @@ const patchSchema = z.object({
 });
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'read');
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;
@@ -58,23 +58,50 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       profile = p;
     }
 
+    /** driver_locations.driver_id et orders.driver_id = auth user id (profiles.id), pas drivers.id */
+    const locDriverKey = uid ?? id;
     const { data: locs } = await sb
       .from('driver_locations')
       .select('id, lat, lng, accuracy, accuracy_m, heading, speed_mps, created_at, captured_at, recorded_at, order_id')
-      .eq('driver_id', id)
+      .eq('driver_id', locDriverKey)
+      .order('captured_at', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(200);
 
+    const orderDriverKey = uid ?? id;
     const { data: recentOrders } = await sb
       .from('orders')
-      .select('id, order_number, status, total_amount, created_at')
-      .eq('driver_id', id)
+      .select('id, order_number, status, total_amount, created_at, updated_at')
+      .eq('driver_id', orderDriverKey)
       .order('created_at', { ascending: false })
-      .limit(25);
+      .limit(100);
 
-    const now = new Date();
-    const d30 = new Date(now);
-    d30.setDate(d30.getDate() - 30);
+    const sevenAgo = new Date();
+    sevenAgo.setDate(sevenAgo.getDate() - 6);
+    sevenAgo.setHours(0, 0, 0, 0);
+    const { data: weekOrders } = await sb
+      .from('orders')
+      .select('created_at')
+      .eq('driver_id', orderDriverKey)
+      .gte('created_at', sevenAgo.toISOString());
+
+    const dayKeys: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      dayKeys.push(d.toISOString().slice(0, 10));
+    }
+    const countsByDay = new Map<string, number>();
+    for (const k of dayKeys) countsByDay.set(k, 0);
+    for (const row of weekOrders || []) {
+      const r = row as { created_at?: string };
+      if (!r.created_at) continue;
+      const k = r.created_at.slice(0, 10);
+      if (countsByDay.has(k)) countsByDay.set(k, (countsByDay.get(k) || 0) + 1);
+    }
+    const orders_per_day = dayKeys.map((day) => ({ day, count: countsByDay.get(day) || 0 }));
+
     const ratings: number[] = [];
     for (let i = 0; i < 3; i++) {
       const base = Number(driver.rating_avg) || 4.2;
@@ -88,7 +115,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       orders: recentOrders || [],
       chart: {
         rating_series: ratings,
-        orders_per_day: [] as { day: string; count: number }[],
+        orders_per_day,
       },
     });
   } catch (e) {
@@ -98,7 +125,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'update');
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;
@@ -196,7 +223,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'delete');
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;

@@ -28,6 +28,10 @@ type Props = {
   highlightDriverId?: string | null;
   /** Trajet replay : polyline violette */
   replayLatLngs?: [number, number][];
+  /** Position courante pendant le replay (marqueur animé) */
+  replayPlayhead?: [number, number] | null;
+  /** Trajet client (segment statique) pendant replay */
+  replayClientLatLngs?: [number, number][];
   /** Style de contour des polygones de zone */
   zoneOutlineStyle?: 'dash' | 'round';
   onSelect: (m: LiveMapMarker | null) => void;
@@ -53,6 +57,8 @@ export function DriversLiveLeaflet({
   selectedId,
   highlightDriverId,
   replayLatLngs,
+  replayPlayhead,
+  replayClientLatLngs,
   zoneOutlineStyle = 'dash',
   onSelect,
   className,
@@ -65,6 +71,8 @@ export function DriversLiveLeaflet({
   const companionRef = React.useRef<import('leaflet').LayerGroup | null>(null);
   const heatRef = React.useRef<import('leaflet').Layer | null>(null);
   const replayRef = React.useRef<import('leaflet').Polyline | null>(null);
+  const replayClientRef = React.useRef<import('leaflet').Polyline | null>(null);
+  const replayHeadRef = React.useRef<import('leaflet').Marker | null>(null);
   const didFitRef = React.useRef(false);
   const [ready, setReady] = React.useState(false);
   const leafletRef = React.useRef<typeof import('leaflet') | null>(null);
@@ -229,15 +237,29 @@ export function DriversLiveLeaflet({
 
       const parts = [
         `<strong>${escapeHtml(m.display_name)}</strong>`,
+        `<div style="font-size:11px;margin-top:2px;color:#64748b">Dernière mise à jour : ${escapeHtml(
+          new Date(m.at).toLocaleString('fr-FR'),
+        )}</div>`,
         `<div style="font-size:12px;margin-top:4px">Statut : ${escapeHtml(m.status)}</div>`,
       ];
       if (m.speed_kmh != null) parts.push(`<div style="font-size:12px">Vitesse : ${m.speed_kmh} km/h</div>`);
       if (m.battery_level != null) parts.push(`<div style="font-size:12px">Batterie : ${m.battery_level}%</div>`);
-      if (m.order_id) parts.push(`<div style="font-size:12px">Commande : ${escapeHtml(m.order_id.slice(0, 8))}…</div>`);
+      if (m.order_id) parts.push(`<div style="font-size:12px">Livraison en cours</div>`);
       if (m.delivery_address) {
         parts.push(`<div style="font-size:11px;margin-top:4px;max-width:220px">${escapeHtml(m.delivery_address)}</div>`);
       }
-      if (m.stale_position) parts.push(`<div style="font-size:11px;color:#b45309">Position &gt; 10 min</div>`);
+      if (m.source === 'live' && !m.stale_position) {
+        parts.push(`<div style="font-size:11px;color:#059669">🟢 Temps réel</div>`);
+      } else if (m.source === 'live' && m.stale_position) {
+        parts.push(`<div style="font-size:11px;color:#b45309">🟡 Dernière position connue</div>`);
+      } else if (m.source === 'db_fallback') {
+        parts.push(`<div style="font-size:11px;color:#2563eb">🔵 Dernière position enregistrée</div>`);
+      }
+      if (m.companion?.source === 'order_delivery') {
+        parts.push(`<div style="font-size:11px;color:#64748b">📍 Client · position commande</div>`);
+      } else if (m.companion?.source === 'user_current_location') {
+        parts.push(`<div style="font-size:11px;color:#059669">📍 Client · suivi temps réel</div>`);
+      }
       const mapsStreetViewUrl = `https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}&layer=c`;
       parts.push(`<div style="margin-top:8px"><a style="font-size:12px;color:#6C47FF;font-weight:600" href="${mapsStreetViewUrl}" target="_blank" rel="noopener">Vue immersive (Street View)</a></div>`);
 
@@ -258,7 +280,9 @@ export function DriversLiveLeaflet({
         });
         const companionMarker = L.marker([m.companion.lat, m.companion.lng], { icon: companionIcon });
         companionMarker.bindPopup(
-          `<div style="min-width:160px"><strong>${escapeHtml(m.companion.label)}</strong><div style="font-size:12px;margin-top:4px">Source : ${escapeHtml(m.companion.source)}</div></div>`,
+          `<div style="min-width:160px"><strong>Client</strong><div style="font-size:12px;margin-top:4px">${escapeHtml(
+            m.companion.source === 'user_current_location' ? 'Position mise à jour en direct' : 'Position au moment de la commande',
+          )}</div></div>`,
         );
         companionRef.current.addLayer(companionMarker);
 
@@ -369,6 +393,10 @@ export function DriversLiveLeaflet({
       map.removeLayer(replayRef.current);
       replayRef.current = null;
     }
+    if (replayClientRef.current) {
+      map.removeLayer(replayClientRef.current);
+      replayClientRef.current = null;
+    }
 
     if (replayLatLngs && replayLatLngs.length >= 2) {
       const pl = L.polyline(replayLatLngs, {
@@ -382,7 +410,40 @@ export function DriversLiveLeaflet({
       replayRef.current = pl;
       map.fitBounds(pl.getBounds(), { padding: [48, 48], maxZoom: 16 });
     }
-  }, [ready, replayLatLngs]);
+
+    if (replayClientLatLngs && replayClientLatLngs.length >= 2) {
+      const cl = L.polyline(replayClientLatLngs, {
+        color: '#94a3b8',
+        weight: 3,
+        opacity: 0.75,
+        dashArray: '6 6',
+        lineJoin: 'round',
+      }).addTo(map);
+      replayClientRef.current = cl;
+    }
+  }, [ready, replayLatLngs, replayClientLatLngs]);
+
+  React.useEffect(() => {
+    if (!ready || !mapRef.current || !leafletRef.current) return;
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (replayHeadRef.current) {
+      map.removeLayer(replayHeadRef.current);
+      replayHeadRef.current = null;
+    }
+    if (!replayPlayhead) return;
+    const [lat, lng] = replayPlayhead;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const icon = L.divIcon({
+      className: 'gba-replay-head',
+      html: `<div style="width:22px;height:22px;border-radius:50%;background:#6C47FF;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.35)"></div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+    });
+    const mk = L.marker([lat, lng], { icon, zIndexOffset: 2000 }).addTo(map);
+    mk.bindPopup('<strong>Livreur (replay)</strong>');
+    replayHeadRef.current = mk;
+  }, [ready, replayPlayhead]);
 
   React.useEffect(() => {
     if (!ready || !mapRef.current || !leafletRef.current) return;

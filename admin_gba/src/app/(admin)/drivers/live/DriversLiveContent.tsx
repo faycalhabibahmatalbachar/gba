@@ -11,12 +11,16 @@ import { fr } from 'date-fns/locale';
 import {
   ArrowLeft,
   Bell,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Flame,
   Layers,
   MapPinned,
   Maximize2,
   Minimize2,
+  Pause,
+  Play,
   PlayCircle,
   Radio,
   RefreshCw,
@@ -55,7 +59,6 @@ type ZoneRow = { id: string; name: string; color: string; geojson: unknown; is_a
 type ReplayDriver = { driver_id: string; label: string };
 
 const REFETCH_MS = 10_000;
-const shortId = (v: string | null | undefined) => (v ? `${v.slice(0, 8)}…` : '—');
 
 async function fetchLive(): Promise<LiveResponse> {
   const r = await fetch('/api/drivers/locations/live', { credentials: 'include' });
@@ -111,6 +114,13 @@ export default function DriversLiveContent() {
   const [replayDriverId, setReplayDriverId] = React.useState<string>('');
   const [replayDay, setReplayDay] = React.useState<Date | undefined>(new Date());
   const [replayLine, setReplayLine] = React.useState<[number, number][]>([]);
+  const [replayPointsMeta, setReplayPointsMeta] = React.useState<{ lat: number; lng: number; t: string }[]>([]);
+  const [replayClientLine, setReplayClientLine] = React.useState<[number, number][]>([]);
+  const [replayIdx, setReplayIdx] = React.useState(0);
+  const [replayPlaying, setReplayPlaying] = React.useState(false);
+  const [replaySpeed, setReplaySpeed] = React.useState<1 | 2 | 4>(1);
+  const [replayOrderFilter, setReplayOrderFilter] = React.useState('');
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [replayLoading, setReplayLoading] = React.useState(false);
   const [replayCalendarMonth, setReplayCalendarMonth] = React.useState<Date>(() => new Date());
   const [mapFullscreen, setMapFullscreen] = React.useState(false);
@@ -219,7 +229,7 @@ export default function DriversLiveContent() {
     return list.filter((m) => {
       if (!matchFilter(m, filter)) return false;
       if (!q) return true;
-      return m.display_name.toLowerCase().includes(q) || m.driver_id.toLowerCase().includes(q);
+      return m.display_name.toLowerCase().includes(q);
     });
   }, [liveQ.data?.markers, filter, search]);
 
@@ -283,24 +293,62 @@ export default function DriversLiveContent() {
     end.setHours(23, 59, 59, 999);
     const from = start.toISOString();
     const to = end.toISOString();
+    const oid = replayOrderFilter.trim();
+    const orderQ =
+      oid && /^[0-9a-f-]{36}$/i.test(oid) ? `&order_id=${encodeURIComponent(oid)}` : '';
     setReplayLoading(true);
     try {
       const r = await fetch(
-        `/api/drivers/locations/history/${replayDriverId}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+        `/api/drivers/locations/history/${replayDriverId}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${orderQ}`,
         { credentials: 'include' },
       );
       const j = await parseApiJson<{
-        data?: { points?: { lat: number; lng: number }[] };
+        data?: { points?: { lat: number; lng: number; t?: string }[] };
         error?: string;
       }>(r);
       if (!r.ok) throw new Error(typeof j.error === 'string' ? j.error : 'Historique indisponible');
       const pts = j.data?.points || [];
-      const line: [number, number][] = pts.map((p) => [p.lat, p.lng]);
+      const meta = pts
+        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+        .map((p) => ({ lat: p.lat, lng: p.lng, t: p.t || new Date(0).toISOString() }));
+      const line: [number, number][] = meta.map((p) => [p.lat, p.lng]);
+      setReplayClientLine([]);
       if (line.length < 2) {
-        toast.message('Pas assez de points pour ce jour');
+        toast.message('Pas assez de points pour cette sélection');
         setReplayLine([]);
+        setReplayPointsMeta([]);
+        setReplayIdx(0);
+        setReplayPlaying(false);
       } else {
         setReplayLine(line);
+        setReplayPointsMeta(meta);
+        setReplayIdx(0);
+        setReplayPlaying(false);
+        let clientSeg: [number, number][] = [];
+        if (oid && /^[0-9a-f-]{36}$/i.test(oid)) {
+          const or = await fetch(`/api/orders?id=${encodeURIComponent(oid)}`, { credentials: 'include' });
+          const oj = await parseApiJson<{
+            order?: { delivery_lat?: number | null; delivery_lng?: number | null } | null;
+            error?: string;
+          }>(or);
+          if (or.ok && oj.order) {
+            const ord = oj.order;
+            if (
+              ord.delivery_lat != null &&
+              ord.delivery_lng != null &&
+              Number.isFinite(Number(ord.delivery_lat)) &&
+              Number.isFinite(Number(ord.delivery_lng))
+            ) {
+              const clat = Number(ord.delivery_lat);
+              const clng = Number(ord.delivery_lng);
+              clientSeg = [
+                [line[0][0], line[0][1]],
+                [clat, clng],
+              ];
+            }
+          }
+        }
+        setReplayClientLine(clientSeg.length >= 2 ? clientSeg : []);
         toast.success(`Trajet chargé (${line.length} points)`);
         setReplayOpen(false);
       }
@@ -311,6 +359,27 @@ export default function DriversLiveContent() {
     }
   }
 
+  React.useEffect(() => {
+    if (!replayPlaying || replayPointsMeta.length < 2) return;
+    const base = 280;
+    const ms = Math.max(40, base / replaySpeed);
+    const t = setInterval(() => {
+      setReplayIdx((i) => {
+        if (i >= replayPointsMeta.length - 1) {
+          setReplayPlaying(false);
+          return i;
+        }
+        return i + 1;
+      });
+    }, ms);
+    return () => clearInterval(t);
+  }, [replayPlaying, replaySpeed, replayPointsMeta.length]);
+
+  const replayPlayheadPos =
+    replayPointsMeta.length > 0 && replayIdx >= 0 && replayIdx < replayPointsMeta.length
+      ? ([replayPointsMeta[replayIdx].lat, replayPointsMeta[replayIdx].lng] as [number, number])
+      : null;
+
   return (
     <motion.div
       className="flex h-[calc(100dvh-3.5rem)] min-h-[560px] flex-col gap-2 overflow-hidden"
@@ -319,8 +388,8 @@ export default function DriversLiveContent() {
       transition={{ duration: 0.25 }}
     >
       <PageHeader
-        title="Centrale commandement visuel — GPS Live"
-        subtitle="Temps réel, replay trajectoires, heatmap, zones — lié aux notifications livreurs"
+        title="GPS Live"
+        subtitle="Suivi des livreurs, zones et replay de trajets"
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -427,8 +496,10 @@ export default function DriversLiveContent() {
 
       <div
         className={cn(
-          'relative grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]',
-          mapFullscreen && 'fixed inset-0 z-[200] grid-cols-1 bg-background p-2 sm:p-3',
+          'relative grid min-h-0 flex-1 gap-0 lg:gap-3',
+          sidebarOpen && !mapFullscreen && 'lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]',
+          (!sidebarOpen || mapFullscreen) && 'grid-cols-1',
+          mapFullscreen && 'fixed inset-0 z-[200] bg-background p-2 sm:p-3',
         )}
       >
         <motion.div
@@ -439,6 +510,18 @@ export default function DriversLiveContent() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
+          {!mapFullscreen ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="absolute left-3 top-3 z-[520] h-9 w-9 rounded-full shadow-md"
+              onClick={() => setSidebarOpen((o) => !o)}
+              aria-label={sidebarOpen ? 'Masquer le panneau' : 'Afficher le panneau'}
+            >
+              {sidebarOpen ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+            </Button>
+          ) : null}
           {liveQ.isError ? (
             <div className="absolute inset-0 z-[400] flex flex-col items-center justify-center gap-2 bg-muted/40 p-6 text-center backdrop-blur-sm">
               <p className="text-sm text-destructive">{(liveQ.error as Error).message}</p>
@@ -496,6 +579,10 @@ export default function DriversLiveContent() {
                 className="shadow-md"
                 onClick={() => {
                   setReplayLine([]);
+                  setReplayPointsMeta([]);
+                  setReplayClientLine([]);
+                  setReplayIdx(0);
+                  setReplayPlaying(false);
                   toast.message('Trajet effacé');
                 }}
               >
@@ -514,16 +601,79 @@ export default function DriversLiveContent() {
             selectedId={selected?.driver_id ?? null}
             highlightDriverId={highlightFromUrl}
             replayLatLngs={replayLine.length >= 2 ? replayLine : undefined}
+            replayPlayhead={replayPlayheadPos}
+            replayClientLatLngs={replayClientLine.length >= 2 ? replayClientLine : undefined}
             zoneOutlineStyle={zoneFrameStyle}
             onSelect={setSelected}
             mapControlsRef={mapControlsRef}
           />
+
+          {replayPointsMeta.length >= 2 ? (
+            <div className="absolute bottom-14 left-3 right-3 z-[510] rounded-xl border border-border bg-background/95 p-3 shadow-lg backdrop-blur-sm sm:left-auto sm:right-3 sm:w-[min(100%,420px)]">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold">Replay</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => setReplayPlaying((p) => !p)}
+                >
+                  {replayPlaying ? <Pause className="mr-1 size-3.5" /> : <Play className="mr-1 size-3.5" />}
+                  {replayPlaying ? 'Pause' : 'Lecture'}
+                </Button>
+                {([1, 2, 4] as const).map((sp) => (
+                  <Button
+                    key={sp}
+                    type="button"
+                    size="sm"
+                    variant={replaySpeed === sp ? 'default' : 'outline'}
+                    className="h-8 px-2 text-xs"
+                    onClick={() => setReplaySpeed(sp)}
+                  >
+                    ×{sp}
+                  </Button>
+                ))}
+              </div>
+              <input
+                type="range"
+                className="mb-2 w-full accent-[#6C47FF]"
+                min={0}
+                max={Math.max(0, replayPointsMeta.length - 1)}
+                value={replayIdx}
+                onChange={(e) => setReplayIdx(Number(e.target.value))}
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>
+                  {replayPointsMeta[0]?.t
+                    ? format(new Date(replayPointsMeta[0].t), 'HH:mm:ss', { locale: fr })
+                    : '—'}
+                </span>
+                <span>
+                  {replayPointsMeta[replayIdx]?.t
+                    ? format(new Date(replayPointsMeta[replayIdx].t), 'dd/MM HH:mm:ss', { locale: fr })
+                    : '—'}
+                </span>
+                <span>
+                  {replayPointsMeta[replayPointsMeta.length - 1]?.t
+                    ? format(new Date(replayPointsMeta[replayPointsMeta.length - 1].t), 'HH:mm:ss', { locale: fr })
+                    : '—'}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 border-t border-border pt-2 text-[10px] text-muted-foreground">
+                <span className="rounded-md bg-muted px-2 py-0.5">Commande passée</span>
+                <span className="rounded-md bg-muted px-2 py-0.5">Départ livreur</span>
+                <span className="rounded-md bg-muted px-2 py-0.5">Livraison</span>
+              </div>
+            </div>
+          ) : null}
         </motion.div>
 
         <Card
           className={cn(
             'flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto border-border p-4',
             mapFullscreen && 'hidden',
+            !sidebarOpen && 'hidden',
           )}
         >
           <div className="flex items-center gap-2 text-sm font-semibold">
@@ -555,8 +705,13 @@ export default function DriversLiveContent() {
               >
                 <div className="font-medium text-foreground">{m.display_name}</div>
                 <div className="text-muted-foreground">
-                  {m.status}
-                  {m.stale_position ? ' · position ancienne' : ''}
+                  {m.source === 'live' && !m.stale_position
+                    ? 'Temps réel'
+                    : m.source === 'db_fallback'
+                      ? 'Dernière position enregistrée'
+                      : m.stale_position
+                        ? 'Dernière position connue'
+                        : m.status}
                 </div>
                 {m.speed_kmh != null ? <div className="text-[10px]">{m.speed_kmh} km/h</div> : null}
               </button>
@@ -591,7 +746,7 @@ export default function DriversLiveContent() {
                 href={`/drivers/live?highlight=${selected.driver_id}`}
                 className="inline-flex h-9 w-full items-center justify-center rounded-md border border-input bg-background text-sm font-medium hover:bg-muted"
               >
-                Lien direct (highlight)
+                Partager cette vue
               </Link>
               <a
                 href={
@@ -624,23 +779,8 @@ export default function DriversLiveContent() {
       </div>
 
       <div className="flex h-8 shrink-0 items-center justify-center border-t border-border bg-muted/30 text-xs text-muted-foreground">
-        Actualisation dans {Math.max(0, secondsToRefetch)}s · {markers.length} livreur(s) affiché(s) · Temps réel +
-        polling 10s
+        Prochaine actualisation dans {Math.max(0, secondsToRefetch)}s · {markers.length} livreur(s)
       </div>
-
-      <Card className="shrink-0 border-dashed border-border/80 bg-muted/10 p-4 text-xs text-muted-foreground">
-        <h3 className="text-sm font-semibold text-foreground mb-2">Feuille de route — fonctionnalités à ajouter</h3>
-        <ul className="list-disc space-y-1 pl-4 leading-relaxed">
-          <li>WebSocket ou channel dédié pour latence &lt; 3 s sans sur-poller.</li>
-          <li>Clustering intelligent des marqueurs + compteur par zone (GeoJSON).</li>
-          <li>Historique multi-jours export GPX / CSV et comparaison de tournées.</li>
-          <li>Alertes géofence (sortie zone, immobilité prolongée) avec file vers notifications.</li>
-          <li>Couche trafic / ETA vers prochaine livraison (API Maps).</li>
-          <li>Mode « dispatch » : assignation commande → livreur depuis la carte.</li>
-          <li>File d’attente audio / PTT (WebRTC) ops ↔ livreur (hors scope court terme).</li>
-          <li>Heatmap temps réel configurable (1 h / 6 h / 24 h) + légende.</li>
-        </ul>
-      </Card>
 
       <AdminDrawer
         open={notifOpen}
@@ -680,8 +820,8 @@ export default function DriversLiveContent() {
             />
           </div>
           {selected ? (
-            <p className="text-[10px] text-muted-foreground font-mono">
-              user_id={shortId(selected.driver_id)} · lat {selected.lat?.toFixed(5) ?? '—'} lng {selected.lng?.toFixed(5) ?? '—'}
+            <p className="text-[10px] text-muted-foreground">
+              Position : {selected.lat != null && selected.lng != null ? 'disponible' : 'indisponible'}
             </p>
           ) : (
             <p className="text-xs text-amber-600">Sélectionnez un livreur avant d’ouvrir le hub.</p>
@@ -692,8 +832,8 @@ export default function DriversLiveContent() {
       <AdminDrawer
         open={replayOpen}
         onOpenChange={setReplayOpen}
-        title="Replay trajectoire"
-        description="Charger les positions enregistrées pour une journée (driver_locations)."
+        title="Replay de trajet"
+        description="Choisissez un livreur, une date et éventuellement une commande pour filtrer les points enregistrés."
         footer={
           <div className="flex w-full justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setReplayOpen(false)}>
@@ -707,7 +847,15 @@ export default function DriversLiveContent() {
       >
         <div className="space-y-4 text-sm">
           <div className="space-y-2">
-            <Label>Livreur (UUID auth / driver_id GPS)</Label>
+            <Label>Commande (optionnel)</Label>
+            <Input
+              placeholder="Référence interne pour filtrer le trajet"
+              value={replayOrderFilter}
+              onChange={(e) => setReplayOrderFilter(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Livreur</Label>
             <select
               className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
               value={replayDriverId}
@@ -716,7 +864,7 @@ export default function DriversLiveContent() {
               <option value="">— Choisir —</option>
               {(replayDriversQ.data || liveQ.data?.markers || []).map((m) => (
                 <option key={m.driver_id} value={m.driver_id}>
-                  {'label' in m ? m.label : m.display_name} ({shortId(m.driver_id)})
+                  {'label' in m ? m.label : m.display_name}
                 </option>
               ))}
             </select>

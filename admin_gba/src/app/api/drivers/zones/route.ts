@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
@@ -18,7 +18,7 @@ const postSchema = z.object({
 });
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'read');
   if (!auth.ok) return auth.response;
 
   let sb: ReturnType<typeof getServiceSupabase>;
@@ -42,7 +42,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'create');
   if (!auth.ok) return auth.response;
 
   let json: unknown;

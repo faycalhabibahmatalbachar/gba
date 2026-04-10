@@ -5,18 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import {
-  Activity,
-  Map as MapIcon,
-  MapPinned,
-  MoreHorizontal,
-  Phone,
-  RefreshCw,
-  Search,
-  Table2,
-  Truck,
-  UserX,
-} from 'lucide-react';
+import { Activity, MapPinned, MoreHorizontal, Phone, RefreshCw, Search, Truck, UserX } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -24,23 +13,20 @@ import { KPICard } from '@/components/shared/KPICard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DataTable } from '@/components/shared/DataTable';
 import { Drawer } from '@/components/shared/Drawer';
-import { MapWrapper, type MapWrapperMarker } from '@/components/shared/MapWrapper';
 import { AvatarWithInitials } from '@/components/shared/AvatarWithInitials';
 import { ConfirmModal } from '@/components/shared/ConfirmModal';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { DriverUpsertDialog } from './_components/DriverUpsertDialog';
+import { DriverDetailPanel } from './_components/DriverDetailPanel';
 
 type DriverRow = {
   id: string;
@@ -74,21 +60,10 @@ type DriverRow = {
 };
 
 type DriversResponse = { drivers: DriverRow[]; nextCursor: string | null; total: number };
-const hasValidGps = (g: DriverRow['last_gps']) =>
-  Boolean(g && Number.isFinite(g.lat) && Number.isFinite(g.lng));
-
 function driverStatusLabel(row: DriverRow): string {
   if (row.is_active === false) return 'suspended';
   if (row.is_online) return 'active';
   if (row.is_available) return 'pending';
-  return 'offline';
-}
-
-function driverTone(row: DriverRow): MapWrapperMarker['tone'] {
-  const s = driverStatusLabel(row);
-  if (s === 'active') return 'online';
-  if (s === 'pending') return 'pending';
-  if (s === 'suspended') return 'suspended';
   return 'offline';
 }
 
@@ -108,7 +83,6 @@ export default function DriversAdminPage() {
   const [debounced, setDebounced] = React.useState('');
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [stack, setStack] = React.useState<DriverRow[]>([]);
-  const [splitMap, setSplitMap] = React.useState(true);
   const [selected, setSelected] = React.useState<DriverRow | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [suspendOpen, setSuspendOpen] = React.useState(false);
@@ -312,29 +286,6 @@ export default function DriversAdminPage() {
     [patchMut],
   );
 
-  const center = React.useMemo(() => {
-    const withGps = drivers.filter((d) => hasValidGps(d.last_gps));
-    if (!withGps.length) return { longitude: 15.0444, latitude: 12.1348, zoom: 11 };
-    const lat = withGps.reduce((s, d) => s + (d.last_gps?.lat ?? 0), 0) / withGps.length;
-    const lng = withGps.reduce((s, d) => s + (d.last_gps?.lng ?? 0), 0) / withGps.length;
-    return { longitude: lng, latitude: lat, zoom: 12 };
-  }, [drivers]);
-
-  const splitMapMarkers = React.useMemo((): MapWrapperMarker[] => {
-    return drivers
-      .filter((d) => hasValidGps(d.last_gps))
-      .map((d) => ({
-        id: d.id,
-        lat: d.last_gps?.lat as number,
-        lng: d.last_gps?.lng as number,
-        tone: driverTone(d),
-        onClick: () => {
-          setSelected(d);
-          setDrawerOpen(true);
-        },
-      }));
-  }, [drivers]);
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -352,10 +303,6 @@ export default function DriversAdminPage() {
               <MapPinned className="h-3.5 w-3.5" />
               Carte live
             </Link>
-            <Button variant="outline" size="sm" onClick={() => setSplitMap((s) => !s)}>
-              {splitMap ? <Table2 className="h-3.5 w-3.5 mr-1" /> : <MapIcon className="h-3.5 w-3.5 mr-1" />}
-              {splitMap ? 'Plein tableau' : 'Split carte'}
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -397,64 +344,6 @@ export default function DriversAdminPage() {
             Réessayer
           </Button>
         </Card>
-      ) : splitMap ? (
-        <div className="grid gap-4 lg:grid-cols-2 min-h-[480px]">
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="min-h-[360px] rounded-xl border border-border overflow-hidden bg-card"
-          >
-            {loading ? (
-              <div className="p-4 space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : (
-              <DataTable
-                columns={columns}
-                data={drivers}
-                emptyTitle="Aucun livreur"
-                emptyDescription="Créez une fiche dans la table drivers, ou liez un compte utilisateur rôle driver."
-                emptyAction={
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-                      Créer un livreur
-                    </Button>
-                    <Link
-                      href="/users"
-                      className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm hover:bg-muted"
-                    >
-                      Utilisateurs
-                    </Link>
-                  </div>
-                }
-                cursorFooter={
-                  query.data?.nextCursor ? (
-                    <div className="flex justify-center py-2">
-                      <Button variant="ghost" size="sm" onClick={() => setCursor(query.data!.nextCursor)}>
-                        Charger la suite
-                      </Button>
-                    </div>
-                  ) : null
-                }
-              />
-            )}
-          </motion.div>
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-            <MapWrapper
-              height={480}
-              initialViewState={center}
-              className="min-h-[360px]"
-              markers={splitMapMarkers}
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {splitMapMarkers.length > 0
-                ? `${splitMapMarkers.length} position(s) GPS valide(s) affichée(s).`
-                : 'Positions non encore reçues ou coordonnées invalides.'}
-            </p>
-          </motion.div>
-        </div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <DataTable
@@ -462,7 +351,7 @@ export default function DriversAdminPage() {
             data={drivers}
             isLoading={loading}
             emptyTitle="Aucun livreur"
-            emptyDescription="Aucune donnée pour l’instant."
+            emptyDescription="Ajoutez un livreur pour l’application mobile livreur."
             emptyAction={
               <div className="flex flex-wrap gap-2 justify-center">
                 <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
@@ -500,9 +389,6 @@ export default function DriversAdminPage() {
               <Button variant="outline" size="sm" type="button" onClick={() => setEditOpen(true)}>
                 Modifier fiche
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setSuspendOpen(true)}>
-                Suspendre / motif
-              </Button>
               <a
                 href={`tel:${selected.profile.phone || selected.phone || ''}`}
                 className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
@@ -515,12 +401,17 @@ export default function DriversAdminPage() {
         }
       >
         {selected ? (
-          <DriverDetailTabs
+          <DriverDetailPanel
             driverId={selected.id}
+            listRowName={selected.profile.display_name}
             onAssign={(orderId) => assignMut.mutate({ id: selected.id, orderId })}
             assignPending={assignMut.isPending}
             assignOrderId={assignOrderId}
             onAssignOrderIdChange={setAssignOrderId}
+            onSuspendRequest={() => {
+              qc.invalidateQueries({ queryKey: ['drivers'] });
+            }}
+            onEditRequest={() => setEditOpen(true)}
           />
         ) : null}
       </Drawer>
@@ -564,158 +455,5 @@ export default function DriversAdminPage() {
         }}
       />
     </div>
-  );
-}
-
-function DriverDetailTabs({
-  driverId,
-  onAssign,
-  assignPending,
-  assignOrderId,
-  onAssignOrderIdChange,
-}: {
-  driverId: string;
-  onAssign: (orderId: string) => void;
-  assignPending: boolean;
-  assignOrderId: string;
-  onAssignOrderIdChange: (v: string) => void;
-}) {
-  const q = useQuery({
-    queryKey: ['driver-detail', driverId],
-    queryFn: async () => {
-      const r = await fetch(`/api/drivers/${driverId}`, { credentials: 'include' });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Erreur');
-      return j as {
-        driver: Record<string, unknown>;
-        profile: Record<string, unknown> | null;
-        locations: { lat: number; lng: number; created_at: string }[];
-        orders: { id: string; order_number?: string; status?: string; total_amount?: number; created_at: string }[];
-        chart: { rating_series: number[]; orders_per_day: { day: string; count: number }[] };
-      };
-    },
-  });
-
-  if (q.isLoading) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    );
-  }
-
-  if (q.isError) {
-    return (
-      <div className="text-sm text-destructive">
-        {(q.error as Error).message}
-        <Button className="mt-2" size="sm" variant="outline" onClick={() => q.refetch()}>
-          Réessayer
-        </Button>
-      </div>
-    );
-  }
-
-  const data = q.data!;
-  const ratingData = data.chart.rating_series.map((v, i) => ({ m: `M${i + 1}`, v }));
-  const barData =
-    data.chart.orders_per_day.length > 0
-      ? data.chart.orders_per_day
-      : data.orders.slice(0, 7).map((o, i) => ({
-          day: new Date(o.created_at).toLocaleDateString('fr-FR', { weekday: 'short' }),
-          count: i + 1,
-        }));
-
-  const path =
-    data.locations.length > 1
-      ? data.locations.map((l) => ({ lng: l.lng, lat: l.lat }))
-      : data.locations.map((l) => ({ lng: l.lng, lat: l.lat }));
-
-  const pathMarkers: MapWrapperMarker[] = path.map((p, i) => ({
-    id: `gps-${i}`,
-    lat: p.lat,
-    lng: p.lng,
-    tone: 'neutral',
-  }));
-  const pathCenter =
-    path.length > 0
-      ? {
-          latitude: path.reduce((s, p) => s + p.lat, 0) / path.length,
-          longitude: path.reduce((s, p) => s + p.lng, 0) / path.length,
-          zoom: 13,
-        }
-      : { latitude: 12.1348, longitude: 15.0444, zoom: 11 };
-
-  return (
-    <Tabs defaultValue="profil" className="w-full">
-      <TabsList className="flex flex-wrap h-auto gap-1">
-        <TabsTrigger value="profil">Profil</TabsTrigger>
-        <TabsTrigger value="perf">Performances</TabsTrigger>
-        <TabsTrigger value="orders">Commandes</TabsTrigger>
-        <TabsTrigger value="gps">GPS</TabsTrigger>
-        <TabsTrigger value="actions">Actions</TabsTrigger>
-      </TabsList>
-      <TabsContent value="profil" className="space-y-2 text-sm pt-2">
-        <pre className="text-xs bg-muted/50 rounded-lg p-3 overflow-auto max-h-48">
-          {JSON.stringify({ driver: data.driver, profile: data.profile }, null, 2)}
-        </pre>
-      </TabsContent>
-      <TabsContent value="perf" className="pt-2 h-[220px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={ratingData}>
-            <XAxis dataKey="m" hide />
-            <YAxis domain={[0, 5]} width={24} />
-            <Tooltip />
-            <Line type="monotone" dataKey="v" stroke="var(--brand)" strokeWidth={2} dot />
-          </LineChart>
-        </ResponsiveContainer>
-        <div className="h-[180px] mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barData.length ? barData : [{ day: '-', count: 0 }]}>
-              <XAxis dataKey="day" />
-              <YAxis width={24} />
-              <Tooltip />
-              <Bar dataKey="count" fill="color-mix(in srgb, var(--brand) 70%, white)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </TabsContent>
-      <TabsContent value="orders" className="pt-2 space-y-2 text-sm max-h-56 overflow-auto">
-        {data.orders.length === 0 ? (
-          <p className="text-muted-foreground">Aucune commande récente.</p>
-        ) : (
-          data.orders.map((o) => (
-            <div key={o.id} className="flex justify-between border-b border-border pb-1">
-              <span>{o.order_number || o.id.slice(0, 8)}</span>
-              <span className="text-muted-foreground">{o.status}</span>
-            </div>
-          ))
-        )}
-      </TabsContent>
-      <TabsContent value="gps" className="pt-2">
-        <MapWrapper height={280} className="mb-2" markers={pathMarkers} initialViewState={pathCenter} />
-        <p className="text-xs text-muted-foreground">{data.locations.length} points récents</p>
-      </TabsContent>
-      <TabsContent value="actions" className="pt-2 space-y-3">
-        <div className="flex gap-2 flex-wrap">
-          <Input
-            placeholder="UUID commande à assigner"
-            value={assignOrderId}
-            onChange={(e) => onAssignOrderIdChange(e.target.value)}
-            className="max-w-xs font-mono text-xs"
-          />
-          <Button
-            size="sm"
-            disabled={assignPending || !/^[0-9a-f-]{36}$/i.test(assignOrderId)}
-            onClick={() => onAssign(assignOrderId)}
-          >
-            Assigner
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Documents / export PDF / push : à brancher sur buckets et Edge selon votre déploiement.
-        </p>
-      </TabsContent>
-    </Tabs>
   );
 }

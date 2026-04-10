@@ -392,6 +392,7 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
     onSuccess: () => {
       toast.success('Permissions CRUD enregistrées');
       void qc.invalidateQueries({ queryKey: ['admin-role-permissions', user?.id] });
+      void qc.invalidateQueries({ queryKey: ['me-admin-permissions'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

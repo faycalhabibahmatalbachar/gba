@@ -13,52 +13,55 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAdminPermissions } from '@/components/providers/AdminPermissionsProvider';
 
+type NavChild = { label: string; href: string; scope: string };
 type NavItem = {
   label: string;
   href?: string;
   icon: React.ElementType;
-  children?: { label: string; href: string }[];
+  scope?: string;
+  children?: NavChild[];
 };
 
 const NAV: NavItem[] = [
   { label: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Commandes', href: '/orders', icon: ShoppingCart },
+  { label: 'Commandes', href: '/orders', icon: ShoppingCart, scope: 'orders' },
   {
-    label: 'Produits', icon: Package,
+    label: 'Produits',
+    icon: Package,
     children: [
-      { label: 'Tous les produits', href: '/products' },
-      { label: 'Catégories', href: '/products/categories' },
+      { label: 'Tous les produits', href: '/products', scope: 'products' },
+      { label: 'Catégories', href: '/products/categories', scope: 'categories' },
     ],
   },
   {
-    label: 'Livraisons', icon: Truck,
-    children: [
-      { label: 'Toutes les livraisons', href: '/deliveries' },
-    ],
+    label: 'Livraisons',
+    icon: Truck,
+    children: [{ label: 'Toutes les livraisons', href: '/deliveries', scope: 'orders' }],
   },
   {
     label: 'Livreurs',
     icon: Car,
     children: [
-      { label: 'Liste & carte', href: '/drivers' },
-      { label: 'Carte live', href: '/drivers/live' },
+      { label: 'Liste & carte', href: '/drivers', scope: 'drivers' },
+      { label: 'Carte live', href: '/drivers/live', scope: 'drivers' },
     ],
   },
-  { label: 'Utilisateurs', href: '/users', icon: Users },
-  { label: 'Messages', href: '/messages', icon: MessageSquare },
-  { label: 'Notifications', href: '/notifications', icon: Bell },
-  { label: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { label: 'Avis', href: '/reviews', icon: Star },
-  { label: 'Inventaire', href: '/inventory', icon: Warehouse },
-  { label: 'CMS', href: '/cms', icon: FileText },
-  { label: 'Rapports', href: '/reports', icon: FileSpreadsheet },
-  { label: 'Audit', href: '/audit', icon: ClipboardList },
-  { label: 'Sécurité', href: '/security', icon: Shield },
-  { label: 'Surveillance', href: '/monitoring', icon: Activity },
-  { label: 'Bannières', href: '/banners', icon: Image },
-  { label: 'Journal emails', href: '/email-logs', icon: Mail },
-  { label: 'Paramètres', href: '/settings', icon: Settings },
+  { label: 'Utilisateurs', href: '/users', icon: Users, scope: 'users' },
+  { label: 'Messages', href: '/messages', icon: MessageSquare, scope: 'messages' },
+  { label: 'Notifications', href: '/notifications', icon: Bell, scope: 'notifications' },
+  { label: 'Analytics', href: '/analytics', icon: BarChart3, scope: 'reports' },
+  { label: 'Avis', href: '/reviews', icon: Star, scope: 'products' },
+  { label: 'Inventaire', href: '/inventory', icon: Warehouse, scope: 'products' },
+  { label: 'CMS', href: '/cms', icon: FileText, scope: 'settings' },
+  { label: 'Rapports', href: '/reports', icon: FileSpreadsheet, scope: 'reports' },
+  { label: 'Audit', href: '/audit', icon: ClipboardList, scope: 'security' },
+  { label: 'Sécurité', href: '/security', icon: Shield, scope: 'security' },
+  { label: 'Surveillance', href: '/monitoring', icon: Activity, scope: 'settings' },
+  { label: 'Bannières', href: '/banners', icon: Image, scope: 'settings' },
+  { label: 'Journal emails', href: '/email-logs', icon: Mail, scope: 'settings' },
+  { label: 'Paramètres', href: '/settings', icon: Settings, scope: 'settings' },
 ];
 
 interface Props {
@@ -68,6 +71,7 @@ interface Props {
 
 export function AdminSidebar({ collapsed, onToggle }: Props) {
   const pathname = usePathname();
+  const { can, superadmin } = useAdminPermissions();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     Produits: pathname.startsWith('/products'),
     Livraisons: pathname.startsWith('/deliveries'),
@@ -115,14 +119,19 @@ export function AdminSidebar({ collapsed, onToggle }: Props) {
               const isOpen = expanded[item.label];
 
               if (item.children) {
-                const anyActive = item.children.some(c => isActive(c.href));
+                const visibleChildren = superadmin
+                  ? item.children
+                  : item.children.filter((c) => can(c.scope, 'read'));
+                if (visibleChildren.length === 0) return null;
+                const anyActive = visibleChildren.some((c) => isActive(c.href));
                 return (
                   <div key={item.label}>
                     {collapsed ? (
                       <Tooltip>
                         <TooltipTrigger
                           render={
-                            <button
+                            <Link
+                              href={visibleChildren[0]?.href || '#'}
                               className={cn(
                                 'flex h-9 w-full items-center justify-center rounded-md transition-colors',
                                 anyActive
@@ -131,7 +140,7 @@ export function AdminSidebar({ collapsed, onToggle }: Props) {
                               )}
                             >
                               <Icon className="h-[18px] w-[18px]" />
-                            </button>
+                            </Link>
                           }
                         />
                         <TooltipContent side="right">{item.label}</TooltipContent>
@@ -153,7 +162,7 @@ export function AdminSidebar({ collapsed, onToggle }: Props) {
                         </button>
                         {isOpen && (
                           <div className="ml-6 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
-                            {item.children.map(child => (
+                            {visibleChildren.map((child) => (
                               <Link
                                 key={child.href}
                                 href={child.href}
@@ -174,6 +183,8 @@ export function AdminSidebar({ collapsed, onToggle }: Props) {
                   </div>
                 );
               }
+
+              if (item.scope && !superadmin && !can(item.scope, 'read')) return null;
 
               return (
                 <Tooltip key={item.label}>

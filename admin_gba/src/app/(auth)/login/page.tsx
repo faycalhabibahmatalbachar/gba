@@ -43,6 +43,17 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      const allowedRes = await fetch('/api/me/connection-allowed', { credentials: 'include' });
+      const allowedJson = (await allowedRes.json()) as { allowed?: boolean; error?: string };
+      if (!allowedRes.ok || allowedJson.allowed === false) {
+        await supabase.auth.signOut();
+        toast.error(
+          typeof allowedJson.error === 'string'
+            ? allowedJson.error
+            : 'Accès non autorisé en dehors des horaires définis',
+        );
+        return;
+      }
       void fetch('/api/security/login-attempts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

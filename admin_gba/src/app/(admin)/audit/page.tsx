@@ -6,6 +6,8 @@
 
 'use client';
 
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AuditLogViewer } from '@/components/audit/AuditLogViewer';
 import { AuditHourlyChart } from '@/components/audit/AuditHourlyChart';
 import { PageHeader } from '@/components/ui/custom/PageHeader';
@@ -13,6 +15,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuditStatistics } from '@/lib/hooks/useAuditLog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Shield, Activity, Users, AlertTriangle } from 'lucide-react';
+
+function AuditLogSection() {
+  const sp = useSearchParams();
+  const initialEntityType = sp.get('entity_type')?.trim() || undefined;
+  const initialEntityId = sp.get('entity_id')?.trim() || undefined;
+  return <AuditLogViewer initialEntityType={initialEntityType} initialEntityId={initialEntityId} />;
+}
 
 export default function AuditPage() {
   const { statistics, isLoading } = useAuditStatistics();
@@ -92,7 +101,9 @@ export default function AuditPage() {
 
       <AuditHourlyChart hours={24} />
 
-      <AuditLogViewer />
+      <Suspense fallback={<div className="text-sm text-muted-foreground">Chargement du journal…</div>}>
+        <AuditLogSection />
+      </Suspense>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 
 export const dynamic = 'force-dynamic';
@@ -302,7 +302,7 @@ function applyListFilters<
 }
 
 export async function GET(req: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('orders', 'read');
   if (!auth.ok) return auth.response;
 
   let sb: ReturnType<typeof getServiceSupabase>;
@@ -313,6 +313,17 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
+  const orderById = url.searchParams.get('id')?.trim();
+  if (orderById && /^[0-9a-f-]{36}$/i.test(orderById)) {
+    const { data, error } = await sb
+      .from('orders')
+      .select('id, delivery_lat, delivery_lng, created_at, updated_at, status, order_number')
+      .eq('id', orderById)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ order: data });
+  }
+
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1);
   const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize') || '20') || 20));
   const offset = (page - 1) * pageSize;

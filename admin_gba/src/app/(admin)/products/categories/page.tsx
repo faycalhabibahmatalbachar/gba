@@ -27,8 +27,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ChevronRight, ChevronDown, GripVertical, Plus, Trash2, Pencil } from 'lucide-react';
+import { ChevronRight, ChevronDown, GripVertical, Plus, Trash2, Pencil, Power, Package, Truck, ShoppingBag, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseApiJson } from '@/lib/fetch-api-json';
 
@@ -40,6 +42,7 @@ type Cat = {
   parent_id: string | null;
   sort_order: number;
   is_active: boolean;
+  link_url: string | null;
   accent_color: string | null;
   icon_key: string | null;
   image_url: string | null;
@@ -47,6 +50,23 @@ type Cat = {
   revenue_total: number;
   conversion_rate: number;
 };
+
+function slugify(s: string) {
+  return s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+const ICON_PRESETS = [
+  { key: 'package', Icon: Package, label: 'Colis' },
+  { key: 'truck', Icon: Truck, label: 'Livraison' },
+  { key: 'shopping', Icon: ShoppingBag, label: 'Courses' },
+  { key: 'home', Icon: Home, label: 'Maison' },
+] as const;
 
 function buildTree(flat: Cat[]): Cat[] {
   const map = new Map<string, Cat & { children?: Cat[] }>();
@@ -80,6 +100,7 @@ function SortableRow({
   setEditName,
   onSaveEdit,
   onCancelEdit,
+  onToggleActive,
 }: {
   cat: Cat & { children?: Cat[] };
   depth: number;
@@ -87,6 +108,7 @@ function SortableRow({
   onToggle: (id: string) => void;
   onEdit: (id: string, name: string) => void;
   onDelete: (c: Cat) => void;
+  onToggleActive: (c: Cat) => void;
   editingId: string | null;
   editName: string;
   setEditName: (s: string) => void;
@@ -141,6 +163,14 @@ function SortableRow({
           </button>
         )}
         <span
+          className={cn(
+            'text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium',
+            cat.is_active ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300' : 'bg-muted text-muted-foreground',
+          )}
+        >
+          {cat.is_active ? 'Active' : 'Inactive'}
+        </span>
+        <span
           className="text-xs px-2 py-0.5 rounded-full shrink-0"
           style={{ background: cat.accent_color ? `${cat.accent_color}22` : undefined, color: cat.accent_color || undefined }}
         >
@@ -150,6 +180,16 @@ function SortableRow({
           {Math.round(cat.revenue_total).toLocaleString('fr-FR')} XOF
         </span>
         <span className="text-[10px] text-muted-foreground shrink-0 hidden md:inline">{cat.conversion_rate}% conv.</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="h-8 w-8 opacity-0 group-hover:opacity-100"
+          title={cat.is_active ? 'Désactiver' : 'Activer'}
+          onClick={() => onToggleActive(cat)}
+        >
+          <Power className="h-3.5 w-3.5" />
+        </Button>
         <Button type="button" variant="ghost" size="icon-sm" className="h-8 w-8 opacity-0 group-hover:opacity-100" onClick={() => onEdit(cat.id, cat.name)}>
           <Pencil className="h-3.5 w-3.5" />
         </Button>
@@ -168,6 +208,7 @@ function SortableRow({
               onToggle={onToggle}
               onEdit={onEdit}
               onDelete={onDelete}
+              onToggleActive={onToggleActive}
               editingId={editingId}
               editName={editName}
               setEditName={setEditName}
@@ -191,6 +232,7 @@ export default function CategoriesAdminPage() {
   const [delCat, setDelCat] = React.useState<Cat | null>(null);
   const [migrateTo, setMigrateTo] = React.useState('');
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [slugTouched, setSlugTouched] = React.useState(false);
   const [form, setForm] = React.useState({
     name: '',
     slug: '',
@@ -199,6 +241,8 @@ export default function CategoriesAdminPage() {
     accent_color: '',
     icon_key: '',
     image_url: '',
+    link_url: '',
+    is_active: true,
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -246,14 +290,48 @@ export default function CategoriesAdminPage() {
     }
   };
 
-  const onRootDragEnd = (e: DragEndEvent) => {
+  const siblingsOf = React.useCallback(
+    (id: string) => {
+      const self = flat.find((c) => c.id === id);
+      if (!self) return [];
+      const pid = self.parent_id ?? null;
+      return flat
+        .filter((c) => (c.parent_id ?? null) === pid)
+        .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+        .map((c) => c.id);
+    },
+    [flat],
+  );
+
+  const onTreeDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    const oldI = rootIds.indexOf(String(active.id));
-    const newI = rootIds.indexOf(String(over.id));
+    const aid = String(active.id);
+    const oid = String(over.id);
+    const sa = siblingsOf(aid);
+    if (!sa.includes(oid)) return;
+    const oldI = sa.indexOf(aid);
+    const newI = sa.indexOf(oid);
     if (oldI < 0 || newI < 0) return;
-    const next = arrayMove(rootIds, oldI, newI);
+    const next = arrayMove(sa, oldI, newI);
     void persistOrder(next);
+  };
+
+  const toggleCategoryActive = async (c: Cat) => {
+    try {
+      const r = await fetch(`/api/categories/${c.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !c.is_active }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(typeof j.error === 'string' ? j.error : 'Erreur');
+      toast.success(c.is_active ? 'Catégorie désactivée' : 'Catégorie activée');
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    }
   };
 
   const toggle = (id: string) => {
@@ -307,13 +385,26 @@ export default function CategoriesAdminPage() {
           accent_color: form.accent_color || null,
           icon_key: form.icon_key || null,
           image_url: form.image_url || null,
+          link_url: form.link_url.trim() || null,
+          is_active: form.is_active,
         }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'Erreur');
       toast.success('Catégorie créée');
       setCreateOpen(false);
-      setForm({ name: '', slug: '', parent_id: '', description: '', accent_color: '', icon_key: '', image_url: '' });
+      setSlugTouched(false);
+      setForm({
+        name: '',
+        slug: '',
+        parent_id: '',
+        description: '',
+        accent_color: '',
+        icon_key: '',
+        image_url: '',
+        link_url: '',
+        is_active: true,
+      });
       void load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
@@ -354,19 +445,34 @@ export default function CategoriesAdminPage() {
       />
 
       {createOpen && (
-        <Card className="p-4 space-y-3 max-w-lg">
-          <div className="grid gap-2">
-            <Label>Nom</Label>
-            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Slug</Label>
-            <Input
-              value={form.slug}
-              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              className="font-mono text-sm"
-            />
-          </div>
+        <Card className="p-4 space-y-4 max-w-3xl">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <div className="grid gap-2">
+                <Label>Nom de la catégorie *</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      name,
+                      slug: slugTouched ? f.slug : slugify(name),
+                    }));
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Slug (URL) *</Label>
+                <Input
+                  value={form.slug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setForm((f) => ({ ...f, slug: e.target.value }));
+                  }}
+                  className="font-mono text-sm"
+                />
+              </div>
           <div className="grid gap-2">
             <Label>Parent</Label>
             <Select
@@ -390,25 +496,111 @@ export default function CategoriesAdminPage() {
             <Label>Description</Label>
             <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="grid gap-1">
-              <Label className="text-xs">Couleur</Label>
-              <Input value={form.accent_color} onChange={(e) => setForm((f) => ({ ...f, accent_color: e.target.value }))} placeholder="#6C47FF" />
+              <div className="grid gap-2">
+                <Label>Couleur d’accent</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="color"
+                    className="h-10 w-14 cursor-pointer rounded border p-1"
+                    value={form.accent_color?.startsWith('#') ? form.accent_color : '#6C47FF'}
+                    onChange={(e) => setForm((f) => ({ ...f, accent_color: e.target.value }))}
+                  />
+                  <Input
+                    value={form.accent_color}
+                    onChange={(e) => setForm((f) => ({ ...f, accent_color: e.target.value }))}
+                    placeholder="#6C47FF"
+                    className="max-w-[140px] font-mono text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Image de couverture (URL)</Label>
+                <Input value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Lien associé (optionnel)</Label>
+                <Input
+                  value={form.link_url}
+                  onChange={(e) => setForm((f) => ({ ...f, link_url: e.target.value }))}
+                  placeholder="https://"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                <div>
+                  <Label className="text-sm">Catégorie active</Label>
+                  <p className="text-xs text-muted-foreground">Visible dans les listes lorsque activée</p>
+                </div>
+                <Switch checked={form.is_active} onCheckedChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs">Icône</Label>
+                <div className="flex flex-wrap gap-2">
+                  {ICON_PRESETS.map(({ key, Icon, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, icon_key: key }))}
+                      className={cn(
+                        'flex flex-col items-center gap-1 rounded-lg border px-3 py-2 text-[10px] transition-colors',
+                        form.icon_key === key ? 'border-violet-600 bg-violet-500/10' : 'border-border hover:bg-muted',
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  value={form.icon_key}
+                  onChange={(e) => setForm((f) => ({ ...f, icon_key: e.target.value }))}
+                  placeholder="Clé personnalisée"
+                  className="text-xs"
+                />
+              </div>
             </div>
-            <div className="grid gap-1">
-              <Label className="text-xs">Icône (clé)</Label>
-              <Input value={form.icon_key} onChange={(e) => setForm((f) => ({ ...f, icon_key: e.target.value }))} placeholder="package" />
+            <div>
+              <Label className="mb-2 block text-xs text-muted-foreground">Aperçu (app client)</Label>
+              <div
+                className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+                style={{
+                  maxWidth: 280,
+                  borderColor: form.accent_color || undefined,
+                }}
+              >
+                <div className="relative h-28 w-full bg-muted">
+                  {form.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={form.image_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div
+                      className="flex h-full w-full items-center justify-center text-muted-foreground"
+                      style={{ background: form.accent_color ? `${form.accent_color}33` : undefined }}
+                    >
+                      <Package className="h-10 w-10 opacity-40" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="font-semibold leading-tight">{form.name.trim() || 'Nom de la catégorie'}</p>
+                  {form.description ? (
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{form.description}</p>
+                  ) : null}
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="grid gap-2">
-            <Label>Image URL</Label>
-            <Input value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} />
           </div>
           <div className="flex gap-2">
             <Button type="button" onClick={() => void createCat()}>
               Créer
             </Button>
-            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCreateOpen(false);
+                setSlugTouched(false);
+              }}
+            >
               Annuler
             </Button>
           </div>
@@ -418,26 +610,30 @@ export default function CategoriesAdminPage() {
       <Card className="p-4">
         {loadError ? (
           <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-            Chargement incomplet des categories: {loadError}
+            Chargement incomplet des catégories : {loadError}
           </div>
         ) : null}
         {!loading && flat.length > 0 ? (
           <div className="mb-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span>Total categories: {flat.length}</span>
+            <span>Total catégories : {flat.length}</span>
             <span>
-              Produits lies: {flat.reduce((s, c) => s + Number(c.product_count || 0), 0).toLocaleString('fr-FR')}
+              Produits liés : {flat.reduce((s, c) => s + Number(c.product_count || 0), 0).toLocaleString('fr-FR')}
             </span>
             <span>
-              CA cumule: {Math.round(flat.reduce((s, c) => s + Number(c.revenue_total || 0), 0)).toLocaleString('fr-FR')} XOF
+              CA cumulé : {Math.round(flat.reduce((s, c) => s + Number(c.revenue_total || 0), 0)).toLocaleString('fr-FR')} XOF
             </span>
           </div>
         ) : null}
         {loading ? (
-          <p className="text-sm text-muted-foreground">Chargement…</p>
+          <div className="space-y-2 py-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-3/4" />
+          </div>
         ) : flat.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground text-sm">Aucune catégorie — créez-en une.</div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onRootDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onTreeDragEnd}>
             <SortableContext items={rootIds} strategy={verticalListSortingStrategy}>
               {tree.map((c) => (
                 <SortableRow
@@ -448,6 +644,7 @@ export default function CategoriesAdminPage() {
                   onToggle={toggle}
                   onEdit={startEdit}
                   onDelete={setDelCat}
+                  onToggleActive={(x) => void toggleCategoryActive(x)}
                   editingId={editingId}
                   editName={editName}
                   setEditName={setEditName}

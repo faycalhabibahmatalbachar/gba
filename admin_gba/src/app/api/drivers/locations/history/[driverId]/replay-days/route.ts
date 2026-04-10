@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { format, startOfDay } from 'date-fns';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 
 export const dynamic = 'force-dynamic';
 
 /** Jours calendaires ayant au moins un point GPS (pour surlignage replay). */
 export async function GET(req: Request, ctx: { params: Promise<{ driverId: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'read');
   if (!auth.ok) return auth.response;
 
   const { driverId } = await ctx.params;

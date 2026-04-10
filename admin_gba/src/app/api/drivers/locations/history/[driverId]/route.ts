@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 
 export const dynamic = 'force-dynamic';
 
 /** Historique GPS pour un livreur (driver_id = auth.users.id). */
 export async function GET(req: Request, ctx: { params: Promise<{ driverId: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('drivers', 'read');
   if (!auth.ok) return auth.response;
 
   const { driverId } = await ctx.params;
@@ -17,6 +17,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ driverId: strin
   const { searchParams } = new URL(req.url);
   const from = searchParams.get('from')?.trim();
   const to = searchParams.get('to')?.trim();
+  const orderId = searchParams.get('order_id')?.trim();
   if (!from || !to) {
     return NextResponse.json({ error: 'from et to (ISO) requis' }, { status: 400 });
   }
@@ -29,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ driverId: strin
   }
 
   try {
-    const { data, error } = await sb
+    let locQuery = sb
       .from('driver_locations')
       .select('id, lat, lng, recorded_at, captured_at, created_at, speed_mps, heading, order_id')
       .eq('driver_id', driverId)
@@ -37,6 +38,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ driverId: strin
       .lte('captured_at', to)
       .order('captured_at', { ascending: true })
       .limit(5000);
+    if (orderId && /^[0-9a-f-]{36}$/i.test(orderId)) {
+      locQuery = locQuery.eq('order_id', orderId);
+    }
+    const { data, error } = await locQuery;
 
     if (error) throw error;
 
