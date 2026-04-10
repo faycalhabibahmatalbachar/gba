@@ -125,6 +125,22 @@ function emergencyIpsAsCidrs(ips: string[]): string[] {
   return ips.map(normalizeIpOrCidr).filter(Boolean);
 }
 
+/** CIDR issus de la table ip_whitelist (parfois sans /32 explicite) — aligné sur emergency_allowlist_ips. */
+function whitelistCidrsForMatch(cidrs: string[]): string[] {
+  const out: string[] = [];
+  for (const c of cidrs) {
+    const n = normalizeIpOrCidr(c);
+    if (n) out.push(n);
+    else if (c.trim()) out.push(c.trim());
+  }
+  return out;
+}
+
+function isStaffAdminRole(role: string | null | undefined): boolean {
+  const r = String(role || '');
+  return r === 'admin' || r === 'superadmin' || r === 'super_admin';
+}
+
 export async function loadGatePayload(sb: SupabaseClient): Promise<GatePayload> {
   const now = Date.now();
   if (gateCache && now - gateCache.at < GATE_TTL_MS) return gateCache.payload;
@@ -189,14 +205,33 @@ export async function evaluateAdminGate(opts: {
   const country = getClientCountry(request);
 
   if (payload.lockdownActive) {
-    const sup = await isSuperAdmin(sb, user);
-    if (!sup) {
-      return {
-        ok: false,
-        status: 403,
-        code: 'LOCKDOWN',
-        message: 'Verrouillage d’urgence actif — accès réservé aux super-administrateurs.',
-      };
+    if (metaSuperAdmin(user)) {
+      /* ok */
+    } else {
+      const { data: prof } = await sb
+        .from('profiles')
+        .select('role,is_suspended')
+        .eq('id', user.id)
+        .maybeSingle();
+      const role = prof?.role as string | undefined;
+      const dbSuper = role === 'superadmin' || role === 'super_admin';
+      if (dbSuper) {
+        /* ok */
+      } else {
+        const wl = whitelistCidrsForMatch(payload.whitelistCidrs);
+        const onWhitelist = Boolean(ip && wl.length > 0 && ipAllowedByList(ip, wl));
+        const staff = isStaffAdminRole(role);
+        const suspended = Boolean(prof?.is_suspended);
+        if (!(onWhitelist && staff && !suspended)) {
+          return {
+            ok: false,
+            status: 403,
+            code: 'LOCKDOWN',
+            message:
+              'Verrouillage d’urgence — accès : super-admin, ou admin actif (non suspendu) depuis une IP en liste blanche.',
+          };
+        }
+      }
     }
   }
 
@@ -206,7 +241,7 @@ export async function evaluateAdminGate(opts: {
 
   if (payload.access.enforce_ip_allowlist) {
     const emergencyCidrs = emergencyIpsAsCidrs(payload.access.emergency_allowlist_ips);
-    const effectiveWhitelist = [...payload.whitelistCidrs, ...emergencyCidrs];
+    const effectiveWhitelist = [...whitelistCidrsForMatch(payload.whitelistCidrs), ...emergencyCidrs];
     if (effectiveWhitelist.length > 0) {
       if (!ip || !ipAllowedByList(ip, effectiveWhitelist)) {
         const sup = await isSuperAdmin(sb, user);
