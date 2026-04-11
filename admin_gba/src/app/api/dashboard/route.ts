@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { subDays, startOfDay, format, getHours } from 'date-fns';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
+import { computeExtendedBigData } from '@/app/api/dashboard/_lib/business-intel';
 
 export const dynamic = 'force-dynamic';
 
@@ -262,8 +263,6 @@ export async function GET(req: Request) {
         sales: p.qty,
       }));
 
-    const topProductsWeek = topProducts.slice(0, 3);
-
     const totalO = ordersWindow.length;
     const pending = ordersWindow.filter((o) => o.status === 'pending').length;
     const delivered = ordersWindow.filter((o) => o.status === 'delivered').length;
@@ -311,42 +310,48 @@ export async function GET(req: Request) {
     const reviewAvg =
       reviewRatingsNum.length > 0 ? Math.round((sum(reviewRatingsNum) / reviewRatingsNum.length) * 10) / 10 : 0;
 
-    const retention3x3 = [
-      [100, Math.round(repeatRate * 100), buyers],
-      [Math.round(avgLtv / 1000), repeaters, totalO],
-      [newUsersToday, Math.round(repeatRate * 1000) / 10, delivered],
-    ];
-
-    let topDriversMonth: { id: string; name: string; count: number }[] = [];
+    let bigDataPayload: Awaited<ReturnType<typeof computeExtendedBigData>>;
     try {
-      const del = await sb.from('deliveries').select('driver_id').gte('created_at', monthStart).limit(8000);
-      if (!del.error && del.data?.length) {
-        const cnt: Record<string, number> = {};
-        for (const row of del.data as { driver_id?: string }[]) {
-          const id = row.driver_id;
-          if (!id) continue;
-          cnt[id] = (cnt[id] || 0) + 1;
-        }
-        const topIds = Object.entries(cnt)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([id]) => id);
-        if (topIds.length) {
-          const dr = await sb.from('drivers').select('id, name').in('id', topIds);
-          const names = new Map<string, string>();
-          for (const p of (dr.data || []) as { id: string; name?: string }[]) {
-            names.set(p.id, (p.name || '').trim() || p.id.slice(0, 8));
-          }
-          topDriversMonth = topIds.map((id) => ({
-            id,
-            name: names.get(id) || id.slice(0, 8),
-            count: cnt[id] || 0,
-          }));
-        }
-      }
-    } catch {
-      topDriversMonth = [];
+      bigDataPayload = await computeExtendedBigData(sb, now, monthStart, {
+        baseAvgLtv: Math.round(avgLtv),
+        baseRepeat: repeatRate,
+        baseReviewAvg: reviewAvg,
+      });
+    } catch (be) {
+      console.error('[api/dashboard] business-intel', be);
+      bigDataPayload = {
+        avgLtv: Math.round(avgLtv),
+        repeatPurchaseRate: Math.round(repeatRate * 1000) / 1000,
+        reviewAvg,
+        reviewCount: 0,
+        ltvDeltaPct: null,
+        repeatDeltaPts: null,
+        reviewDeltaPts: null,
+        cohortRetentionRows: [],
+        ordersUsedInCohortSample: 0,
+        topDriversMonth: [],
+        topProductsMonth: [],
+      };
     }
+
+    const topProductsWeek =
+      bigDataPayload.topProductsMonth.length > 0
+        ? bigDataPayload.topProductsMonth.map((p) => ({
+            id: p.id,
+            name: p.name,
+            fullName: p.fullName,
+            sales: p.sales,
+            revenue: p.revenue,
+            imageUrl: p.imageUrl,
+          }))
+        : topProducts.slice(0, 3).map((p) => ({
+            id: p.id,
+            name: p.name,
+            fullName: p.fullName,
+            sales: p.sales,
+            revenue: 0,
+            imageUrl: null as string | null,
+          }));
 
     const recentOrdersRes = await sb
       .from('orders')
@@ -428,14 +433,7 @@ export async function GET(req: Request) {
       funnel,
       geoSales,
       geoTop5,
-      bigData: {
-        avgLtv: Math.round(avgLtv),
-        repeatPurchaseRate: Math.round(repeatRate * 1000) / 1000,
-        cohortNote: 'Basé sur commandes échantillon (15k max) — affinage SQL possible.',
-        reviewAvg,
-        retention3x3,
-        topDriversMonth,
-      },
+      bigData: bigDataPayload,
       activity: {
         recentOrders: recentOrdersRes.data || [],
         newSignups: newProfilesListRes.data || [],

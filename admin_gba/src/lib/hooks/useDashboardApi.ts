@@ -41,17 +41,50 @@ export type DashboardApiPayload = {
   }[];
   orderHourHeatmap: { hour: string; count: number }[];
   topProducts: { id?: string | null; name: string; fullName?: string; sales: number }[];
-  topProductsWeek: { id?: string | null; name: string; fullName?: string; sales: number }[];
+  topProductsWeek: {
+    id?: string | null;
+    name: string;
+    fullName?: string;
+    sales: number;
+    revenue?: number;
+    imageUrl?: string | null;
+  }[];
   funnel: { name: string; value: number }[];
   geoSales: { country: string; orders: number }[];
   geoTop5: { country: string; orders: number }[];
   bigData: {
     avgLtv: number;
     repeatPurchaseRate: number;
-    cohortNote: string;
     reviewAvg: number;
-    retention3x3: number[][];
-    topDriversMonth: { id: string; name: string; count: number }[];
+    reviewCount: number;
+    ltvDeltaPct: number | null;
+    repeatDeltaPts: number | null;
+    reviewDeltaPts: number | null;
+    cohortRetentionRows: {
+      cohortLabel: string;
+      cohortKey: string;
+      size: number;
+      m1: number | null;
+      m2: number | null;
+      m3: number | null;
+    }[];
+    ordersUsedInCohortSample: number;
+    topDriversMonth: {
+      id: string;
+      name: string;
+      deliveries: number;
+      earningsMonth: number;
+      ratingAvg: number | null;
+      avatarUrl: string | null;
+    }[];
+    topProductsMonth: {
+      id: string;
+      name: string;
+      fullName: string;
+      sales: number;
+      revenue: number;
+      imageUrl: string | null;
+    }[];
   };
   activity: {
     recentOrders: Record<string, unknown>[];

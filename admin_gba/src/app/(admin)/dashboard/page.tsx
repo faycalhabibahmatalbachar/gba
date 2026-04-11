@@ -152,7 +152,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="print:hidden">
-        <DashboardBigData data={data} />
+        <DashboardBigData data={data} loading={isLoading} />
       </div>
     </div>
   );

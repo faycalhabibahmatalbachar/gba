@@ -1,7 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryState, parseAsString } from 'nuqs';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -77,8 +79,9 @@ async function fetchDrivers(cursor: string | null, q: string): Promise<DriversRe
   return { drivers: j.drivers || [], nextCursor: j.nextCursor ?? null, total: j.total ?? 0 };
 }
 
-export default function DriversAdminPage() {
+function DriversPageInner() {
   const qc = useQueryClient();
+  const [driverDeeplink, setDriverDeeplink] = useQueryState('driver', parseAsString.withDefault(''));
   const [q, setQ] = React.useState('');
   const [debounced, setDebounced] = React.useState('');
   const [cursor, setCursor] = React.useState<string | null>(null);
@@ -94,6 +97,68 @@ export default function DriversAdminPage() {
     const t = setTimeout(() => setDebounced(q), 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  React.useEffect(() => {
+    const id = driverDeeplink?.trim();
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/drivers/${id}`, { credentials: 'include' });
+        const j = (await r.json()) as {
+          driver?: Record<string, unknown>;
+          profile?: Record<string, unknown> | null;
+          error?: string;
+        };
+        if (!r.ok || cancelled) {
+          if (!cancelled && j.error) toast.error(typeof j.error === 'string' ? j.error : 'Livreur introuvable');
+          return;
+        }
+        const d = j.driver;
+        const p = j.profile;
+        if (!d || cancelled) return;
+        const uid = (d.user_id as string | null) ?? null;
+        const first = (p?.first_name as string | null) ?? '';
+        const last = (p?.last_name as string | null) ?? '';
+        const fromProfile = `${first} ${last}`.trim();
+        const displayName =
+          fromProfile || (d.name as string | null)?.trim() || 'Livreur';
+        const row: DriverRow = {
+          id: d.id as string,
+          user_id: uid,
+          name: (d.name as string | null) ?? null,
+          phone: (d.phone as string | null) ?? (p?.phone as string | null) ?? null,
+          is_active: (d.is_active as boolean | null) ?? null,
+          is_online: (d.is_online as boolean | null) ?? null,
+          is_available: (d.is_available as boolean | null) ?? null,
+          vehicle_type: (d.vehicle_type as string | null) ?? null,
+          vehicle_plate: (d.vehicle_plate as string | null) ?? null,
+          vehicle_color: (d.vehicle_color as string | null) ?? null,
+          rating_avg: (d.rating_avg as number | null) ?? null,
+          total_deliveries: (d.total_deliveries as number | null) ?? null,
+          total_earnings: (d.total_earnings as number | null) ?? null,
+          last_location_at: (d.last_location_at as string | null) ?? null,
+          profile: {
+            display_name: displayName,
+            email: (p?.email as string | null) ?? null,
+            phone: (p?.phone as string | null) ?? null,
+            avatar_url: (p?.avatar_url as string | null) ?? null,
+            city: (p?.city as string | null) ?? null,
+            country: (p?.country as string | null) ?? null,
+          },
+          stats: { orders_today: 0, completion_pct_30d: 0, revenue_month_approx: 0 },
+          last_gps: null,
+        };
+        setSelected(row);
+        setDrawerOpen(true);
+      } catch {
+        if (!cancelled) toast.error('Impossible de charger le livreur');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [driverDeeplink]);
 
   const query = useQuery({
     queryKey: ['drivers', cursor, debounced],
@@ -380,7 +445,10 @@ export default function DriversAdminPage() {
 
       <Drawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+        onOpenChange={(o) => {
+          setDrawerOpen(o);
+          if (!o) void setDriverDeeplink(null);
+        }}
         title={selected?.profile.display_name || 'Livreur'}
         description={selected?.profile.email || undefined}
         footer={
@@ -455,5 +523,13 @@ export default function DriversAdminPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function DriversAdminPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Chargement…</div>}>
+      <DriversPageInner />
+    </Suspense>
   );
 }

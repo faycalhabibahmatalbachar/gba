@@ -69,32 +69,37 @@ export default function AnalyticsPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {q.isLoading ? (
-          [...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)
-        ) : (
-          <>
-            <Card className="p-4">
-              <div className="text-xs text-muted-foreground">Revenus</div>
-              <div className="text-xl font-bold">{fmtCurrency(d?.revenue ?? 0)}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="text-xs text-muted-foreground">Commandes</div>
-              <div className="text-xl font-bold">{d?.orderCount ?? 0}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="text-xs text-muted-foreground">Nouveaux utilisateurs</div>
-              <div className="text-xl font-bold">{d?.newUsers ?? 0}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="text-xs text-muted-foreground">ARPU (acheteurs)</div>
-              <div className="text-xl font-bold">{fmtCurrency(d?.arpu ?? 0)}</div>
-            </Card>
-          </>
-        )}
-      </div>
+      <section id="clients" className="scroll-mt-24 space-y-3">
+        <h2 className="sr-only">Clients et revenus</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {q.isLoading ? (
+            [...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)
+          ) : (
+            <>
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground">Revenus</div>
+                <div className="text-xl font-bold">{fmtCurrency(d?.revenue ?? 0)}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground">Commandes</div>
+                <div className="text-xl font-bold">{d?.orderCount ?? 0}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground">Nouveaux utilisateurs</div>
+                <div className="text-xl font-bold">{d?.newUsers ?? 0}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground">ARPU (acheteurs)</div>
+                <div className="text-xl font-bold">{fmtCurrency(d?.arpu ?? 0)}</div>
+              </Card>
+            </>
+          )}
+        </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <section id="comportement" className="scroll-mt-24 space-y-6">
+        <h2 className="sr-only">Comportement et volumes</h2>
+        <div className="grid gap-6 lg:grid-cols-2">
         <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-sm">Commandes par statut</CardTitle>
@@ -136,16 +141,23 @@ export default function AnalyticsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Avis — moyenne {d?.avgReviewRating ?? '—'} ({d?.reviewCount ?? 0} avis)</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Données issues de la table <code className="text-xs">reviews</code> sur la période.
-        </CardContent>
-      </Card>
+      <section id="cohortes" className="scroll-mt-24">
+        <h2 className="sr-only">Cohortes et satisfaction</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">
+              Avis — moyenne {d?.avgReviewRating ?? '—'} ({d?.reviewCount ?? 0} avis)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Agrégation sur la période sélectionnée. Pour la matrice de rétention détaillée, voir le
+            tableau « Rétention clients » dans le dashboard (section Intelligence business).
+          </CardContent>
+        </Card>
+      </section>
 
       <Card>
         <CardHeader>
