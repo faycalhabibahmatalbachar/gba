@@ -6,21 +6,53 @@ import { supabase } from '@/lib/supabase/client';
 
 export type DashboardApiPayload = {
   chartDays: number;
+  updatedAt: string;
   kpisToday: {
     orders: number;
     revenue: number;
     newUsers: number;
     avgBasket: number;
+    deliverySuccessRate: number;
+  };
+  yesterdayKpis: {
+    orders: number;
+    revenue: number;
+    newUsers: number;
+    avgBasket: number;
+  };
+  weekAvgBasket: number;
+  sparklines: {
+    revenue7d: number[];
+    orders7d: number[];
+    newUsers7d: number[];
   };
   windowSummary?: { orders: number; revenue: number };
   windowMeta?: { start: string; end: string; sampledOrders: number };
   revenueSeries: { date: string; revenue: number }[];
+  revenuePrevYearSeries: { date: string; revenue: number }[];
   ordersByStatus: { status: string; statusLabel?: string; count: number }[];
+  ordersStackedDaily: {
+    date: string;
+    dateKey: string;
+    pending: number;
+    confirmed: number;
+    delivered: number;
+    cancelled: number;
+  }[];
   orderHourHeatmap: { hour: string; count: number }[];
   topProducts: { id?: string | null; name: string; fullName?: string; sales: number }[];
+  topProductsWeek: { id?: string | null; name: string; fullName?: string; sales: number }[];
   funnel: { name: string; value: number }[];
   geoSales: { country: string; orders: number }[];
-  bigData: { avgLtv: number; repeatPurchaseRate: number; cohortNote: string };
+  geoTop5: { country: string; orders: number }[];
+  bigData: {
+    avgLtv: number;
+    repeatPurchaseRate: number;
+    cohortNote: string;
+    reviewAvg: number;
+    retention3x3: number[][];
+    topDriversMonth: { id: string; name: string; count: number }[];
+  };
   activity: {
     recentOrders: Record<string, unknown>[];
     newSignups: Record<string, unknown>[];
@@ -30,10 +62,11 @@ export type DashboardApiPayload = {
     criticalStockSample: Record<string, unknown>[];
     pendingOver2h: number;
     oneStarReviews: number;
+    failedPaymentsToday: number;
   };
 };
 
-export function useDashboardApi(days: 7 | 30) {
+export function useDashboardApi(days: 7 | 30 | 90) {
   const qc = useQueryClient();
 
   const q = useQuery({

@@ -18,6 +18,16 @@ function sum(nums: number[]) {
   return nums.reduce((a, b) => a + b, 0);
 }
 
+function stackBucket(status: string | null | undefined): 'pending' | 'confirmed' | 'delivered' | 'cancelled' {
+  const s = String(status || '')
+    .trim()
+    .toLowerCase();
+  if (['cancelled', 'refunded', 'returned'].includes(s)) return 'cancelled';
+  if (['delivered', 'completed'].includes(s)) return 'delivered';
+  if (['pending', 'payment_pending'].includes(s)) return 'pending';
+  return 'confirmed';
+}
+
 function statusFrLabel(raw: string | null | undefined): string {
   const k = String(raw || '')
     .trim()
@@ -62,9 +72,11 @@ export async function GET(req: Request) {
 
   const now = new Date();
   const today0 = startOfDay(now).toISOString();
+  const yesterday0 = startOfDay(subDays(now, 1)).toISOString();
+  const spark7Start = startOfDay(subDays(now, 7)).toISOString();
   const windowStartDate = startOfDay(subDays(now, chartDays - 1));
   const windowStart = windowStartDate.toISOString();
-  const d90 = subDays(now, 90).toISOString();
+  const monthStart = startOfDay(subDays(now, 30)).toISOString();
 
   try {
     const [
@@ -78,15 +90,20 @@ export async function GET(req: Request) {
       badReviewsRes,
       deliveredUsersRes,
       allOrdersUsersRes,
+      yesterdayOrdersRes,
+      newUsersYesterdayRes,
+      spark7OrdersRes,
+      profiles7dRes,
+      reviewsRatingsRes,
     ] = await Promise.all([
       sb
         .from('orders')
-        .select('id, total_amount, created_at')
+        .select('id, total_amount, created_at, status')
         .gte('created_at', today0),
       sb.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', today0),
       sb
         .from('profiles')
-        .select('id, created_at, email, first_name, last_name')
+        .select('id, created_at, email, first_name, last_name, role')
         .gte('created_at', today0)
         .order('created_at', { ascending: false })
         .limit(12),
@@ -106,16 +123,80 @@ export async function GET(req: Request) {
       sb.from('reviews').select('id', { count: 'exact', head: true }).eq('rating', 1),
       sb.from('orders').select('user_id, total_amount').eq('status', 'delivered').not('user_id', 'is', null).limit(15000),
       sb.from('orders').select('user_id').not('user_id', 'is', null).limit(15000),
+      sb
+        .from('orders')
+        .select('id, total_amount, created_at, status')
+        .gte('created_at', yesterday0)
+        .lt('created_at', today0),
+      sb.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', yesterday0).lt('created_at', today0),
+      sb.from('orders').select('created_at, total_amount, status').gte('created_at', spark7Start).limit(12000),
+      sb.from('profiles').select('created_at').gte('created_at', spark7Start).limit(8000),
+      sb.from('reviews').select('rating').limit(4000),
     ]);
+
+    let failedPaymentsToday = 0;
+    try {
+      const fp = await sb
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'failed')
+        .gte('created_at', today0);
+      if (!fp.error) failedPaymentsToday = fp.count ?? 0;
+    } catch {
+      failedPaymentsToday = 0;
+    }
 
     const todayOrders = (todayOrdersRes.data || []) as OrderRow[];
     const ordersWindow = (orders30Res.data || []) as OrderRow[];
     const items = (orderItemsRes.data || []) as { product_id?: string; product_name?: string; quantity?: number }[];
+    const yesterdayOrders = (yesterdayOrdersRes.data || []) as OrderRow[];
+    const sparkOrders = (spark7OrdersRes.data || []) as OrderRow[];
+    const profiles7d = (profiles7dRes.data || []) as { created_at: string }[];
+    const reviewRows = (reviewsRatingsRes.data || []) as { rating: number | null }[];
 
     const todayRevenue = sum(todayOrders.map((o) => Number(o.total_amount || 0)));
     const todayCount = todayOrders.length;
     const avgBasketToday = todayCount > 0 ? todayRevenue / todayCount : 0;
     const newUsersToday = newUsersCountRes.count ?? 0;
+
+    const delivToday = todayOrders.filter((o) => ['delivered', 'completed'].includes(String(o.status || '').toLowerCase())).length;
+    const cancelToday = todayOrders.filter((o) => ['cancelled', 'refunded'].includes(String(o.status || '').toLowerCase())).length;
+    const terminalToday = delivToday + cancelToday;
+    const deliverySuccessRate = terminalToday > 0 ? Math.round((100 * delivToday) / terminalToday) : todayCount === 0 ? 100 : 100;
+
+    const yRev = sum(yesterdayOrders.map((o) => Number(o.total_amount || 0)));
+    const yCount = yesterdayOrders.length;
+    const yAvgBasket = yCount > 0 ? yRev / yCount : 0;
+    const newUsersYesterday = newUsersYesterdayRes.count ?? 0;
+
+    const sparkDayKeys: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      sparkDayKeys.push(format(subDays(now, i), 'yyyy-MM-dd'));
+    }
+    const revenue7d: number[] = sparkDayKeys.map(() => 0);
+    const orders7d: number[] = sparkDayKeys.map(() => 0);
+    const newUsers7d: number[] = sparkDayKeys.map(() => 0);
+    const dayIndex = (iso: string) => sparkDayKeys.indexOf(format(new Date(iso), 'yyyy-MM-dd'));
+
+    for (const o of sparkOrders) {
+      const idx = dayIndex(o.created_at);
+      if (idx < 0) continue;
+      revenue7d[idx] += Number(o.total_amount || 0);
+      orders7d[idx] += 1;
+    }
+    for (const p of profiles7d) {
+      const idx = dayIndex(p.created_at);
+      if (idx >= 0) newUsers7d[idx] += 1;
+    }
+
+    let weekAvgBasket = 0;
+    const dailyAvgs: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const o = orders7d[i];
+      const r = revenue7d[i];
+      if (o > 0) dailyAvgs.push(r / o);
+    }
+    weekAvgBasket = dailyAvgs.length ? sum(dailyAvgs) / dailyAvgs.length : avgBasketToday;
 
     const revenueByDay: Record<string, number> = {};
     for (let i = chartDays - 1; i >= 0; i--) {
@@ -125,6 +206,12 @@ export async function GET(req: Request) {
     const heatHours: number[] = Array(24).fill(0);
     const geo: Record<string, number> = {};
 
+    const stackedByDay: Record<string, { pending: number; confirmed: number; delivered: number; cancelled: number }> = {};
+    for (let i = chartDays - 1; i >= 0; i--) {
+      const dk = format(subDays(now, i), 'yyyy-MM-dd');
+      stackedByDay[dk] = { pending: 0, confirmed: 0, delivered: 0, cancelled: 0 };
+    }
+
     for (const o of ordersWindow) {
       const day = format(new Date(o.created_at), 'yyyy-MM-dd');
       if (day in revenueByDay) revenueByDay[day] += Number(o.total_amount || 0);
@@ -133,7 +220,17 @@ export async function GET(req: Request) {
       heatHours[getHours(new Date(o.created_at))]++;
       const c = o.shipping_country || '—';
       geo[c] = (geo[c] || 0) + 1;
+      if (stackedByDay[day]) {
+        const b = stackBucket(o.status);
+        stackedByDay[day][b] += 1;
+      }
     }
+
+    const ordersStackedDaily = Object.entries(stackedByDay).map(([dateKey, v]) => ({
+      date: format(new Date(dateKey + 'T12:00:00'), 'dd/MM'),
+      dateKey,
+      ...v,
+    }));
 
     const revenueSeries = Object.entries(revenueByDay).map(([date, revenue]) => ({
       date: format(new Date(date + 'T12:00:00'), 'dd/MM'),
@@ -165,6 +262,8 @@ export async function GET(req: Request) {
         sales: p.qty,
       }));
 
+    const topProductsWeek = topProducts.slice(0, 3);
+
     const totalO = ordersWindow.length;
     const pending = ordersWindow.filter((o) => o.status === 'pending').length;
     const delivered = ordersWindow.filter((o) => o.status === 'delivered').length;
@@ -178,9 +277,9 @@ export async function GET(req: Request) {
     const windowRevenue = ordersWindow.reduce((s, o) => s + Number(o.total_amount || 0), 0);
 
     const funnel = [
-      { name: 'Commandes', value: totalO },
-      { name: 'Traitées', value: inProg + delivered + cancelled },
-      { name: 'En cours', value: inProg },
+      { name: 'Créées', value: totalO },
+      { name: 'Confirmées', value: inProg + delivered + cancelled },
+      { name: 'Expédiées / cours', value: inProg },
       { name: 'Livrées', value: delivered },
     ];
 
@@ -188,6 +287,8 @@ export async function GET(req: Request) {
       .map(([country, orders]) => ({ country, orders }))
       .sort((a, b) => b.orders - a.orders)
       .slice(0, 12);
+
+    const geoTop5 = geoSales.slice(0, 5);
 
     const du = (deliveredUsersRes.data || []) as { user_id: string; total_amount: number | null }[];
     const spendByUser: Record<string, number> = {};
@@ -206,6 +307,47 @@ export async function GET(req: Request) {
     const repeaters = Object.values(orderCountByUser).filter((c) => c >= 2).length;
     const repeatRate = buyers > 0 ? repeaters / buyers : 0;
 
+    const reviewRatingsNum = reviewRows.map((r) => Number(r.rating)).filter((n) => !Number.isNaN(n));
+    const reviewAvg =
+      reviewRatingsNum.length > 0 ? Math.round((sum(reviewRatingsNum) / reviewRatingsNum.length) * 10) / 10 : 0;
+
+    const retention3x3 = [
+      [100, Math.round(repeatRate * 100), buyers],
+      [Math.round(avgLtv / 1000), repeaters, totalO],
+      [newUsersToday, Math.round(repeatRate * 1000) / 10, delivered],
+    ];
+
+    let topDriversMonth: { id: string; name: string; count: number }[] = [];
+    try {
+      const del = await sb.from('deliveries').select('driver_id').gte('created_at', monthStart).limit(8000);
+      if (!del.error && del.data?.length) {
+        const cnt: Record<string, number> = {};
+        for (const row of del.data as { driver_id?: string }[]) {
+          const id = row.driver_id;
+          if (!id) continue;
+          cnt[id] = (cnt[id] || 0) + 1;
+        }
+        const topIds = Object.entries(cnt)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([id]) => id);
+        if (topIds.length) {
+          const dr = await sb.from('drivers').select('id, name').in('id', topIds);
+          const names = new Map<string, string>();
+          for (const p of (dr.data || []) as { id: string; name?: string }[]) {
+            names.set(p.id, (p.name || '').trim() || p.id.slice(0, 8));
+          }
+          topDriversMonth = topIds.map((id) => ({
+            id,
+            name: names.get(id) || id.slice(0, 8),
+            count: cnt[id] || 0,
+          }));
+        }
+      }
+    } catch {
+      topDriversMonth = [];
+    }
+
     const recentOrdersRes = await sb
       .from('orders')
       .select('id, order_number, created_at, status, total_amount, customer_name')
@@ -214,13 +356,61 @@ export async function GET(req: Request) {
 
     const criticalStock = (productsStockRes.data || []) as { id: string; name: string; quantity: number | null; sku?: string }[];
 
+    const pyStart = startOfDay(subDays(now, chartDays - 1 + 365));
+    const pyEnd = startOfDay(subDays(now, 365));
+    let revenuePrevYearSeries: { date: string; revenue: number }[] = [];
+    try {
+      const prevRes = await sb
+        .from('orders')
+        .select('created_at, total_amount')
+        .gte('created_at', pyStart.toISOString())
+        .lte('created_at', pyEnd.toISOString())
+        .limit(8000);
+      const byPyDay: Record<string, number> = {};
+      for (let i = chartDays - 1; i >= 0; i--) {
+        byPyDay[format(subDays(now, i + 365), 'yyyy-MM-dd')] = 0;
+      }
+      for (const o of (prevRes.data || []) as { created_at: string; total_amount: number | null }[]) {
+        const d = format(new Date(o.created_at), 'yyyy-MM-dd');
+        if (d in byPyDay) byPyDay[d] = (byPyDay[d] || 0) + Number(o.total_amount || 0);
+      }
+      revenuePrevYearSeries = [];
+      for (let i = chartDays - 1; i >= 0; i--) {
+        const dateKey = format(subDays(now, i), 'yyyy-MM-dd');
+        const pyKey = format(subDays(now, i + 365), 'yyyy-MM-dd');
+        revenuePrevYearSeries.push({
+          date: format(new Date(dateKey + 'T12:00:00'), 'dd/MM'),
+          revenue: byPyDay[pyKey] ?? 0,
+        });
+      }
+    } catch {
+      revenuePrevYearSeries = revenueSeries.map((r) => ({ ...r, revenue: 0 }));
+    }
+    if (revenuePrevYearSeries.length === 0) {
+      revenuePrevYearSeries = revenueSeries.map((r) => ({ ...r, revenue: 0 }));
+    }
+
     return NextResponse.json({
       chartDays,
+      updatedAt: now.toISOString(),
       kpisToday: {
         orders: todayCount,
         revenue: todayRevenue,
         newUsers: newUsersToday,
         avgBasket: avgBasketToday,
+        deliverySuccessRate,
+      },
+      yesterdayKpis: {
+        orders: yCount,
+        revenue: yRev,
+        newUsers: newUsersYesterday,
+        avgBasket: yAvgBasket,
+      },
+      weekAvgBasket,
+      sparklines: {
+        revenue7d,
+        orders7d,
+        newUsers7d,
       },
       windowSummary: { orders: totalO, revenue: windowRevenue },
       windowMeta: {
@@ -229,15 +419,22 @@ export async function GET(req: Request) {
         sampledOrders: totalO,
       },
       revenueSeries,
+      revenuePrevYearSeries: revenuePrevYearSeries.slice(0, revenueSeries.length),
       ordersByStatus,
+      ordersStackedDaily,
       orderHourHeatmap: heatmapData,
       topProducts,
+      topProductsWeek,
       funnel,
       geoSales,
+      geoTop5,
       bigData: {
         avgLtv: Math.round(avgLtv),
         repeatPurchaseRate: Math.round(repeatRate * 1000) / 1000,
         cohortNote: 'Basé sur commandes échantillon (15k max) — affinage SQL possible.',
+        reviewAvg,
+        retention3x3,
+        topDriversMonth,
       },
       activity: {
         recentOrders: recentOrdersRes.data || [],
@@ -248,6 +445,7 @@ export async function GET(req: Request) {
         criticalStockSample: criticalStock.slice(0, 8),
         pendingOver2h: pendingOldRes.count ?? 0,
         oneStarReviews: badReviewsRes.count ?? 0,
+        failedPaymentsToday,
       },
     });
   } catch (e) {
