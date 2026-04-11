@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { collectUrlsFromChatAttachments, storageRefFromPublicUrl } from '@/app/api/_lib/storage-from-public-url';
+import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +73,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     const { error } = await sb.from('chat_messages').update(upd).eq('id', id);
     if (error) throw error;
+
+    const role = await fetchActorRole(auth.userId);
+    const actionType = parsed.data.deleted === true ? 'delete' : 'update';
+    await writeAuditLog({
+      actorUserId: auth.userId,
+      actorEmail: auth.email,
+      actorRole: role,
+      actionType,
+      entityType: 'message',
+      entityId: id,
+      entityName: 'chat_message',
+      changes: { after: parsed.data },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });
@@ -114,6 +129,18 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
       })
       .eq('id', id);
     if (error) throw error;
+
+    const role = await fetchActorRole(auth.userId);
+    await writeAuditLog({
+      actorUserId: auth.userId,
+      actorEmail: auth.email,
+      actorRole: role,
+      actionType: 'delete',
+      entityType: 'message',
+      entityId: id,
+      entityName: 'chat_message',
+    });
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });

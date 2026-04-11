@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { decodeCursor, encodeCursor } from '@/app/api/messages/_lib/cursor';
+import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +93,12 @@ export async function GET(req: Request) {
       .order('id', { ascending: false })
       .limit(PAGE + 1);
 
+    if (filter === 'archived') {
+      q = q.contains('metadata', { archived: true });
+    } else {
+      q = q.or('metadata->>archived.is.null,metadata->>archived.neq.true');
+    }
+
     if (filter === 'broadcast') {
       q = q.eq('type', 'broadcast');
     } else if (unreadConvIds !== null) {
@@ -129,12 +136,12 @@ export async function GET(req: Request) {
 
     const convIds = list.map((c) => c.id);
     const unreadMap = new Map<string, number>();
-    const lastMap = new Map<string, { excerpt: string; at: string }>();
+    const lastMap = new Map<string, { excerpt: string; at: string; message_type: string }>();
 
     if (convIds.length) {
       const { data: msgs } = await sb
         .from('chat_messages')
-        .select('id, conversation_id, message, created_at, is_read, sender_id, deleted_at')
+        .select('id, conversation_id, message, created_at, is_read, sender_id, deleted_at, message_type, image_url')
         .in('conversation_id', convIds)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -146,7 +153,8 @@ export async function GET(req: Request) {
         if (!seenLast.has(cid)) {
           seenLast.add(cid);
           const text = (m.message as string) || (m as { image_url?: string }).image_url || '';
-          lastMap.set(cid, { excerpt: String(text).slice(0, 120), at: m.created_at as string });
+          const mt = String((m as { message_type?: string }).message_type || 'text');
+          lastMap.set(cid, { excerpt: String(text).slice(0, 120), at: m.created_at as string, message_type: mt });
         }
         if (m.is_read === false) {
           unreadMap.set(cid, (unreadMap.get(cid) || 0) + 1);
@@ -158,6 +166,8 @@ export async function GET(req: Request) {
       const p = row.user_id ? profMap.get(row.user_id) : undefined;
       const last = lastMap.get(row.id);
       const unread = unreadMap.get(row.id) || 0;
+      const meta = (row.metadata || {}) as Record<string, unknown>;
+      const tagList = Array.isArray(meta.tags) ? (meta.tags as string[]).slice(0, 10) : [];
       return {
         id: row.id,
         user_id: row.user_id,
@@ -175,6 +185,10 @@ export async function GET(req: Request) {
         avatar_url: p?.avatar_url ?? null,
         last_message_excerpt: last?.excerpt ?? '',
         last_message_at: last?.at ?? row.updated_at,
+        last_message_type: last?.message_type ?? 'text',
+        tags: tagList,
+        is_pinned: meta.pinned === true,
+        is_muted: Boolean(meta.muted_until),
         unread_count: unread,
       };
     });
@@ -192,7 +206,21 @@ export async function GET(req: Request) {
     const next_cursor =
       hasMore && last?.updated_at && last?.id ? encodeCursor(last.updated_at, last.id) : null;
 
-    return NextResponse.json({ conversations: enriched, next_cursor: next_cursor });
+    let tab_counts: { unread_conversations: number } | undefined;
+    try {
+      const { data: ucRows } = await sb
+        .from('chat_messages')
+        .select('conversation_id')
+        .eq('is_read', false)
+        .is('deleted_at', null)
+        .limit(4000);
+      const uc = new Set((ucRows || []).map((r: { conversation_id: string }) => r.conversation_id));
+      tab_counts = { unread_conversations: uc.size };
+    } catch {
+      tab_counts = undefined;
+    }
+
+    return NextResponse.json({ conversations: enriched, next_cursor: next_cursor, tab_counts });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });
   }
@@ -251,6 +279,19 @@ export async function POST(req: Request) {
 
     const { data, error } = await sb.from('chat_conversations').insert(insert).select('id').single();
     if (error) throw error;
+
+    const role = await fetchActorRole(auth.userId);
+    await writeAuditLog({
+      actorUserId: auth.userId,
+      actorEmail: auth.email,
+      actorRole: role,
+      actionType: 'create',
+      entityType: 'conversation',
+      entityId: data?.id,
+      entityName: 'chat_conversation',
+      changes: { after: { participant_id: uid } },
+    });
+
     return NextResponse.json({ conversation: data, reused: false });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });

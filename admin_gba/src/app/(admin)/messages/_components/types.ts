@@ -16,6 +16,7 @@ export type ChatMessage = {
 export type ConversationListItem = {
   id: string;
   user_id: string | null;
+  created_at?: string;
   contact_name: string;
   contact_email: string | null;
   contact_role: string | null;
@@ -24,6 +25,10 @@ export type ConversationListItem = {
   avatar_url: string | null;
   last_message_excerpt: string;
   last_message_at: string | null;
+  last_message_type?: string;
+  tags?: string[];
+  is_pinned?: boolean;
+  is_muted?: boolean;
   unread_count: number;
   type: string;
   metadata: Record<string, unknown>;

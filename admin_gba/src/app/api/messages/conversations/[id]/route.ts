@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { differenceInWeeks } from 'date-fns';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
+import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 export const dynamic = 'force-dynamic';
 
 const MSG_PAGE = 50;
@@ -19,6 +21,49 @@ function decodeMsgCursor(s: string | null): { t: string; i: string } | null {
 
 function encodeMsgCursor(t: string, i: string): string {
   return Buffer.from(JSON.stringify({ t, i }), 'utf8').toString('base64url');
+}
+
+function collectUrlsFromMessageRow(m: Record<string, unknown>): { url: string; type?: string }[] {
+  const out: { url: string; type?: string }[] = [];
+  const img = m.image_url as string | null;
+  if (img) out.push({ url: img, type: 'image' });
+  const raw = m.attachments;
+  try {
+    const arr = Array.isArray(raw)
+      ? raw
+      : typeof raw === 'string' && raw.trim()
+        ? (JSON.parse(raw) as unknown[])
+        : [];
+    for (const a of arr) {
+      const o = a as { url?: string; type?: string };
+      if (o?.url) out.push({ url: o.url, type: o.type });
+    }
+  } catch {
+    /* ignore */
+  }
+  return out;
+}
+
+function avgResponseMinutes(
+  chronological: { sender_id: string; created_at: string }[],
+  participantUserId: string | null,
+): number | null {
+  if (!participantUserId) return null;
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < chronological.length; i++) {
+    if (chronological[i].sender_id !== participantUserId) continue;
+    const reply = chronological.slice(i + 1).find((m) => m.sender_id !== participantUserId);
+    if (!reply) continue;
+    const t0 = new Date(chronological[i].created_at).getTime();
+    const t1 = new Date(reply.created_at).getTime();
+    if (t1 > t0) {
+      sum += (t1 - t0) / 60000;
+      n++;
+    }
+  }
+  if (n === 0) return null;
+  return Math.round((sum / n) * 10) / 10;
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -112,6 +157,58 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       metadata: m.metadata,
     }));
 
+    const uid = (conv.user_id as string) || null;
+
+    const [{ data: statRows }, { data: mediaRows }] = await Promise.all([
+      sb
+        .from('chat_messages')
+        .select('sender_id, created_at')
+        .eq('conversation_id', id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true })
+        .limit(800),
+      sb
+        .from('chat_messages')
+        .select('image_url, attachments, message_type, message')
+        .eq('conversation_id', id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(120),
+    ]);
+
+    const avgMin = avgResponseMinutes((statRows || []) as { sender_id: string; created_at: string }[], uid);
+    const avgLabel = avgMin != null ? `~${avgMin} min` : '—';
+
+    let messagesPerWeek: number | null = null;
+    if (firstRow?.created_at && msgCount != null && msgCount > 0) {
+      const weeks = Math.max(1, differenceInWeeks(new Date(), new Date(firstRow.created_at as string)));
+      messagesPerWeek = Math.round((msgCount / weeks) * 10) / 10;
+    }
+
+    const medias: { url: string; type?: string }[] = [];
+    const seen = new Set<string>();
+    for (const m of mediaRows || []) {
+      for (const u of collectUrlsFromMessageRow(m as Record<string, unknown>)) {
+        if (!seen.has(u.url)) {
+          seen.add(u.url);
+          medias.push(u);
+          if (medias.length >= 12) break;
+        }
+      }
+      if (medias.length >= 12) break;
+    }
+
+    let orders_count = 0;
+    let orders_total = 0;
+    if (uid) {
+      const { data: ords } = await sb.from('orders').select('total').eq('user_id', uid).limit(2000);
+      for (const o of ords || []) {
+        orders_count++;
+        const t = (o as { total?: number }).total;
+        if (typeof t === 'number' && !Number.isNaN(t)) orders_total += t;
+      }
+    }
+
     return NextResponse.json({
       conversation: conv,
       participant: profile,
@@ -120,8 +217,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       stats: {
         message_count: msgCount ?? 0,
         first_message_at: firstRow?.created_at ?? null,
-        avg_response_time: '—',
+        avg_response_time: avgLabel,
+        avg_response_time_minutes: avgMin,
+        messages_per_week: messagesPerWeek,
+        orders_count,
+        orders_total,
       },
+      medias,
     });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });
@@ -177,6 +279,26 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     const { error } = await sb.from('chat_conversations').update(upd).eq('id', id);
     if (error) throw error;
+
+    const role = await fetchActorRole(auth.userId);
+    await writeAuditLog({
+      actorUserId: auth.userId,
+      actorEmail: auth.email,
+      actorRole: role,
+      actionType: 'update',
+      entityType: 'conversation',
+      entityId: id,
+      entityName: 'chat_conversation',
+      changes: {
+        after: {
+          metadata: parsed.data.metadata,
+          status: parsed.data.status,
+          admin_notes: parsed.data.admin_notes !== undefined,
+          tags: parsed.data.tags !== undefined,
+        },
+      },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });
