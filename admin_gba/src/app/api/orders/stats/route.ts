@@ -97,12 +97,47 @@ export async function GET(req: Request) {
     return NextResponse.json(stats);
   } catch (e) {
     const msg = String((e as Error)?.message || e);
+    // #region agent log
+    fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+      body: JSON.stringify({
+        sessionId: '789a98',
+        location: 'api/orders/stats/route.ts:GET',
+        message: 'stats compute error',
+        data: {
+          hypothesisId: 'H5',
+          kind: filterParams.kind ?? 'all',
+          useMetaFirst: true,
+          errMsg: msg.slice(0, 500),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (/metadata|column orders\.metadata/i.test(msg)) {
       try {
         const stats = await computeStats(sb, filterParams, false);
         return NextResponse.json(stats);
       } catch (e2) {
         console.error('[/api/orders/stats]', e2);
+        // #region agent log
+        fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+          body: JSON.stringify({
+            sessionId: '789a98',
+            location: 'api/orders/stats/route.ts:GET',
+            message: 'stats compute error after metadata fallback',
+            data: {
+              hypothesisId: 'H5',
+              kind: filterParams.kind ?? 'all',
+              errMsg: String((e2 as Error)?.message || e2).slice(0, 500),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         return NextResponse.json({ error: String((e2 as Error)?.message || e2) }, { status: 500 });
       }
     }

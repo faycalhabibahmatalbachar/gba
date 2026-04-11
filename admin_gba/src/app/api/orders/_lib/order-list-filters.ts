@@ -54,11 +54,81 @@ export function applyListFilters(q: FilterChain, params: ListFilterParams, useMe
   if (params.dateTo) qq = qq.lte('created_at', params.dateTo);
   if (params.amountMin != null) qq = qq.gte('total_amount', params.amountMin);
   if (params.amountMax != null) qq = qq.lte('total_amount', params.amountMax);
-  if (params.search?.trim()) {
-    const s = params.search.trim();
+
+  const kind = params.kind ?? 'all';
+  const hasSearch = Boolean(params.search?.trim());
+  const s = hasSearch ? params.search!.trim() : '';
+
+  /**
+   * Deux `.or()` successifs = deux paramètres `or=` dans l’URL → PostgREST peut répondre 4xx/5xx ou résultats incohérents.
+   * Pour spécial + recherche : un seul `and=(or(recherche),or(heuristique spéciale))`.
+   */
+  if (hasSearch && kind === 'special_mobile') {
+    const searchInner = `order_number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`;
+    const specInner = useMetadataInFilter ? SPECIAL_ORDER_OR_FILTERS : SPECIAL_ORDER_OR_FILTERS_NO_METADATA;
+    const u = qq.url as URL | undefined;
+    if (u) u.searchParams.append('and', `(or(${searchInner}),or(${specInner}))`);
+    const out = qq;
+    // #region agent log
+    try {
+      const urlObj = out?.url as URL | undefined;
+      fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+        body: JSON.stringify({
+          sessionId: '789a98',
+          location: 'order-list-filters.ts:applyListFilters',
+          message: 'filter chain built',
+          data: {
+            hypothesisId: 'H1-fix',
+            mergedSearchAndSpecial: true,
+            kind,
+            useMetadataInFilter,
+            orParamCount: urlObj ? urlObj.searchParams.getAll('or').length : 0,
+            andParamCount: urlObj ? urlObj.searchParams.getAll('and').length : 0,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {
+      /* ignore */
+    }
+    // #endregion
+    return out;
+  }
+
+  if (hasSearch) {
     qq = qq.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`);
   }
-  return applyKindFilter(qq, params.kind ?? 'all', useMetadataInFilter);
+  const out = applyKindFilter(qq, kind, useMetadataInFilter);
+  // #region agent log
+  try {
+    const urlObj = out?.url as URL | undefined;
+    const orCount = urlObj ? urlObj.searchParams.getAll('or').length : 0;
+    const notOrCount = urlObj ? urlObj.searchParams.getAll('not.or').length : 0;
+    fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+      body: JSON.stringify({
+        sessionId: '789a98',
+        location: 'order-list-filters.ts:applyListFilters',
+        message: 'filter chain built',
+        data: {
+          hypothesisId: 'H1',
+          kind,
+          useMetadataInFilter,
+          hasSearch,
+          orParamCount: orCount,
+          notOrParamCount: notOrCount,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+  return out;
 }
 
 export function parseListFilterParams(url: URL): ListFilterParams {

@@ -330,6 +330,26 @@ export async function GET(req: Request) {
 
   if (res.error) {
     console.error('[/api/orders] Supabase error:', JSON.stringify(res.error));
+    // #region agent log
+    fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+      body: JSON.stringify({
+        sessionId: '789a98',
+        location: 'api/orders/route.ts:GET',
+        message: 'orders list final error after fallbacks',
+        data: {
+          hypothesisId: 'H2-H3',
+          kind: filterParams.kind ?? 'all',
+          hasSearch: Boolean(filterParams.search?.trim()),
+          supabaseMessage: String(res.error?.message ?? ''),
+          supabaseCode: String((res.error as { code?: string })?.code ?? ''),
+          hint: String((res.error as { hint?: string })?.hint ?? ''),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     return NextResponse.json({ error: res.error.message }, { status: 500 });
   }
 
