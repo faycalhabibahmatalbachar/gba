@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
+import { AuthCard } from '@/components/auth/AuthCard';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
-
+import { cn } from '@/lib/utils';
 type Phase = 'loading' | 'ready' | 'done' | 'error';
 
 export default function ResetPasswordPage() {
@@ -45,7 +47,7 @@ export default function ResetPasswordPage() {
       }
       setPhase('error');
       setHint(
-        'Lien invalide ou expiré. Demandez un nouveau lien depuis l’application (Mot de passe oublié).',
+        'Lien invalide ou expiré. Demandez un nouveau lien depuis la page de connexion (Mot de passe oublié).',
       );
     })();
 
@@ -81,102 +83,114 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-violet-600 via-indigo-600 to-fuchsia-500 px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white/95 p-8 shadow-2xl backdrop-blur">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-lg font-bold text-white">
-            G
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold text-zinc-900">GBA</h1>
-            <p className="text-xs text-zinc-500">Nouveau mot de passe</p>
+    <AuthShell>
+      <div className="flex flex-col">
+        <div className="mb-6 lg:hidden">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-base font-black text-primary-foreground shadow-md shadow-primary/20">
+              G
+            </div>
+            <div>
+              <p className="font-heading text-sm font-semibold text-muted-foreground">GBA</p>
+              <p className="text-xs text-muted-foreground">Réinitialisation</p>
+            </div>
           </div>
         </div>
 
-        {phase === 'loading' && (
-          <div className="flex flex-col items-center gap-4 py-10 text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
-            <p className="text-sm text-zinc-600">Vérification du lien sécurisé…</p>
-            {hint ? <p className="text-xs text-amber-700">{hint}</p> : null}
-          </div>
-        )}
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground md:text-[1.75rem]">
+          Nouveau mot de passe
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Définissez un mot de passe fort pour votre compte administrateur GBA.
+        </p>
 
-        {phase === 'error' && (
-          <div className="space-y-4 py-4">
-            <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{hint}</span>
+        <AuthCard className="mt-8">
+          {phase === 'loading' && (
+            <div className="flex flex-col items-center gap-4 py-10 text-center">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
+              <p className="text-sm text-muted-foreground">Vérification du lien sécurisé…</p>
+              {hint ? <p className="text-xs text-amber-800 dark:text-amber-200">{hint}</p> : null}
             </div>
-            <Link
-              href="/login"
-              className="inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent"
-            >
-              Retour connexion admin
-            </Link>
-          </div>
-        )}
+          )}
 
-        {phase === 'ready' && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-sm text-zinc-600">
-              Choisissez un mot de passe fort (8 caractères minimum). Vous pourrez vous connecter
-              ensuite dans l’application GBA.
-            </p>
-            {hint && !submitting ? (
-              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                {hint}
+          {phase === 'error' && (
+            <div className="space-y-4 py-2">
+              <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <span>{hint}</span>
               </div>
-            ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="np">Nouveau mot de passe</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <Link
+                href="/login"
+                className={cn(buttonVariants({ variant: 'outline' }), 'inline-flex h-11 min-h-11 w-full items-center justify-center')}
+              >
+                Retour à la connexion
+              </Link>
+            </div>
+          )}
+
+          {phase === 'ready' && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Choisissez un mot de passe d’au moins 8 caractères. Vous pourrez ensuite ouvrir une session dans
+                l’administration GBA.
+              </p>
+              {hint && !submitting ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+                  {hint}
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                <Label htmlFor="np">Nouveau mot de passe</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="np"
+                    type="password"
+                    autoComplete="new-password"
+                    className="h-11 min-h-11 pl-9"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="npc">Confirmer le mot de passe</Label>
                 <Input
-                  id="np"
+                  id="npc"
                   type="password"
                   autoComplete="new-password"
-                  className="pl-9"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-11 min-h-11"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
                   required
                   minLength={8}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="npc">Confirmer</Label>
-              <Input
-                id="npc"
-                type="password"
-                autoComplete="new-password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-                minLength={8}
-              />
-            </div>
-            <Button type="submit" disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enregistrer le mot de passe'}
-            </Button>
-          </form>
-        )}
+              <Button type="submit" disabled={submitting} className="h-11 min-h-11 w-full transition-colors duration-150">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : 'Enregistrer le mot de passe'}
+              </Button>
+            </form>
+          )}
 
-        {phase === 'done' && (
-          <div className="space-y-4 py-4 text-center">
-            <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-500" />
-            <p className="font-medium text-zinc-900">Mot de passe mis à jour</p>
-            <p className="text-sm text-zinc-600">
-              Vous pouvez fermer cette page et ouvrir l’application GBA pour vous connecter.
-            </p>
-            <Link
-              href="/login"
-              className="inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent"
-            >
-              Connexion admin (si besoin)
-            </Link>
-          </div>
-        )}
+          {phase === 'done' && (
+            <div className="space-y-4 py-2 text-center">
+              <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              <p className="font-medium text-foreground">Mot de passe mis à jour</p>
+              <p className="text-sm text-muted-foreground">
+                Vous pouvez fermer cette page et retourner à la connexion administrateur pour vous identifier.
+              </p>
+              <Link
+                href="/login"
+                className={cn(buttonVariants({ variant: 'outline' }), 'inline-flex h-11 min-h-11 w-full items-center justify-center')}
+              >
+                Connexion administrateur
+              </Link>
+            </div>
+          )}
+        </AuthCard>
       </div>
-    </div>
+    </AuthShell>
   );
 }

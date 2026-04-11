@@ -1,47 +1,68 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
+import { AuthCard } from '@/components/auth/AuthCard';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog';
+import { GateMessage } from '@/components/auth/GateMessage';
+import { PasswordField } from '@/components/auth/PasswordField';
+import { TrustFooter } from '@/components/auth/TrustFooter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, ShieldCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-function GateMessage() {
-  const sp = useSearchParams();
-  const code = sp.get('error');
-  const reason = sp.get('reason');
-  if (!code && !reason) return null;
-  return (
-    <div className="mb-4 space-y-2 rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-3 text-xs text-destructive">
-      <p className="font-medium">{reason || `Accès refusé (${code})`}</p>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="w-full border-destructive/40"
-        onClick={() => void supabase.auth.signOut().then(() => window.location.replace('/login'))}
-      >
-        Déconnecter cette session
-      </Button>
-    </div>
-  );
+function formatAuthError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  return 'Identifiants incorrects';
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
+
+  function validate(): boolean {
+    let ok = true;
+    const em = email.trim();
+    if (!em) {
+      setEmailError('Saisissez votre adresse e-mail professionnelle.');
+      ok = false;
+    } else if (!EMAIL_RE.test(em)) {
+      setEmailError('Format d’e-mail invalide.');
+      ok = false;
+    } else {
+      setEmailError(null);
+    }
+    if (!password) {
+      setPasswordError('Saisissez votre mot de passe.');
+      ok = false;
+    } else {
+      setPasswordError(null);
+    }
+    return ok;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!validate()) return;
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
       if (error) throw error;
       const allowedRes = await fetch('/api/me/connection-allowed', { credentials: 'include' });
       const allowedJson = (await allowedRes.json()) as { allowed?: boolean; error?: string };
@@ -66,7 +87,7 @@ export default function LoginPage() {
       });
       router.push('/dashboard');
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       void fetch('/api/security/login-attempts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,80 +95,120 @@ export default function LoginPage() {
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           success: false,
-          reason: String(err?.message || 'invalid_credentials'),
+          reason: String(err instanceof Error ? err.message : 'invalid_credentials'),
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
         }),
       });
-      toast.error(err.message || 'Identifiants invalides');
+      toast.error(formatAuthError(err));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      {/* Background gradient */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
-      </div>
-
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/25 mb-4">
-            <span className="text-2xl font-black text-primary-foreground">G</span>
+    <AuthShell>
+      <div className="flex flex-col">
+        <div className="mb-8 lg:hidden">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-base font-black text-primary-foreground shadow-md shadow-primary/20">
+              G
+            </div>
+            <div>
+              <p className="font-heading text-sm font-semibold text-muted-foreground">GBA</p>
+              <p className="text-xs text-muted-foreground">Back-office</p>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">GBA Admin</h1>
-          <p className="text-sm text-muted-foreground mt-1">Connectez-vous pour accéder au panneau</p>
         </div>
 
-        {/* Card */}
-        <div className="bg-card border border-border rounded-2xl p-6 shadow-lg">
+        <div className="mb-8 hidden lg:block" aria-hidden />
+
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground md:text-[1.75rem]">
+          Connexion administrateur
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Gestion des commandes, catalogue et opérations.
+        </p>
+
+        <AuthCard className="mt-8">
           <Suspense fallback={null}>
             <GateMessage />
           </Suspense>
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div className="space-y-2">
-              <Label htmlFor="email">Adresse email</Label>
+              <Label htmlFor="email">Adresse e-mail professionnelle</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@gba.com"
+                placeholder="prenom.nom@entreprise.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError(null);
+                }}
                 autoComplete="email"
-                required
+                disabled={loading}
+                aria-invalid={Boolean(emailError)}
+                aria-describedby={emailError ? 'email-error' : undefined}
+                className={cn(
+                  'h-11 min-h-11 transition-colors duration-150',
+                  emailError && 'border-destructive',
+                )}
               />
+              {emailError ? (
+                <p id="email-error" className="text-xs text-destructive" role="alert">
+                  {emailError}
+                </p>
+              ) : null}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
+            <PasswordField
+              id="password"
+              label="Mot de passe"
+              value={password}
+              onChange={(v) => {
+                setPassword(v);
+                if (passwordError) setPasswordError(null);
+              }}
+              error={passwordError}
+              errorId="password-error"
+              disabled={loading}
+            />
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="text-sm font-medium text-primary underline-offset-4 transition-colors duration-150 hover:underline"
+                onClick={() => setForgotOpen(true)}
+                disabled={loading}
+              >
+                Mot de passe oublié ?
+              </button>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="h-11 min-h-11 w-full transition-colors duration-150"
+              disabled={loading}
+            >
               {loading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Connexion...</>
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Connexion…
+                </>
               ) : (
-                <><ShieldCheck className="h-4 w-4 mr-2" />Se connecter</>
+                <>
+                  <ShieldCheck className="mr-2 h-4 w-4" aria-hidden />
+                  Se connecter
+                </>
               )}
             </Button>
           </form>
-        </div>
+        </AuthCard>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Accès réservé aux administrateurs GBA
-        </p>
+        <TrustFooter />
       </div>
-    </div>
+
+      <ForgotPasswordDialog open={forgotOpen} onOpenChange={setForgotOpen} initialEmail={email} />
+    </AuthShell>
   );
 }
