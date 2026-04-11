@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
+import {
+  applyListFilters,
+  parseListFilterParams,
+  type ListFilterParams,
+} from '@/app/api/orders/_lib/order-list-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -140,10 +145,6 @@ function mapOrderRow(order: OrderEmbedRow) {
   };
 }
 
-/** PostgREST OR group: matches mobile "special" heuristics (order_number + notes + raw metadata text). */
-const SPECIAL_ORDER_OR_FILTERS =
-  'order_number.ilike.sp-%,notes.ilike.%special%,notes.ilike.%devis%,notes.ilike.%quote%,notes.ilike.%quotation%,metadata.ilike.%special%,metadata.ilike.%quote%,metadata.ilike.%devis%';
-
 const SELECT_FULL = `
   id,
   order_number,
@@ -244,63 +245,6 @@ const SELECT_MIN_SAFE = `
 
 const SORT_WHITELIST = new Set(['created_at', 'total_amount', 'status', 'order_number']);
 
-type ListFilterParams = {
-  status?: string;
-  driverId?: string | null;
-  dateFrom?: string | null;
-  dateTo?: string | null;
-  amountMin?: number | null;
-  amountMax?: number | null;
-  search?: string;
-  kind?: 'all' | 'special_mobile' | 'standard';
-};
-
-function applyKindFilter<
-  Q extends {
-    or: (f: string) => Q;
-    not: (column: string, operator: string, value: unknown) => Q;
-  },
->(q: Q, kind: ListFilterParams['kind']): Q {
-  if (kind === 'special_mobile') {
-    return q.or(SPECIAL_ORDER_OR_FILTERS);
-  }
-  if (kind === 'standard') {
-    // NOT (special heuristics), null-safe on notes/metadata (avoids SQL UNKNOWN wiping rows).
-    let qq = q.not('order_number', 'ilike', 'sp%');
-    qq = qq.or(
-      'notes.is.null,and(notes.not.ilike.%special%,notes.not.ilike.%devis%,notes.not.ilike.%quote%,notes.not.ilike.%quotation%)',
-    );
-    qq = qq.or(
-      'metadata.is.null,and(metadata.not.ilike.%special%,metadata.not.ilike.%quote%,metadata.not.ilike.%devis%)',
-    );
-    return qq;
-  }
-  return q;
-}
-
-function applyListFilters<
-  Q extends {
-    eq: (c: string, v: string) => Q;
-    gte: (c: string, v: string | number) => Q;
-    lte: (c: string, v: string | number) => Q;
-    or: (f: string) => Q;
-    not: (column: string, operator: string, value: unknown) => Q;
-  },
->(q: Q, params: ListFilterParams): Q {
-  let qq = q;
-  if (params.status && params.status !== 'all') qq = qq.eq('status', params.status);
-  if (params.driverId) qq = qq.eq('driver_id', params.driverId);
-  if (params.dateFrom) qq = qq.gte('created_at', params.dateFrom);
-  if (params.dateTo) qq = qq.lte('created_at', params.dateTo);
-  if (params.amountMin != null) qq = qq.gte('total_amount', params.amountMin);
-  if (params.amountMax != null) qq = qq.lte('total_amount', params.amountMax);
-  if (params.search?.trim()) {
-    const s = params.search.trim();
-    qq = qq.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`);
-  }
-  return applyKindFilter(qq, params.kind ?? 'all');
-}
-
 export async function GET(req: Request) {
   const auth = await requireAdminPermission('orders', 'read');
   if (!auth.ok) return auth.response;
@@ -327,56 +271,60 @@ export async function GET(req: Request) {
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1);
   const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize') || '20') || 20));
   const offset = (page - 1) * pageSize;
-  const search = url.searchParams.get('search') || url.searchParams.get('q') || '';
-  const status = url.searchParams.get('status') || 'all';
-  const driverId = url.searchParams.get('driverId');
-  const dateFrom = url.searchParams.get('dateFrom');
-  const dateTo = url.searchParams.get('dateTo');
-  const amountMinRaw = url.searchParams.get('amountMin');
-  const amountMaxRaw = url.searchParams.get('amountMax');
-  const amountMin = amountMinRaw != null && amountMinRaw !== '' ? Number(amountMinRaw) : null;
-  const amountMax = amountMaxRaw != null && amountMaxRaw !== '' ? Number(amountMaxRaw) : null;
   const sortByRaw = url.searchParams.get('sortBy') || 'created_at';
-  const kindRaw = url.searchParams.get('kind') || 'all';
-  const kind = kindRaw === 'special_mobile' || kindRaw === 'standard' ? kindRaw : 'all';
   const sortBy = SORT_WHITELIST.has(sortByRaw) ? sortByRaw : 'created_at';
   const sortOrder = url.searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
   const ascending = sortOrder === 'asc';
 
-  const filterParams: ListFilterParams = {
-    status: status === 'all' ? undefined : status,
-    driverId: driverId || null,
-    dateFrom: dateFrom || null,
-    dateTo: dateTo || null,
-    amountMin: Number.isFinite(amountMin as number) ? amountMin : null,
-    amountMax: Number.isFinite(amountMax as number) ? amountMax : null,
-    search,
-    kind,
-  };
+  const filterParams: ListFilterParams = parseListFilterParams(url);
 
-  const runSelect = async (selectStr: string) => {
+  const runSelect = async (selectStr: string, useMetadataFilter: boolean) => {
     const base = sb.from('orders').select(selectStr, { count: 'exact' });
-    const filtered = applyListFilters(base, filterParams);
+    const filtered = applyListFilters(base, filterParams, useMetadataFilter);
     return filtered.order(sortBy, { ascending }).range(offset, offset + pageSize - 1);
   };
 
-  let res = await runSelect(SELECT_FULL);
+  let res = await runSelect(SELECT_FULL, true);
+  if (res.error) {
+    const msg = String(res.error.message || '');
+    if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
+      res = await runSelect(SELECT_FULL, false);
+    }
+  }
   if (res.error) {
     const msg = String(res.error.message || '');
     if (msg.includes('driver_profile') || msg.includes('orders_driver_id_fkey') || msg.includes('Could not find')) {
-      res = await runSelect(SELECT_NO_DRIVER);
+      res = await runSelect(SELECT_NO_DRIVER, true);
+    }
+  }
+  if (res.error) {
+    const msg = String(res.error.message || '');
+    if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
+      res = await runSelect(SELECT_NO_DRIVER, false);
     }
   }
   if (res.error) {
     const msg = String(res.error.message || '');
     if (msg.includes('products') || msg.includes('relationship')) {
-      res = await runSelect(SELECT_NO_PRODUCTS);
+      res = await runSelect(SELECT_NO_PRODUCTS, true);
+    }
+  }
+  if (res.error) {
+    const msg = String(res.error.message || '');
+    if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
+      res = await runSelect(SELECT_NO_PRODUCTS, false);
     }
   }
   if (res.error) {
     const msg = String(res.error.message || '');
     if (msg.includes('metadata') || msg.includes('column orders.metadata does not exist')) {
-      res = await runSelect(SELECT_MIN_SAFE);
+      res = await runSelect(SELECT_MIN_SAFE, true);
+    }
+  }
+  if (res.error) {
+    const msg = String(res.error.message || '');
+    if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
+      res = await runSelect(SELECT_MIN_SAFE, false);
     }
   }
 

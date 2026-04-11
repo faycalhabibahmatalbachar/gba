@@ -57,21 +57,6 @@ export type OrdersKpis = {
   deliveryRate: number;
 };
 
-function applyFilters(q: any, params: FetchOrdersParams) {
-  let qq = q;
-  if (params.status && params.status !== 'all') qq = qq.eq('status', params.status);
-  if (params.driverId) qq = qq.eq('driver_id', params.driverId);
-  if (params.dateFrom) qq = qq.gte('created_at', params.dateFrom);
-  if (params.dateTo) qq = qq.lte('created_at', params.dateTo);
-  if (params.amountMin != null) qq = qq.gte('total_amount', params.amountMin);
-  if (params.amountMax != null) qq = qq.lte('total_amount', params.amountMax);
-  if (params.search?.trim()) {
-    const s = params.search.trim();
-    qq = qq.or(`order_number.ilike.%${s}%,customer_name.ilike.%${s}%,customer_phone.ilike.%${s}%`);
-  }
-  return qq;
-}
-
 export async function fetchOrders(params: FetchOrdersParams = {}) {
   const page = params.page ?? 1;
   const pageSize = Math.min(params.pageSize ?? 20, 100);
@@ -101,46 +86,24 @@ export async function fetchOrders(params: FetchOrdersParams = {}) {
   return { data: j.data ?? [], count: j.count ?? 0 };
 }
 
-/** KPIs for current filters. Revenue/avg are computed from up to 5000 rows for performance. */
+/** KPIs alignés sur GET /api/orders (mêmes filtres, service role côté serveur). */
 export async function fetchOrdersKpis(params: Omit<FetchOrdersParams, 'page' | 'pageSize'> = {}): Promise<OrdersKpis> {
-  const baseQ = supabase
-    .from('orders')
-    .select('id, total_amount, status', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(0, 4999);
+  const qs = new URLSearchParams();
+  if (params.search?.trim()) qs.set('search', params.search.trim());
+  if (params.status && params.status !== 'all') qs.set('status', params.status);
+  if (params.kind && params.kind !== 'all') qs.set('kind', params.kind);
+  if (params.driverId) qs.set('driverId', params.driverId);
+  if (params.dateFrom) qs.set('dateFrom', params.dateFrom);
+  if (params.dateTo) qs.set('dateTo', params.dateTo);
+  if (params.amountMin != null) qs.set('amountMin', String(params.amountMin));
+  if (params.amountMax != null) qs.set('amountMax', String(params.amountMax));
 
-  const q = applyFilters(baseQ, { ...params, page: 1, pageSize: 5000 });
-  const res = await q;
-
-  if (res.error) {
-    const fallback = applyFilters(
-      supabase.from('orders').select('id, total_amount, status', { count: 'exact' }).order('created_at', { ascending: false }).range(0, 4999),
-      { ...params, page: 1, pageSize: 5000 },
-    );
-    const r = await fallback;
-    if (r.error) return { totalOrders: 0, revenue: 0, avgBasket: 0, pendingCount: 0, deliveredCount: 0, deliveryRate: 0 };
-    return computeKpis(r.data || [], r.count || 0);
+  const r = await fetch(`/api/orders/stats?${qs.toString()}`, { credentials: 'include' });
+  const j = await parseApiJson<OrdersKpis & { error?: string }>(r);
+  if (!r.ok) {
+    throw new Error(typeof j.error === 'string' ? j.error : `HTTP ${r.status}`);
   }
-
-  return computeKpis((res.data || []) as { total_amount: number | null; status: string | null }[], res.count || 0);
-}
-
-function computeKpis(
-  rows: { total_amount: number | null; status: string | null }[],
-  totalCount: number,
-): OrdersKpis {
-  const revenue = rows.reduce((s, r) => s + Number(r.total_amount || 0), 0);
-  const pendingCount = rows.filter((r) => String(r.status || '').toLowerCase() === 'pending').length;
-  const deliveredCount = rows.filter((r) => String(r.status || '').toLowerCase() === 'delivered').length;
-  const n = rows.length;
-  return {
-    totalOrders: totalCount,
-    revenue,
-    avgBasket: n ? revenue / n : 0,
-    pendingCount,
-    deliveredCount,
-    deliveryRate: totalCount ? (deliveredCount / totalCount) * 100 : 0,
-  };
+  return j as OrdersKpis;
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {

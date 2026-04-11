@@ -13,23 +13,27 @@ import { supabase } from '@/lib/supabase/client';
 import { KpiCard } from '@/components/ui/custom/KpiCard';
 import { PageHeader } from '@/components/ui/custom/PageHeader';
 import { StatusBadge } from '@/components/ui/custom/StatusBadge';
-import { EmptyState } from '@/components/ui/custom/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ShoppingCart, DollarSign, Clock, CheckCircle2,
   Search, Filter, Download, ChevronLeft, ChevronRight,
   RefreshCw, User, Phone, MapPin, Package, Truck, Loader2,
-  TrendingUp, Printer, UserCheck, AlertTriangle,
-  ShoppingBag, Eye,
+  TrendingUp, Printer,
+  LayoutGrid, List,
 } from 'lucide-react';
+import { parseApiJson } from '@/lib/fetch-api-json';
+import { OrdersDataTable } from './_components/orders-data-table';
+import { OrdersKanbanBoard } from './_components/orders-kanban-board';
+import { useOrdersRealtimeInvalidation } from './_components/use-orders-realtime';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -42,6 +46,7 @@ import {
 import type { OrderItem } from '@/lib/services/orders';
 
 const PAGE_SIZE = 20;
+const KANBAN_PAGE_SIZE = 100;
 
 const STATUSES = [
   { value: 'all', label: 'Tous les statuts' },
@@ -109,6 +114,7 @@ function OrdersContent() {
   const [status, setStatus] = useQueryState('status', parseAsString.withDefault('all'));
   const [kind, setKind] = useQueryState('kind', parseAsString.withDefault('all'));
   const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(1));
+  const [view, setView] = useQueryState('view', parseAsString.withDefault('list'));
   const [focusOrderId, setFocusOrderId] = useQueryState('focus', parseAsString.withDefault(''));
 
   // Local state
@@ -118,6 +124,13 @@ function OrdersContent() {
   const [bulkStatus, setBulkStatus] = useState('');
   const [availableDrivers, setAvailableDrivers] = useState<{id:string;name:string}[]>([]);
   const [itemsModalOrder, setItemsModalOrder] = useState<OrderRow | null>(null);
+  const [quoteAmount, setQuoteAmount] = useState('');
+  const [quoteMessage, setQuoteMessage] = useState('');
+
+  const listView = view !== 'kanban';
+  const effectivePageSize = listView ? PAGE_SIZE : KANBAN_PAGE_SIZE;
+
+  useOrdersRealtimeInvalidation(qc);
 
   // Load drivers once
   const loadDrivers = useCallback(async () => {
@@ -131,11 +144,11 @@ function OrdersContent() {
 
   // Queries
   const ordersQuery = useQuery({
-    queryKey: ['orders', { search, status, kind, page }],
+    queryKey: ['orders', { search, status, kind, page, view, effectivePageSize }],
     queryFn: () =>
       fetchOrders({
-        page,
-        pageSize: PAGE_SIZE,
+        page: listView ? page : 1,
+        pageSize: effectivePageSize,
         search: search || undefined,
         status: status || undefined,
         kind: (kind as 'all' | 'special_mobile' | 'standard') || 'all',
@@ -144,8 +157,13 @@ function OrdersContent() {
   });
 
   const kpisQuery = useQuery({
-    queryKey: ['orders-kpis', { search, status }],
-    queryFn: () => fetchOrdersKpis({ search: search || undefined, status: status || undefined }),
+    queryKey: ['orders-kpis', { search, status, kind }],
+    queryFn: () =>
+      fetchOrdersKpis({
+        search: search || undefined,
+        status: status || undefined,
+        kind: (kind as 'all' | 'special_mobile' | 'standard') || 'all',
+      }),
     staleTime: 30_000,
   });
 
@@ -196,8 +214,53 @@ function OrdersContent() {
 
   const orders = ordersQuery.data?.data || [];
   const total = ordersQuery.data?.count || 0;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / effectivePageSize));
   const kpis = kpisQuery.data;
+
+  useEffect(() => {
+    if (ordersQuery.isLoading || ordersQuery.isFetching) return;
+    if (!listView) return;
+    if (total === 0 && page > 1) {
+      void setPage(1);
+      return;
+    }
+    if (page > totalPages) void setPage(totalPages);
+  }, [ordersQuery.isLoading, ordersQuery.isFetching, total, totalPages, page, setPage, listView]);
+
+  const quoteMut = useMutation({
+    mutationFn: async () => {
+      if (!drawerOrderId) throw new Error('Commande manquante');
+      const amount = quoteAmount.trim() ? Number(quoteAmount.replace(/\s/g, '')) : undefined;
+      if (amount != null && (Number.isNaN(amount) || amount < 0)) throw new Error('Montant invalide');
+      const r = await fetch(`/api/orders/${drawerOrderId}/quote`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount_xof: amount,
+          message: quoteMessage.trim() || undefined,
+          quote_status: 'envoye' as const,
+        }),
+      });
+      const j = await parseApiJson<{ ok?: boolean; error?: string; formErrors?: Record<string, string[]> }>(r);
+      if (!r.ok) {
+        if (j.formErrors && typeof j.formErrors === 'object') {
+          throw new Error(JSON.stringify(j.formErrors));
+        }
+        throw new Error(typeof j.error === 'string' ? j.error : `HTTP ${r.status}`);
+      }
+      return j;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['orders-kpis'] });
+      qc.invalidateQueries({ queryKey: ['order-detail', drawerOrderId] });
+      setQuoteAmount('');
+      setQuoteMessage('');
+      toast.success('Devis enregistré');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Erreur'),
+  });
 
   const toggleSelect = useCallback((id: string) => {
     setSelected(prev => {
@@ -350,129 +413,71 @@ function OrdersContent() {
         </CardContent>
       </Card>
 
-      {/* Table */}
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="px-4 py-3 text-left w-10">
-                  <input
-                    type="checkbox"
-                    checked={selected.size === orders.length && orders.length > 0}
-                    onChange={toggleAll}
-                    className="rounded border-border"
-                  />
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">N° commande</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">Client</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Statut</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground hidden md:table-cell">Articles</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Montant</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground hidden lg:table-cell">Date</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {ordersQuery.isLoading && [...Array(8)].map((_, i) => (
-                <tr key={i}>
-                  <td className="px-4 py-3" colSpan={8}><Skeleton className="h-9 w-full" /></td>
-                </tr>
-              ))}
-              {!ordersQuery.isLoading && orders.map(order => (
-                <tr
-                  key={order.id}
-                  className={`hover:bg-muted/20 transition-colors cursor-pointer ${selected.has(order.id) ? 'bg-primary/5' : ''}`}
-                  onClick={() => setDrawerOrderId(order.id)}
-                >
-                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(order.id)}
-                      onChange={() => toggleSelect(order.id)}
-                      className="rounded border-border"
-                    />
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    #{order.order_number || order.id.slice(0, 8)}
-                    {isSpecialOrder(order) ? (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                        spéciale mobile
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell">
-                    <div className="font-medium truncate max-w-[140px]">{order.customer_name || '—'}</div>
-                    {order.customer_phone && (
-                      <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={order.status || 'pending'} size="sm" />
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs hidden md:table-cell" onClick={e => e.stopPropagation()}>
-                    {(() => {
-                      const items = order.items ?? [];
-                      const count = order.item_count ?? order.total_items ?? items.length;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => setItemsModalOrder(order)}
-                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          <ShoppingBag size={14} className="shrink-0" />
-                          <span className="font-medium text-foreground tabular-nums">{count}</span>
-                          <span className="text-muted-foreground">
-                            article{count !== 1 ? 's' : ''}
-                          </span>
-                          <Eye size={12} className="shrink-0 text-muted-foreground" />
-                        </button>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums">
-                    {order.total_amount ? fmtCurrency(order.total_amount) : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
-                    {fmtDate(order.created_at)}
-                  </td>
-                  <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                    <Select
-                      value={order.status || ''}
-                      onValueChange={v => v && statusMut.mutate({ id: order.id, status: v })}
-                    >
-                      <SelectTrigger className="h-7 w-[130px] text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ACTION_STATUSES.map(s => (
-                          <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-                </tr>
-              ))}
-              {!ordersQuery.isLoading && orders.length === 0 && (
-                <tr><td colSpan={8}>
-                  <EmptyState
-                    title="Aucune commande"
-                    description={search || status !== 'all' ? 'Essayez d\'autres filtres.' : 'Les commandes apparaîtront ici.'}
-                  />
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* Liste / Kanban */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant={listView ? 'default' : 'outline'}
+          size="sm"
+          className="h-8"
+          onClick={() => { void setView('list'); }}
+        >
+          <List className="h-3.5 w-3.5 mr-1.5" />
+          Liste
+        </Button>
+        <Button
+          type="button"
+          variant={!listView ? 'default' : 'outline'}
+          size="sm"
+          className="h-8"
+          onClick={() => { void setView('kanban'); void setPage(1); }}
+        >
+          <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
+          Kanban
+        </Button>
+        {!listView && (
+          <p className="text-xs text-muted-foreground ml-2">
+            Jusqu’à {KANBAN_PAGE_SIZE} commandes visibles (filtres appliqués).
+          </p>
+        )}
+      </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+      <Card className="overflow-hidden">
+        {listView ? (
+          <OrdersDataTable
+            orders={orders}
+            loading={ordersQuery.isLoading}
+            selected={selected}
+            onToggle={toggleSelect}
+            onToggleAll={toggleAll}
+            onRowOpen={(id) => setDrawerOrderId(id)}
+            onItemsModal={setItemsModalOrder}
+            onStatusChange={(id, st) => statusMut.mutate({ id, status: st })}
+            fmtCurrency={fmtCurrency}
+            fmtDate={fmtDate}
+            emptyDescription={
+              search || status !== 'all' || (kind && kind !== 'all')
+                ? 'Aucun résultat pour ces critères (recherche, statut ou type). Essayez d’élargir les filtres.'
+                : 'Les commandes apparaîtront ici.'
+            }
+          />
+        ) : (
+          <div className="p-3">
+            <OrdersKanbanBoard
+              orders={orders}
+              fmtCurrency={fmtCurrency}
+              onMoveToStatus={(orderId, newStatus) => statusMut.mutate({ id: orderId, status: newStatus })}
+            />
+          </div>
+        )}
+
+        {listView && totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-border px-4 py-3">
             <p className="text-xs text-muted-foreground">
               Page {page} sur {totalPages} — {total} résultats
             </p>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
               <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
@@ -669,6 +674,39 @@ function OrdersContent() {
                         Les détails spéciaux sont stockés dans les notes.
                       </p>
                     )}
+                    <div className="mt-3 space-y-2 border-t border-amber-500/20 pt-3">
+                      <p className="text-xs font-medium text-foreground">Envoyer / mettre à jour un devis</p>
+                      <div className="space-y-1">
+                        <Label htmlFor="quote-amount" className="text-xs">Montant (XOF)</Label>
+                        <Input
+                          id="quote-amount"
+                          inputMode="numeric"
+                          className="h-8 text-sm"
+                          placeholder="Ex. 150000"
+                          value={quoteAmount}
+                          onChange={(e) => setQuoteAmount(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="quote-msg" className="text-xs">Message (optionnel)</Label>
+                        <Textarea
+                          id="quote-msg"
+                          className="min-h-[72px] text-sm"
+                          placeholder="Conditions, validité…"
+                          value={quoteMessage}
+                          onChange={(e) => setQuoteMessage(e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full"
+                        disabled={quoteMut.isPending}
+                        onClick={() => quoteMut.mutate()}
+                      >
+                        {quoteMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Enregistrer le devis'}
+                      </Button>
+                    </div>
                   </div>
                 );
               })()}
