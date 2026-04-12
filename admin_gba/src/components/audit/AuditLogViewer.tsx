@@ -1,12 +1,11 @@
 /**
- * Journal d’audit : défilement infini (curseur API), virtualisation, filtres, export serveur, détail avec diff JSON.
+ * Journal d’audit : défilement infini (curseur API), virtualisation, filtres, export serveur, détail avec diff tableau.
  */
 
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -14,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -31,18 +29,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Download,
-  Search,
-  Calendar as CalendarIcon,
-  CheckCircle2,
-  AlertCircle,
-  Info,
-  XCircle,
-  Loader2,
-} from 'lucide-react';
-import { AdminDrawer } from '@/components/ui/custom/AdminDrawer';
-import { JsonDiffViewer } from '@/components/ui/custom/JsonDiffViewer';
+import { Download, Search, Calendar as CalendarIcon, Loader2, Radio } from 'lucide-react';
+import { AuditDetailDrawer } from '@/components/audit/AuditDetailDrawer';
+import { AuditLogRow, auditRowHeight } from '@/components/audit/AuditLogRow';
+import { supabase } from '@/lib/supabase/client';
 import {
   downloadAuditExport,
   fetchAuditCursorPage,
@@ -138,38 +128,19 @@ const ENTITY_LABELS: Record<string, string> = {
   permission: 'Permission',
 };
 
-const ROW_H = 54;
-
 function filtersKey(f: AuditStreamFilters): string {
   return JSON.stringify({
     entityType: f.entityType,
     entityId: f.entityId,
     actionType: f.actionType,
+    connections: f.connections,
     actorId: f.actorId,
     status: f.status,
     ip: f.ip,
+    search: f.search,
     from: f.startDate?.toISOString(),
     to: f.endDate?.toISOString(),
   });
-}
-
-function entityAdminHref(entityType: string, entityId?: string | null): string | null {
-  if (!entityId) return null;
-  switch (entityType) {
-    case 'product':
-      return `/products`;
-    case 'order':
-      return `/orders`;
-    case 'user':
-    case 'profile':
-      return `/users`;
-    case 'driver':
-      return `/drivers`;
-    case 'review':
-      return `/reviews`;
-    default:
-      return null;
-  }
 }
 
 interface AuditLogViewerProps {
@@ -183,7 +154,12 @@ export function AuditLogViewer({
   initialEntityType,
   initialEntityId,
 }: AuditLogViewerProps) {
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchInput, setSearchInput] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  React.useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
   const [startDate, setStartDate] = React.useState<Date | undefined>();
   const [endDate, setEndDate] = React.useState<Date | undefined>();
   const [actorId, setActorId] = React.useState('');
@@ -191,9 +167,12 @@ export function AuditLogViewer({
   const [entityType, setEntityType] = React.useState<string>(initialEntityType || '');
   const [entityIdFilter, setEntityIdFilter] = React.useState<string>(initialEntityId || '');
   const [actionType, setActionType] = React.useState<string>('');
+  const [connectionsOnly, setConnectionsOnly] = React.useState(false);
   const [status, setStatus] = React.useState<string>('');
   const [selected, setSelected] = React.useState<AuditLogEntry | null>(null);
   const [exporting, setExporting] = React.useState(false);
+  const [pendingNewCount, setPendingNewCount] = React.useState(0);
+  const [rtStatus, setRtStatus] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (initialEntityType != null) setEntityType(initialEntityType);
@@ -204,14 +183,27 @@ export function AuditLogViewer({
     () => ({
       entityType: entityType || undefined,
       entityId: entityIdFilter.trim() || undefined,
-      actionType: actionType || undefined,
+      connections: connectionsOnly || undefined,
+      actionType: connectionsOnly ? undefined : actionType || undefined,
       status: status || undefined,
       actorId: actorId.trim() || undefined,
       ip: ipFilter.trim() || undefined,
+      search: debouncedSearch || undefined,
       startDate,
       endDate,
     }),
-    [entityType, entityIdFilter, actionType, status, actorId, ipFilter, startDate, endDate],
+    [
+      entityType,
+      entityIdFilter,
+      connectionsOnly,
+      actionType,
+      status,
+      actorId,
+      ipFilter,
+      debouncedSearch,
+      startDate,
+      endDate,
+    ],
   );
 
   const inf = useInfiniteQuery({
@@ -224,26 +216,28 @@ export function AuditLogViewer({
   const flat = inf.data?.pages.flatMap((p) => p.rows) ?? [];
   const totalApprox = inf.data?.pages[0]?.meta.total ?? flat.length;
 
-  const filteredLogs = React.useMemo(() => {
-    if (!searchTerm.trim()) return flat;
-    const term = searchTerm.toLowerCase();
-    return flat.filter(
-      (log) =>
-        log.user_email?.toLowerCase().includes(term) ||
-        log.entity_name?.toLowerCase().includes(term) ||
-        log.action_description?.toLowerCase().includes(term) ||
-        log.entity_id?.toLowerCase().includes(term),
-    );
-  }, [flat, searchTerm]);
-
   const parentRef = React.useRef<HTMLDivElement>(null);
 
   const rowVirtualizer = useVirtualizer({
-    count: filteredLogs.length,
+    count: flat.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_H,
+    estimateSize: () => auditRowHeight(),
     overscan: 14,
   });
+
+  React.useEffect(() => {
+    const channel = supabase
+      .channel('audit-logs-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'audit_logs' },
+        () => setPendingNewCount((n) => n + 1),
+      )
+      .subscribe((s) => setRtStatus(s));
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   React.useEffect(() => {
     const el = parentRef.current;
@@ -256,19 +250,6 @@ export function AuditLogViewer({
     el.addEventListener('scroll', onScroll);
     return () => el.removeEventListener('scroll', onScroll);
   }, [inf.hasNextPage, inf.isFetchingNextPage, inf.fetchNextPage]);
-
-  const getStatusIcon = (s?: string) => {
-    switch (s) {
-      case 'success':
-        return <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-600 shrink-0" />;
-      case 'partial':
-        return <AlertCircle className="h-4 w-4 text-yellow-600 shrink-0" />;
-      default:
-        return <Info className="h-4 w-4 text-blue-600 shrink-0" />;
-    }
-  };
 
   const chip = (label: string, active: boolean, onClick: () => void) => (
     <button
@@ -283,40 +264,22 @@ export function AuditLogViewer({
     </button>
   );
 
-  const toggleAction = (v: string) => setActionType((prev) => (prev === v ? '' : v));
+  const toggleAction = (v: string) => {
+    setConnectionsOnly(false);
+    setActionType((prev) => (prev === v ? '' : v));
+  };
   const toggleStatus = (v: string) => setStatus((prev) => (prev === v ? '' : v));
 
-  const ch = selected?.changes as { before?: unknown; after?: unknown } | undefined;
-  const beforeDiff = ch?.before ?? {};
-  const afterDiff = ch?.after ?? {};
-  const meta = selected?.metadata as Record<string, unknown> | undefined;
+  const selectedIndex = selected ? flat.findIndex((r) => r.id === selected.id) : -1;
 
-  const nearbyQ = useQuery({
-    queryKey: [
-      'audit-nearby',
-      selected?.id,
-      selected?.user_id,
-      selected?.entity_type,
-      selected?.entity_id,
-      selected?.created_at,
-    ],
-    enabled: Boolean(
-      selected?.created_at && (selected?.user_id || (selected?.entity_id && selected?.entity_type)),
-    ),
-    queryFn: async () => {
-      const p = new URLSearchParams();
-      p.set('created_at', selected!.created_at!);
-      if (selected!.user_id) p.set('user_id', selected!.user_id);
-      if (selected!.entity_id && selected!.entity_type) {
-        p.set('entity_type', selected!.entity_type);
-        p.set('entity_id', selected!.entity_id);
-      }
-      const r = await fetch(`/api/audit/nearby?${p}`, { credentials: 'include' });
-      const j = (await r.json()) as { data?: AuditLogEntry[] };
-      if (!r.ok) return [];
-      return j.data ?? [];
-    },
-  });
+  const goPrev = () => {
+    if (selectedIndex <= 0) return;
+    setSelected(flat[selectedIndex - 1]!);
+  };
+  const goNext = () => {
+    if (selectedIndex < 0 || selectedIndex >= flat.length - 1) return;
+    setSelected(flat[selectedIndex + 1]!);
+  };
 
   const runExport = async (format: 'csv' | 'json') => {
     setExporting(true);
@@ -360,12 +323,44 @@ export function AuditLogViewer({
         </CardHeader>
 
         <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5" title="Temps réel audit_logs">
+              <Radio
+                className={cn(
+                  'h-3.5 w-3.5',
+                  rtStatus === 'SUBSCRIBED' ? 'text-green-600 dark:text-green-500' : 'text-amber-600',
+                )}
+              />
+              {rtStatus === 'SUBSCRIBED' ? 'Temps réel connecté' : rtStatus ? `Temps réel : ${rtStatus}` : 'Connexion…'}
+            </span>
+            {pendingNewCount > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-7 text-xs"
+                onClick={() => {
+                  setPendingNewCount(0);
+                  void inf.refetch();
+                }}
+              >
+                {pendingNewCount} nouvel{pendingNewCount > 1 ? 's' : ''} événement{pendingNewCount > 1 ? 's' : ''} — actualiser
+              </Button>
+            ) : null}
+          </div>
+
           {showFilters ? (
             <>
               <div className="flex flex-wrap gap-2">
-                {chip('Connexions', actionType === 'login', () => toggleAction('login'))}
-                {chip('Modifications', actionType === 'update', () => toggleAction('update'))}
-                {chip('Exports', actionType === 'export', () => toggleAction('export'))}
+                {chip('Connexions', connectionsOnly, () => {
+                  setConnectionsOnly((v) => {
+                    const next = !v;
+                    if (next) setActionType('');
+                    return next;
+                  });
+                })}
+                {chip('Modifications', !connectionsOnly && actionType === 'update', () => toggleAction('update'))}
+                {chip('Exports', !connectionsOnly && actionType === 'export', () => toggleAction('export'))}
                 {chip('Échecs', status === 'failed', () => toggleStatus('failed'))}
               </div>
 
@@ -373,18 +368,22 @@ export function AuditLogViewer({
                 <div className="relative lg:col-span-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Rechercher dans la page chargée…"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Rechercher par acteur, action, entité, IP, description…"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     className="pl-9"
+                    maxLength={200}
                   />
                 </div>
                 <Input placeholder="UUID acteur (user_id)" value={actorId} onChange={(e) => setActorId(e.target.value)} />
                 <Input placeholder="Filtre IP (metadata)" value={ipFilter} onChange={(e) => setIpFilter(e.target.value)} />
 
                 <Select
-                  value={actionType || 'all'}
-                  onValueChange={(v) => setActionType(!v || v === 'all' ? '' : v)}
+                  value={connectionsOnly ? 'all' : actionType || 'all'}
+                  onValueChange={(v) => {
+                    setConnectionsOnly(false);
+                    setActionType(!v || v === 'all' ? '' : v);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Action" />
@@ -471,24 +470,24 @@ export function AuditLogViewer({
             </>
           ) : null}
 
-          <div className="border rounded-lg overflow-hidden">
-            <div className="grid grid-cols-[40px_128px_minmax(140px,1fr)_100px_88px_72px_40px] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/40">
-              <span />
+          <div className="border rounded-lg overflow-hidden dark:border-border/80">
+            <div className="grid grid-cols-[40px_108px_44px_minmax(0,1fr)_96px_80px_28px] gap-x-2 px-3 py-2 text-[11px] font-medium text-muted-foreground border-b bg-muted/40 dark:bg-muted/25">
+              <span className="sr-only">Type</span>
               <span>Date</span>
-              <span>Utilisateur</span>
+              <span className="col-span-1" />
+              <span>Acteur &amp; action</span>
               <span>Action</span>
               <span>Entité</span>
-              <span>ID</span>
               <span />
             </div>
             <div ref={parentRef} className="h-[560px] overflow-auto relative">
               {inf.isLoading ? (
                 <div className="p-4 space-y-2">
                   {Array.from({ length: 8 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                    <Skeleton key={i} className="h-[72px] w-full" />
                   ))}
                 </div>
-              ) : filteredLogs.length === 0 ? (
+              ) : flat.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground text-sm">Aucun log</div>
               ) : (
                 <div
@@ -499,41 +498,23 @@ export function AuditLogViewer({
                   }}
                 >
                   {rowVirtualizer.getVirtualItems().map((vi) => {
-                    const log = filteredLogs[vi.index]!;
+                    const log = flat[vi.index]!;
                     return (
-                      <button
+                      <div
                         key={vi.key}
-                        type="button"
-                        className={cn(
-                          'absolute left-0 w-full grid grid-cols-[40px_128px_minmax(140px,1fr)_100px_88px_72px_40px] gap-2 px-3 py-2 text-left text-sm border-b border-border/60 hover:bg-muted/50 items-center',
-                        )}
+                        className="absolute left-0 top-0 w-full"
                         style={{
                           height: `${vi.size}px`,
                           transform: `translateY(${vi.start}px)`,
                         }}
-                        onClick={() => setSelected(log)}
                       >
-                        <span className="flex justify-center">{getStatusIcon(log.status)}</span>
-                        <span className="text-xs whitespace-nowrap tabular-nums">
-                          {log.created_at
-                            ? format(new Date(log.created_at), 'dd/MM HH:mm', { locale: fr })
-                            : '—'}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium">{log.user_email || 'Système'}</span>
-                          <span className="block truncate text-[10px] text-muted-foreground">{log.user_role}</span>
-                        </span>
-                        <Badge variant="outline" className="text-[10px] justify-center px-1">
-                          {ACTION_LABELS[log.action_type] || log.action_type}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px] justify-center px-1">
-                          {ENTITY_LABELS[log.entity_type] || log.entity_type}
-                        </Badge>
-                        <span className="font-mono text-[10px] truncate">
-                          {log.entity_id ? `${log.entity_id.slice(0, 6)}…` : '—'}
-                        </span>
-                        <span className="text-muted-foreground text-lg leading-none">›</span>
-                      </button>
+                        <AuditLogRow
+                          log={log}
+                          actionLabel={ACTION_LABELS[log.action_type] || log.action_type}
+                          entityLabel={ENTITY_LABELS[log.entity_type] || log.entity_type}
+                          onClick={() => setSelected(log)}
+                        />
+                      </div>
                     );
                   })}
                 </div>
@@ -543,7 +524,7 @@ export function AuditLogViewer({
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
-              Affichés : {filteredLogs.length} ligne(s) chargée(s)
+              Affichés : {flat.length} sur ~{totalApprox.toLocaleString('fr-FR')} événement(s)
               {inf.isFetchingNextPage ? ' — chargement…' : ''}
             </span>
             {inf.hasNextPage ? (
@@ -555,126 +536,17 @@ export function AuditLogViewer({
         </CardContent>
       </Card>
 
-      <AdminDrawer
+      <AuditDetailDrawer
         open={!!selected}
-        onOpenChange={(o) => !o && setSelected(null)}
-        title={selected ? 'Détail audit' : 'Détail'}
-        description={selected?.created_at ? format(new Date(selected.created_at), 'PPpp', { locale: fr }) : undefined}
-        className="sm:max-w-[580px]"
-      >
-        {selected ? (
-          <div className="space-y-5 text-sm">
-            <div className="relative rounded-xl border border-border bg-gradient-to-br from-muted/40 to-transparent p-4">
-              <div className="flex flex-wrap items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                  {getStatusIcon(selected.status)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="text-xs">{ACTION_LABELS[selected.action_type] || selected.action_type}</Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {ENTITY_LABELS[selected.entity_type] || selected.entity_type}
-                    </Badge>
-                    {selected.status ? (
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{selected.status}</span>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">Référence entité</p>
-                  <p className="font-mono text-[11px] break-all">{selected.entity_id || '—'}</p>
-                  {entityAdminHref(selected.entity_type, selected.entity_id) ? (
-                    <Link
-                      href={entityAdminHref(selected.entity_type, selected.entity_id)!}
-                      className={cn(buttonVariants({ variant: 'link' }), 'h-auto p-0 mt-2 inline-flex text-sm')}
-                    >
-                      Ouvrir dans l&apos;admin
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-
-            <div className="relative space-y-0 pl-1">
-              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" aria-hidden />
-              <div className="relative flex gap-3 pb-4">
-                <span className="z-[1] mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-primary ring-4 ring-background" />
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Acteur</p>
-                  <p className="font-medium">{selected.user_email || 'Système'}</p>
-                  <p className="text-xs text-muted-foreground">{selected.user_role || '—'}</p>
-                </div>
-              </div>
-              <div className="relative flex gap-3 pb-4">
-                <span className="z-[1] mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-background" />
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Horodatage</p>
-                  <p className="tabular-nums">
-                    {selected.created_at ? format(new Date(selected.created_at), 'EEEE d MMMM yyyy · HH:mm:ss', { locale: fr }) : '—'}
-                  </p>
-                </div>
-              </div>
-              {selected.action_description ? (
-                <div className="relative flex gap-3">
-                  <span className="z-[1] mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-background" />
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Description</p>
-                    <p className="text-sm leading-relaxed">{selected.action_description}</p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {nearbyQ.isFetching ? (
-              <Skeleton className="h-16 w-full" />
-            ) : (nearbyQ.data?.length ?? 0) > 0 ? (
-              <details className="group rounded-lg border border-border bg-card open:shadow-sm">
-                <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium flex items-center justify-between">
-                  Contexte proche (±5 min)
-                  <span className="text-xs text-muted-foreground group-open:rotate-0">▼</span>
-                </summary>
-                <ul className="space-y-1 max-h-44 overflow-y-auto border-t px-3 py-2 text-xs bg-muted/15">
-                  {(nearbyQ.data || []).map((row) => (
-                    <li
-                      key={String(row.id)}
-                      className={cn(
-                        'flex flex-wrap gap-x-2 gap-y-0.5 border-b border-border/40 pb-1.5 last:border-0',
-                        row.id === selected.id && 'font-medium text-primary',
-                      )}
-                    >
-                      <span className="text-muted-foreground whitespace-nowrap tabular-nums">
-                        {row.created_at ? format(new Date(row.created_at), 'HH:mm:ss', { locale: fr }) : '—'}
-                      </span>
-                      <span>{ACTION_LABELS[row.action_type] || row.action_type}</span>
-                      {row.entity_id ? <span className="font-mono text-[10px] opacity-80">{row.entity_id.slice(0, 8)}…</span> : null}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-
-            {meta && Object.keys(meta).length > 0 ? (
-              <details className="group rounded-lg border border-border bg-card">
-                <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium border-b bg-muted/20">
-                  Métadonnées (JSON)
-                </summary>
-                <pre className="text-xs p-3 overflow-auto max-h-48 bg-muted/30">{JSON.stringify(meta, null, 2)}</pre>
-              </details>
-            ) : null}
-
-            <details className="group rounded-lg border border-border bg-card" open>
-              <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium border-b bg-muted/20">
-                Modifications avant / après
-              </summary>
-              <div className="p-2 max-h-[min(50vh,360px)] overflow-auto">
-                <JsonDiffViewer before={beforeDiff} after={afterDiff} />
-              </div>
-            </details>
-
-            {selected.error_message ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive text-xs">{selected.error_message}</p>
-            ) : null}
-          </div>
-        ) : null}
-      </AdminDrawer>
+        onOpenChange={(o) => {
+          if (!o) setSelected(null);
+        }}
+        selected={selected}
+        listIndex={selectedIndex}
+        listLength={flat.length}
+        onPrev={goPrev}
+        onNext={goNext}
+      />
     </>
   );
 }

@@ -56,6 +56,10 @@ export interface AuditLogEntry {
   user_id?: string;
   user_email?: string;
   user_role?: string;
+  /** Renseigné par GET /api/audit (jointure profiles) */
+  actor_display_name?: string;
+  actor_avatar_url?: string | null;
+  actor_profile_role?: string;
   action_type: AuditActionType;
   action_description?: string;
   entity_type: AuditEntityType;
@@ -194,9 +198,13 @@ export type AuditStreamFilters = {
   entityType?: string;
   entityId?: string;
   actionType?: string;
+  /** Filtre connexions (login + logout), prioritaire sur actionType */
+  connections?: boolean;
   actorId?: string;
   status?: string;
   ip?: string;
+  /** Recherche serveur (q) */
+  search?: string;
   startDate?: Date;
   endDate?: Date;
 };
@@ -216,14 +224,16 @@ export async function fetchAuditCursorPage(
 
   const params = new URLSearchParams();
   params.set('paginate', 'cursor');
-  params.set('limit', '100');
+  params.set('limit', '50');
   if (cursor) params.set('cursor', cursor);
   if (filters.entityType) params.set('entity_type', filters.entityType);
   if (filters.entityId) params.set('entity_id', filters.entityId);
-  if (filters.actionType) params.set('action_type', filters.actionType);
+  if (filters.connections) params.set('connections', 'true');
+  else if (filters.actionType) params.set('action_type', filters.actionType);
   if (filters.actorId) params.set('actor_id', filters.actorId);
   if (filters.status) params.set('status', filters.status);
   if (filters.ip?.trim()) params.set('ip', filters.ip.trim());
+  if (filters.search?.trim()) params.set('q', filters.search.trim());
   if (filters.startDate) params.set('from', filters.startDate.toISOString());
   if (filters.endDate) params.set('to', filters.endDate.toISOString());
 
@@ -263,12 +273,14 @@ function streamFiltersToExportBody(filters: AuditStreamFilters, format: 'csv' | 
     format,
     entity_type: filters.entityType,
     entity_id: filters.entityId,
-    action_type: filters.actionType,
+    action_type: filters.connections ? undefined : filters.actionType,
+    connections: filters.connections === true,
     actor_id: filters.actorId,
     status: filters.status,
     from: filters.startDate?.toISOString(),
     to: filters.endDate?.toISOString(),
     ip: filters.ip?.trim() || undefined,
+    q: filters.search?.trim() || undefined,
     limit: 8000,
   };
 }
@@ -362,12 +374,49 @@ export interface AuditStatistics {
   success_count: number;
 }
 
+export type AuditPageKpisResponse = {
+  kpis: {
+    total_events: number;
+    distinct_actors: number;
+    failed_count: number;
+    success_rate_pct: number;
+    distinct_role_values: number;
+    delta_total_pct: number | null;
+    prev_total_events: number;
+  };
+  role_breakdown: { role: string; count: number }[];
+  latency_ms: {
+    avg: number | null;
+    p50: number | null;
+    p95: number | null;
+    p99: number | null;
+    sample_size: number;
+  };
+  period: { from: string; to: string };
+  statistics: AuditStatistics[];
+};
+
+export async function fetchAuditPageKpis(): Promise<AuditPageKpisResponse | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch('/api/audit/stats', { credentials: 'include' });
+    const j = (await res.json()) as AuditPageKpisResponse & { error?: string };
+    if (!res.ok || !j.kpis) return null;
+    return j;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAuditStatistics(): Promise<AuditStatistics[]> {
   if (typeof window === 'undefined') {
     return [];
   }
 
   try {
+    const full = await fetchAuditPageKpis();
+    if (full?.statistics?.length) return full.statistics;
+
     const res = await fetch('/api/audit/stats', { credentials: 'include' });
     const j = (await res.json()) as { statistics?: AuditStatistics[]; error?: string };
     if (!res.ok || !j.statistics?.length) {

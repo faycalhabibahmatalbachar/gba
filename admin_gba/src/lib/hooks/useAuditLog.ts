@@ -18,6 +18,7 @@ import {
   type AuditLogFilters,
   type AuditLogEntry,
   type AuditStatistics,
+  type AuditPageKpisResponse,
 } from '@/lib/audit/audit-logger';
 
 /**
@@ -47,6 +48,8 @@ export function useAuditLog() {
       // Invalidate audit logs queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
       queryClient.invalidateQueries({ queryKey: ['audit-statistics'] });
+      queryClient.invalidateQueries({ queryKey: ['audit-page-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['audit-cursor'] });
     },
   });
 
@@ -116,6 +119,24 @@ export function useAuditStatistics() {
     isLoading: query.isLoading,
     error: query.error,
   };
+}
+
+/**
+ * KPI agrégés (fenêtre 90 j par défaut, /api/audit/stats).
+ */
+export function useAuditPageKpis() {
+  return useQuery({
+    queryKey: ['audit-page-kpis'],
+    queryFn: async (): Promise<AuditPageKpisResponse> => {
+      const res = await fetch('/api/audit/stats', { credentials: 'include' });
+      const j = (await res.json()) as AuditPageKpisResponse & { error?: string };
+      if (!res.ok || !j.kpis) {
+        throw new Error(typeof j.error === 'string' ? j.error : 'Indicateurs indisponibles');
+      }
+      return j;
+    },
+    staleTime: 60_000,
+  });
 }
 
 /**

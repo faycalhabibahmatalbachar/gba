@@ -61,6 +61,11 @@ export interface WriteAuditLogInput {
 export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
   try {
     const sb = getServiceSupabase();
+    const platformDefault = input.actorUserId ? 'web-admin' : 'system';
+    const metadata = {
+      ...(input.metadata ?? {}),
+      platform: (input.metadata?.platform as string | undefined) ?? platformDefault,
+    };
     const { error } = await sb.from('audit_logs').insert({
       user_id: input.actorUserId ?? null,
       user_email: input.actorEmail ?? null,
@@ -71,7 +76,7 @@ export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
       entity_id: input.entityId ?? null,
       entity_name: input.entityName ?? null,
       changes: input.changes ?? {},
-      metadata: input.metadata ?? {},
+      metadata,
       status: input.status ?? 'success',
       error_message: input.errorMessage ?? null,
     });

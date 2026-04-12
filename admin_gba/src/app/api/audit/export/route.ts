@@ -12,11 +12,13 @@ const bodySchema = z.object({
   entity_type: z.string().optional(),
   entity_id: z.string().optional(),
   action_type: z.string().optional(),
+  connections: z.boolean().optional(),
   actor_id: z.string().optional(),
   status: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   ip: z.string().optional(),
+  q: z.string().max(200).optional(),
   limit: z.number().int().min(1).max(10_000).optional().default(5000),
 });
 
@@ -45,11 +47,13 @@ export async function POST(req: Request) {
     entityType: f.entity_type ?? null,
     entityId: f.entity_id ?? null,
     actionType: f.action_type ?? null,
+    connections: f.connections === true ? true : null,
     actorId: f.actor_id ?? null,
     status: f.status ?? null,
     from: f.from ?? null,
     to: f.to ?? null,
     ip: f.ip ?? null,
+    search: f.q?.trim() || null,
   };
 
   let sb: ReturnType<typeof getServiceSupabase>;
