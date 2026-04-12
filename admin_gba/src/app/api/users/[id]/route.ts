@@ -406,3 +406,55 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   return NextResponse.json({ ok: true, data });
 }
+
+/** Suppression définitive du compte Auth + profil (réservé superadmin, pas les comptes admin). */
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const sup = await requireSuperAdmin();
+  if (!sup.ok) return sup.response;
+
+  const { id } = await ctx.params;
+  if (!id || !z.string().uuid().safeParse(id).success) {
+    return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
+  }
+  if (id === sup.userId) {
+    return NextResponse.json({ error: 'Impossible de supprimer votre propre compte' }, { status: 400 });
+  }
+
+  let sb: ReturnType<typeof getServiceSupabase>;
+  try {
+    sb = getServiceSupabase();
+  } catch {
+    return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY manquant' }, { status: 503 });
+  }
+
+  const { data: before } = await sb.from('profiles').select('id, email, role').eq('id', id).maybeSingle();
+  if (!before) return NextResponse.json({ error: 'Introuvable' }, { status: 404 });
+
+  const roleNorm = String(before.role || '').toLowerCase();
+  if (['admin', 'superadmin', 'super_admin'].includes(roleNorm)) {
+    return NextResponse.json(
+      { error: 'Supprimer un administrateur depuis l’onglet Admins ou désactiver le compte.' },
+      { status: 400 },
+    );
+  }
+
+  const { error: delErr } = await sb.auth.admin.deleteUser(id);
+  if (delErr) {
+    return NextResponse.json({ error: delErr.message }, { status: 400 });
+  }
+
+  const role = await fetchActorRole(sup.userId);
+  await writeAuditLog({
+    actorUserId: sup.userId,
+    actorEmail: sup.email,
+    actorRole: role,
+    actionType: 'delete',
+    entityType: 'user',
+    entityId: id,
+    entityName: String(before.email || ''),
+    description: 'Suppression compte utilisateur (admin)',
+    changes: { before: before as Record<string, unknown> },
+  }).catch(() => null);
+
+  return NextResponse.json({ ok: true });
+}

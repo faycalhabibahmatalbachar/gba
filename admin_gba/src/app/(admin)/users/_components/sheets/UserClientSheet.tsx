@@ -705,7 +705,7 @@ export function UserClientSheet({ user, open, onOpenChange }: UserClientSheetPro
         onOpenChange={setRevokeOpen}
         title="Révoquer toutes les sessions"
         description="Déconnexion de tous les appareils pour cet utilisateur."
-        confirmationPhrase="RÉVOQUER"
+        confirmationPhrase="REVOQUER"
         confirmLabel="Révoquer"
         onConfirm={() => void sessionsDel.mutateAsync()}
         variant="destructive"

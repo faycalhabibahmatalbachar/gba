@@ -6,7 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
-import { KeyRound, UserPlus } from 'lucide-react';
+import { KeyRound, Shield, UserPlus } from 'lucide-react';
 
 import { DataTable } from '@/components/shared/DataTable';
 import { AvatarWithInitials } from '@/components/shared/AvatarWithInitials';
@@ -18,11 +18,17 @@ import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  ADMIN_PAGE_ACCESS_KEYS,
+  ADMIN_PERM_ACTIONS,
+  ADMIN_PERM_SCOPES,
+} from '@/app/(admin)/users/_lib/admin-permission-ui';
 
 type AdminRow = Record<string, unknown> & {
   id: string;
@@ -34,9 +40,6 @@ type AdminRow = Record<string, unknown> & {
   last_seen_at?: string | null;
   is_online?: boolean | null;
 };
-
-const SECTIONS = ['products', 'orders', 'users', 'drivers', 'reports', 'settings', 'audit', 'notifications'] as const;
-const ACTIONS = ['read', 'create', 'update', 'delete'] as const;
 
 function randomPassword() {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%';
@@ -55,6 +58,7 @@ export function UsersAdminSection() {
   const [lastName, setLastName] = React.useState('');
   const [role, setRole] = React.useState<'admin' | 'superadmin'>('admin');
   const [perm, setPerm] = React.useState<Record<string, Record<string, boolean>>>({});
+  const [pageAccess, setPageAccess] = React.useState<Record<string, boolean>>({});
 
   const q = useQuery({
     queryKey: ['admin-roles-list'],
@@ -69,9 +73,10 @@ export function UsersAdminSection() {
   const createMut = useMutation({
     mutationFn: async () => {
       const permissions: Record<string, Record<string, boolean>> = {};
-      SECTIONS.forEach((s) => {
+      ADMIN_PERM_SCOPES.forEach((s) => {
         permissions[s] = { ...perm[s] };
       });
+      const page_access = { ...pageAccess };
       const r = await fetch('/api/admin/create-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -83,14 +88,15 @@ export function UsersAdminSection() {
           last_name: lastName,
           role,
           permissions,
+          page_access,
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Échec création');
+      if (!r.ok) throw new Error(typeof j.error === 'string' ? j.error : 'Échec création');
       return j;
     },
     onSuccess: () => {
-      toast.success('Admin créé');
+      toast.success('Compte enregistré');
       setOpen(false);
       void qc.invalidateQueries({ queryKey: ['admin-roles-list'] });
     },
@@ -176,7 +182,13 @@ export function UsersAdminSection() {
             </SelectContent>
           </Select>
         </div>
-        <Button size="sm" onClick={() => { setPassword(randomPassword()); setOpen(true); }}>
+        <Button
+          size="sm"
+          onClick={() => {
+            setPassword(randomPassword());
+            setOpen(true);
+          }}
+        >
           <UserPlus className="h-3.5 w-3.5 mr-1" />
           Créer admin
         </Button>
@@ -192,20 +204,34 @@ export function UsersAdminSection() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[min(720px,100vw)] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nouvel administrateur</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-[var(--gba-brand)]" />
+              Nouvel administrateur
+            </DialogTitle>
+            <DialogDescription>
+              Même principe que la fiche admin : matrice CRUD, accès aux pages, puis enregistrement.
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2">
+          <div className="grid gap-3">
             <div>
               <Label>Email</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" />
             </div>
             <div>
               <Label>Mot de passe temporaire</Label>
               <div className="flex gap-2">
                 <Input value={password} onChange={(e) => setPassword(e.target.value)} />
-                <Button type="button" variant="outline" size="sm" onClick={() => { void navigator.clipboard.writeText(password); toast.success('Copié'); }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(password);
+                    toast.success('Copié');
+                  }}
+                >
                   <KeyRound className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -232,13 +258,13 @@ export function UsersAdminSection() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-xs font-semibold pt-2">Permissions</div>
+            <p className="text-xs font-semibold pt-1">Matrice CRUD</p>
             <div className="border border-border rounded-lg overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="p-2 text-left">Section</th>
-                    {ACTIONS.map((a) => (
+                    {ADMIN_PERM_ACTIONS.map((a) => (
                       <th key={a} className="p-2">
                         {a}
                       </th>
@@ -246,10 +272,10 @@ export function UsersAdminSection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {SECTIONS.map((s) => (
+                  {ADMIN_PERM_SCOPES.map((s) => (
                     <tr key={s} className="border-t border-border">
                       <td className="p-2 capitalize">{s}</td>
-                      {ACTIONS.map((a) => (
+                      {ADMIN_PERM_ACTIONS.map((a) => (
                         <td key={a} className="p-2 text-center">
                           <input
                             type="checkbox"
@@ -264,13 +290,31 @@ export function UsersAdminSection() {
                 </tbody>
               </table>
             </div>
+            <p className="text-xs font-semibold">Accès aux pages</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {ADMIN_PAGE_ACCESS_KEYS.map((pk) => (
+                <label key={pk.path} className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    className="rounded border border-input"
+                    checked={Boolean(pageAccess[pk.path])}
+                    onChange={(e) => setPageAccess((prev) => ({ ...prev, [pk.path]: e.target.checked }))}
+                  />
+                  {pk.label}
+                </label>
+              ))}
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" type="button" onClick={() => setOpen(false)}>
               Annuler
             </Button>
-            <Button type="button" onClick={() => createMut.mutate()} disabled={createMut.isPending || !email || password.length < 8}>
-              Créer
+            <Button
+              type="button"
+              onClick={() => createMut.mutate()}
+              disabled={createMut.isPending || !email || password.length < 8 || !firstName.trim() || !lastName.trim()}
+            >
+              {createMut.isPending ? 'Enregistrement…' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -44,41 +45,77 @@ import {
 } from '@/components/ui/select';
 import { useAdminPermissions } from '@/components/providers/AdminPermissionsProvider';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  ADMIN_PAGE_ACCESS_KEYS,
+  ADMIN_PERM_ACTIONS,
+  ADMIN_PERM_SCOPES,
+} from '@/app/(admin)/users/_lib/admin-permission-ui';
+import { formatOutboundEmailError } from '@/lib/email/format-outbound-error';
 import { adminProfileCopy } from './adminProfileCopy';
 
 type Row = Record<string, unknown> & { id: string };
 
-const SCOPES = ['users', 'orders', 'products', 'categories', 'drivers', 'messages', 'notifications', 'security', 'settings', 'reports'] as const;
-const ACTIONS = ['create', 'read', 'update', 'delete'] as const;
 type Matrix = Record<string, Record<string, boolean>>;
-
-const PAGE_KEYS: { path: string; label: string }[] = [
-  { path: '/orders', label: 'Commandes' },
-  { path: '/products', label: 'Produits' },
-  { path: '/products/categories', label: 'Catégories' },
-  { path: '/drivers', label: 'Livreurs' },
-  { path: '/users', label: 'Utilisateurs' },
-  { path: '/messages', label: 'Messages' },
-  { path: '/notifications', label: 'Notifications' },
-  { path: '/security', label: 'Sécurité' },
-  { path: '/settings', label: 'Paramètres' },
-  { path: '/audit', label: 'Audit' },
-];
 
 function displayName(p: Record<string, unknown>) {
   const a = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
   return a || String(p.email || '?');
 }
 
-function JsonDiffBlock({ changes }: { changes: unknown }) {
-  if (!changes || typeof changes !== 'object') return <span className="text-xs text-muted-foreground">—</span>;
+const ACTION_LABEL: Record<string, string> = {
+  create: 'Création',
+  update: 'Mise à jour',
+  delete: 'Suppression',
+  permission_change: 'Permissions',
+};
+
+const ENTITY_LABEL: Record<string, string> = {
+  user: 'Utilisateur',
+  message: 'Message',
+  order: 'Commande',
+  product: 'Produit',
+  permission: 'Droits',
+  conversation: 'Conversation',
+};
+
+function activitySummary(changes: unknown): string {
+  if (!changes || typeof changes !== 'object') return '';
   const o = changes as Record<string, unknown>;
-  const before = o.before;
-  const after = o.after;
+  const after = o.after as Record<string, unknown> | undefined;
+  if (after && typeof after === 'object') {
+    if (after.deleted === true) return 'Élément supprimé';
+    if (after.read === true) return 'Marqué comme lu';
+    if (after.important !== undefined) return 'Priorité mise à jour';
+    if (typeof after.message_type === 'string')
+      return `Message · ${String(after.message_type)}`;
+    if (typeof after.conversation_id === 'string') return 'Conversation liée';
+    const keys = Object.keys(after).filter((k) => after[k] != null);
+    if (keys.length && keys.length <= 4) return keys.map((k) => `${k}`).join(' · ');
+    if (keys.length > 4) return `${keys.length} changements`;
+  }
+  return 'Activité enregistrée';
+}
+
+function ActivityEntry({ item }: { item: Record<string, unknown> }) {
+  const at = String(item.action_type || '');
+  const et = String(item.entity_type || '');
+  const title = [ACTION_LABEL[at] || at, ENTITY_LABEL[et] || et].filter(Boolean).join(' · ');
   return (
-    <pre className="max-h-40 overflow-auto rounded-md border border-border bg-muted/30 p-2 text-[10px] leading-relaxed">
-      {JSON.stringify({ before, after }, null, 2)}
-    </pre>
+    <div className="rounded-lg border border-border/80 bg-gradient-to-br from-muted/40 to-transparent p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 space-y-1">
+          <p className="text-sm font-medium leading-snug text-foreground">{title || 'Événement'}</p>
+          <p className="text-xs text-muted-foreground">
+            {item.created_at
+              ? format(new Date(String(item.created_at)), 'dd/MM/yyyy HH:mm', { locale: fr })
+              : ''}
+          </p>
+          <p className="text-xs text-foreground/90 leading-relaxed">{activitySummary(item.changes)}</p>
+        </div>
+        <Activity className="h-4 w-4 shrink-0 text-[var(--gba-brand)] opacity-80" />
+      </div>
+    </div>
   );
 }
 
@@ -101,6 +138,11 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
   const [confirmSuspend, setConfirmSuspend] = React.useState(false);
   const [confirmRevoke, setConfirmRevoke] = React.useState(false);
   const [confirmReset, setConfirmReset] = React.useState(false);
+  const [resetLinkDialog, setResetLinkDialog] = React.useState<{
+    link: string;
+    emailSent: boolean;
+    emailError?: string | null;
+  } | null>(null);
 
   const profileQ = useQuery({
     queryKey: ['admin-command-profile', user?.id],
@@ -148,9 +190,9 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
     if (!permQ.data) return;
     const m = permQ.data.matrix || {};
     const next: Matrix = {};
-    for (const s of SCOPES) {
+    for (const s of ADMIN_PERM_SCOPES) {
       next[s] = {};
-      for (const a of ACTIONS) {
+      for (const a of ADMIN_PERM_ACTIONS) {
         next[s][a] = Boolean(m[s]?.[a]);
       }
     }
@@ -212,7 +254,7 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
   const rowVirtualizer = useVirtualizer({
     count: activityItems.length,
     getScrollElement: () => actParentRef.current,
-    estimateSize: () => 76,
+    estimateSize: () => 108,
     overscan: 8,
   });
 
@@ -371,14 +413,27 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
   const resetMut = useMutation({
     mutationFn: async () => {
       const r = await fetch(`/api/admin/${user!.id}/password-reset`, { method: 'POST', credentials: 'include' });
-      const j = await r.json();
+      const j = (await r.json()) as {
+        error?: string;
+        action_link?: string | null;
+        email_sent?: boolean;
+        email_error?: string | null;
+      };
       if (!r.ok) throw new Error(typeof j.error === 'string' ? j.error : 'Échec');
-      return j as { email_sent?: boolean; email_error?: string | null };
+      return j;
     },
     onSuccess: (data) => {
-      toast.success(data.email_sent ? 'Email de réinitialisation envoyé' : 'Lien généré (email désactivé ou erreur)');
+      if (data.email_sent) toast.success('Email de réinitialisation envoyé');
+      else toast.message('Lien généré — copiez-le ou activez l’envoi e-mail.');
       if (data.email_error) toast.message(data.email_error);
       setConfirmReset(false);
+      if (data.action_link) {
+        setResetLinkDialog({
+          link: data.action_link,
+          emailSent: Boolean(data.email_sent),
+          emailError: data.email_error ?? null,
+        });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -595,20 +650,7 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
                           className="absolute left-0 top-0 w-full border-b border-border/60 px-2 py-2"
                           style={{ transform: `translateY(${vi.start}px)` }}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-xs font-medium">
-                                {String(item.action_type || '')} · {String(item.entity_type || '')}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {item.created_at
-                                  ? format(new Date(String(item.created_at)), 'dd/MM/yyyy HH:mm:ss', { locale: fr })
-                                  : ''}
-                              </p>
-                            </div>
-                            <Activity className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          </div>
-                          <JsonDiffBlock changes={item.changes} />
+                          <ActivityEntry item={item as Record<string, unknown>} />
                         </div>
                       );
                     })}
@@ -649,7 +691,7 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
                         <thead>
                           <tr className="bg-muted/50">
                             <th className="p-2 text-left">Section</th>
-                            {ACTIONS.map((a) => (
+                            {ADMIN_PERM_ACTIONS.map((a) => (
                               <th key={a} className="p-2">
                                 {a}
                               </th>
@@ -657,10 +699,10 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
                           </tr>
                         </thead>
                         <tbody>
-                          {SCOPES.map((s) => (
+                          {ADMIN_PERM_SCOPES.map((s) => (
                             <tr key={s} className="border-t border-border">
                               <td className="p-2 capitalize">{s}</td>
-                              {ACTIONS.map((a) => (
+                              {ADMIN_PERM_ACTIONS.map((a) => (
                                 <td key={a} className="p-2 text-center">
                                   <input
                                     type="checkbox"
@@ -682,7 +724,7 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
                     </div>
                     <p className="text-xs font-semibold">{adminProfileCopy.permissions.pagesTitle}</p>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {PAGE_KEYS.map((pk) => (
+                      {ADMIN_PAGE_ACCESS_KEYS.map((pk) => (
                         <label key={pk.path} className="flex items-center gap-2 text-xs">
                           <input
                             type="checkbox"
@@ -835,6 +877,52 @@ export function AdminProfileSheet({ user, open, onOpenChange, isSuperAdminTarget
         confirmLabel="Envoyer"
         onConfirm={() => void resetMut.mutateAsync()}
       />
+
+      <Dialog
+        open={Boolean(resetLinkDialog)}
+        onOpenChange={(o) => {
+          if (!o) setResetLinkDialog(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Réinitialisation du mot de passe</DialogTitle>
+            <DialogDescription>
+              {resetLinkDialog?.emailSent
+                ? 'Un email avec le lien a été envoyé (si la boîte du destinataire accepte l’expéditeur).'
+                : 'Copiez le lien ci-dessous ou configurez l’envoi e-mail (ENABLE_OUTBOUND_EMAIL).'}
+            </DialogDescription>
+          </DialogHeader>
+          {resetLinkDialog?.emailError ? (
+            <p className="text-sm text-destructive">{formatOutboundEmailError(resetLinkDialog.emailError)}</p>
+          ) : null}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Lien de récupération</Label>
+            <ScrollArea className="max-h-[min(200px,40vh)] w-full rounded-md border border-border">
+              <p className="break-all p-3 font-mono text-[11px] leading-relaxed">{resetLinkDialog?.link || ''}</p>
+            </ScrollArea>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setResetLinkDialog(null)}>
+              Fermer
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!resetLinkDialog?.link) return;
+                try {
+                  await navigator.clipboard.writeText(resetLinkDialog.link);
+                  toast.success('Lien copié');
+                } catch {
+                  toast.error('Copie impossible');
+                }
+              }}
+            >
+              Copier le lien
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cloneOpen} onOpenChange={setCloneOpen}>
         <DialogContent>

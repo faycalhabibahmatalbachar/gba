@@ -57,8 +57,9 @@ export const adminProfileCopy = {
   },
   confirm: {
     suspendPhrase: 'SUSPENDRE',
-    revokePhrase: 'RÉVOQUER',
-    resetPhrase: 'RÉINITIALISER',
+    /** Saisie sans accents (évite les erreurs de clavier). */
+    revokePhrase: 'REVOQUER',
+    resetPhrase: 'REINITIALISER',
   },
   errors: {
     loadProfile: 'Impossible de charger le profil administrateur.',

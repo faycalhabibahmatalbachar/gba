@@ -442,7 +442,7 @@ export function UserDriverSheet({ user, open, onOpenChange }: UserDriverSheetPro
         onOpenChange={setRevokeOpen}
         title="Révoquer toutes les sessions"
         description="Déconnexion de tous les appareils pour ce livreur."
-        confirmationPhrase="RÉVOQUER"
+        confirmationPhrase="REVOQUER"
         confirmLabel="Révoquer"
         onConfirm={() => void sessionsDel.mutateAsync()}
         variant="destructive"

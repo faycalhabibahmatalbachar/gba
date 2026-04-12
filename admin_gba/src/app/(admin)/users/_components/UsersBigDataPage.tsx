@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import {
   Bar,
   BarChart,
@@ -33,6 +33,7 @@ import {
   RefreshCw,
   Shield,
   Unlock,
+  Trash2,
   UserPlus,
   Users,
 } from 'lucide-react';
@@ -40,7 +41,8 @@ import {
 import { PageHeader } from '@/components/shared/PageHeader';
 import { KPICard } from '@/components/shared/KPICard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { DataTable } from '@/components/shared/DataTable';
+import { DataTable, dataTableSelectColumn } from '@/components/shared/DataTable';
+import { ConfirmModal } from '@/components/shared/ConfirmModal';
 import { ChartWrapper } from '@/components/shared/ChartWrapper';
 import { Drawer } from '@/components/shared/Drawer';
 import { AvatarWithInitials } from '@/components/shared/AvatarWithInitials';
@@ -68,6 +70,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatApiError } from '@/lib/format-api-error';
 import { formatOutboundEmailError } from '@/lib/email/format-outbound-error';
@@ -161,6 +164,9 @@ export default function UsersBigDataPage() {
     emailSent: boolean;
     emailError?: string | null;
   } | null>(null);
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [bulkDeleteOpen, setBulkDeleteOpen] = React.useState(false);
+  const [singleDeleteRow, setSingleDeleteRow] = React.useState<Row | null>(null);
 
   const meQ = useQuery({
     queryKey: ['admin-me'],
@@ -312,8 +318,50 @@ export default function UsersBigDataPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const bulkMut = useMutation({
+    mutationFn: async (action: 'suspend' | 'reactivate' | 'delete') => {
+      const user_ids = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+      if (!user_ids.length) throw new Error('Sélectionnez au moins un compte');
+      const r = await fetch('/api/users/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_ids, action }),
+      });
+      const j = (await r.json()) as { error?: string; processed?: number; errors?: string[] };
+      if (!r.ok) throw new Error(formatApiError(j, 'Action lot échouée'));
+      return j;
+    },
+    onSuccess: (data, action) => {
+      const n = data.processed ?? 0;
+      toast.success(action === 'delete' ? `${n} compte(s) supprimé(s)` : `${n} compte(s) mis à jour`);
+      if (data.errors?.length) toast.message(data.errors.slice(0, 3).join(' · '));
+      setRowSelection({});
+      setBulkDeleteOpen(false);
+      void inf.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteUserMut = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/users/${id}`, { method: 'DELETE', credentials: 'include' });
+      const j = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(j.error || 'Suppression échouée');
+    },
+    onSuccess: () => {
+      toast.success('Compte supprimé');
+      setSingleDeleteRow(null);
+      void inf.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const selectedCount = Object.keys(rowSelection).filter((id) => rowSelection[id]).length;
+
   const columns = React.useMemo<ColumnDef<Row>[]>(
     () => [
+      dataTableSelectColumn<Row>(),
       {
         id: 'u',
         header: 'Utilisateur',
@@ -452,12 +500,18 @@ export default function UsersBigDataPage() {
                   Bloquer
                 </DropdownMenuItem>
               )}
+              {meQ.data?.isSuperAdmin ? (
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setSingleDeleteRow(row.original)}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Supprimer le compte
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         ),
       },
     ],
-    [pwdResetMut, sessionsRevokeMut, unblockMut],
+    [pwdResetMut, sessionsRevokeMut, unblockMut, deleteUserMut, meQ.data?.isSuperAdmin],
   );
 
   const filterChips = React.useMemo(() => {
@@ -886,27 +940,51 @@ export default function UsersBigDataPage() {
               </Button>
             </Card>
           ) : (
-            <DataTable
-              columns={columns}
-              data={flat}
-              isLoading={loading}
-              emptyTitle="Aucun utilisateur"
-              emptyDescription="Ajustez les filtres ou attendez les premières inscriptions."
-              emptyAction={
-                <Button variant="outline" size="sm" onClick={() => void inf.refetch()}>
-                  Actualiser
-                </Button>
-              }
-              cursorFooter={
-                inf.hasNextPage ? (
-                  <div className="flex justify-center py-2">
-                    <Button variant="ghost" size="sm" onClick={() => void inf.fetchNextPage()} disabled={inf.isFetchingNextPage}>
-                      {inf.isFetchingNextPage ? 'Chargement…' : 'Charger la suite'}
+            <>
+              {selectedCount > 0 ? (
+                <Card className="flex flex-wrap items-center gap-2 border-[var(--gba-brand)]/25 bg-[color-mix(in_srgb,var(--gba-brand)_6%,transparent)] p-3">
+                  <span className="text-sm font-medium">{selectedCount} sélectionné(s)</span>
+                  <Button size="sm" variant="secondary" disabled={bulkMut.isPending} onClick={() => bulkMut.mutate('suspend')}>
+                    Suspendre
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => bulkMut.mutate('reactivate')}>
+                    Réactiver
+                  </Button>
+                  {meQ.data?.isSuperAdmin ? (
+                    <Button size="sm" variant="destructive" disabled={bulkMut.isPending} onClick={() => setBulkDeleteOpen(true)}>
+                      Supprimer
                     </Button>
-                  </div>
-                ) : null
-              }
-            />
+                  ) : null}
+                  <Button size="sm" variant="ghost" onClick={() => setRowSelection({})}>
+                    Effacer la sélection
+                  </Button>
+                </Card>
+              ) : null}
+              <DataTable
+                columns={columns}
+                data={flat}
+                enableRowSelection
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                isLoading={loading}
+                emptyTitle="Aucun utilisateur"
+                emptyDescription="Ajustez les filtres ou attendez les premières inscriptions."
+                emptyAction={
+                  <Button variant="outline" size="sm" onClick={() => void inf.refetch()}>
+                    Actualiser
+                  </Button>
+                }
+                cursorFooter={
+                  inf.hasNextPage ? (
+                    <div className="flex justify-center py-2">
+                      <Button variant="ghost" size="sm" onClick={() => void inf.fetchNextPage()} disabled={inf.isFetchingNextPage}>
+                        {inf.isFetchingNextPage ? 'Chargement…' : 'Charger la suite'}
+                      </Button>
+                    </div>
+                  ) : null
+                }
+              />
+            </>
           )}
         </TabsContent>
       </Tabs>
@@ -938,8 +1016,10 @@ export default function UsersBigDataPage() {
             <p className="text-sm text-destructive">{formatOutboundEmailError(pwdResetDialog.emailError)}</p>
           ) : null}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Lien (copier-coller)</Label>
-            <Textarea readOnly rows={4} value={pwdResetDialog?.link || ''} className="font-mono text-[11px]" />
+            <Label className="text-xs text-muted-foreground">Lien de récupération</Label>
+            <ScrollArea className="max-h-[min(200px,40vh)] w-full rounded-md border border-border">
+              <p className="break-all p-3 font-mono text-[11px] leading-relaxed">{pwdResetDialog?.link || ''}</p>
+            </ScrollArea>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => setPwdResetDialog(null)}>
@@ -1017,6 +1097,38 @@ export default function UsersBigDataPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmModal
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title="Supprimer les comptes sélectionnés"
+        description={`${selectedCount} compte(s) seront supprimés définitivement. Les comptes administrateur ne peuvent pas être supprimés depuis cette liste.`}
+        confirmationPhrase="SUPPRIMER"
+        confirmLabel="Supprimer"
+        variant="destructive"
+        loading={bulkMut.isPending}
+        onConfirm={() => void bulkMut.mutateAsync('delete')}
+      />
+
+      <ConfirmModal
+        open={Boolean(singleDeleteRow)}
+        onOpenChange={(o) => {
+          if (!o) setSingleDeleteRow(null);
+        }}
+        title="Supprimer le compte"
+        description={
+          singleDeleteRow
+            ? `${displayName(singleDeleteRow)} — ${String(singleDeleteRow.email || '')}`
+            : undefined
+        }
+        confirmationPhrase="SUPPRIMER"
+        confirmLabel="Supprimer"
+        variant="destructive"
+        loading={deleteUserMut.isPending}
+        onConfirm={() => {
+          if (singleDeleteRow) void deleteUserMut.mutateAsync(singleDeleteRow.id);
+        }}
+      />
 
       <Dialog open={bulkBroadcastOpen} onOpenChange={setBulkBroadcastOpen}>
         <DialogContent>

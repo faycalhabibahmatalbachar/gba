@@ -6,12 +6,9 @@ import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
-const permSchema = z.object({
-  read: z.boolean().optional(),
-  create: z.boolean().optional(),
-  update: z.boolean().optional(),
-  delete: z.boolean().optional(),
-});
+/** Même forme que `PATCH /api/admin/[id]/permissions` (matrix + accès pages). */
+const matrixSchema = z.record(z.string(), z.record(z.string(), z.boolean()));
+const pageAccessSchema = z.record(z.string(), z.boolean());
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -19,18 +16,8 @@ const bodySchema = z.object({
   first_name: z.string().min(1).max(120),
   last_name: z.string().min(1).max(120),
   role: z.enum(['admin', 'superadmin']),
-  permissions: z
-    .object({
-      products: permSchema.optional(),
-      orders: permSchema.optional(),
-      users: permSchema.optional(),
-      drivers: permSchema.optional(),
-      reports: permSchema.optional(),
-      settings: permSchema.optional(),
-      audit: permSchema.optional(),
-      notifications: permSchema.optional(),
-    })
-    .optional(),
+  permissions: matrixSchema.optional(),
+  page_access: pageAccessSchema.optional(),
 });
 
 export async function POST(req: Request) {
@@ -57,7 +44,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { email, password, first_name, last_name, role, permissions } = parsed.data;
+    const { email, password, first_name, last_name, role, permissions, page_access } = parsed.data;
 
     const { data: created, error: ce } = await sb.auth.admin.createUser({
       email,
@@ -102,6 +89,18 @@ export async function POST(req: Request) {
       );
     }
 
+    if (page_access && Object.keys(page_access).length) {
+      await sb.from('settings').upsert(
+        {
+          key: `admin_page_access_${uid}`,
+          value: page_access as unknown as Record<string, unknown>,
+          updated_at: new Date().toISOString(),
+          updated_by: auth.userId,
+        },
+        { onConflict: 'key' },
+      );
+    }
+
     const actorRole = await fetchActorRole(auth.userId);
     await writeAuditLog({
       actorUserId: auth.userId,
@@ -111,7 +110,7 @@ export async function POST(req: Request) {
       entityType: 'user',
       entityId: uid,
       entityName: email,
-      changes: { after: { role, permissions } },
+      changes: { after: { role, permissions, page_access } },
       description: 'Création compte admin',
     });
 
