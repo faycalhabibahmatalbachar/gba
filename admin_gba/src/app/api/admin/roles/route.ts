@@ -20,7 +20,7 @@ export async function GET() {
   try {
     const { data: rows, error } = await sb
       .from('profiles')
-      .select('id, email, first_name, last_name, role, avatar_url, created_at, last_seen_at')
+      .select('id, email, first_name, last_name, role, avatar_url, created_at, last_seen_at, is_suspended, is_online')
       .in('role', ['admin', 'superadmin', 'super_admin'])
       .order('created_at', { ascending: false })
       .limit(200);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
@@ -27,7 +27,7 @@ const patchSchema = z.object({
 });
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('users', 'read');
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;
@@ -53,6 +53,106 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
     if (pe) throw pe;
     if (!profile) return NextResponse.json({ error: 'Introuvable' }, { status: 404 });
+
+    const roleNorm = String(profile.role || '').toLowerCase();
+    const isAdminLike = ['admin', 'superadmin', 'super_admin'].includes(roleNorm);
+    const isDriver = roleNorm === 'driver';
+
+    let last_sign_in_at: string | null = null;
+    try {
+      const { data: au } = await sb.auth.admin.getUserById(id);
+      last_sign_in_at = au.user?.last_sign_in_at ?? null;
+    } catch {
+      /* ignore */
+    }
+
+    /** Fiches admin / superadmin : aucune métrique e-commerce. */
+    if (isAdminLike) {
+      const tc = await loadTokenCounts(sb, [id]);
+      const sessions = await loadUserSessionRows(sb, id);
+      const { data: roleAudits } = await sb
+        .from('audit_logs')
+        .select('id, created_at, user_id, action_type, entity_type, changes, metadata')
+        .eq('entity_type', 'user')
+        .eq('entity_id', id)
+        .order('created_at', { ascending: false })
+        .limit(40);
+      const { data: tokens } = await sb
+        .from('device_tokens')
+        .select('id, token, platform, device_model, is_valid, last_seen_at, last_active_at, updated_at, created_at')
+        .eq('user_id', id)
+        .order('updated_at', { ascending: false })
+        .limit(50);
+      const nc = await loadNotificationCounts(sb, [id]);
+      return NextResponse.json({
+        profile: { ...profile, last_sign_in_at },
+        stats: {
+          orders_count: 0,
+          total_spent: 0,
+          ltv_score: null,
+          device_tokens_count: tc[id] || 0,
+          notifications_received_count: nc[id] || 0,
+          reorder_rate: 0,
+          avg_basket: 0,
+          delivered_count: 0,
+        },
+        bigdata: null,
+        orders: [],
+        payments: [],
+        device_tokens: tokens || [],
+        activities: [],
+        sessions: sessions || [],
+        role_audit_samples: roleAudits || [],
+        user_behaviors: [],
+      });
+    }
+
+    /** Livreur : pas de tunnel e-commerce client. */
+    if (isDriver) {
+      const tc = await loadTokenCounts(sb, [id]);
+      const nc = await loadNotificationCounts(sb, [id]);
+      const sessions = await loadUserSessionRows(sb, id);
+      const { data: roleAudits } = await sb
+        .from('audit_logs')
+        .select('id, created_at, user_id, action_type, entity_type, changes, metadata')
+        .eq('entity_type', 'user')
+        .eq('entity_id', id)
+        .order('created_at', { ascending: false })
+        .limit(40);
+      const { data: tokens } = await sb
+        .from('device_tokens')
+        .select('id, token, platform, device_model, is_valid, last_seen_at, last_active_at, updated_at, created_at')
+        .eq('user_id', id)
+        .order('updated_at', { ascending: false })
+        .limit(50);
+      const { data: activities } = await sb
+        .from('user_activities')
+        .select('id, action_type, entity_type, entity_id, action_details, created_at')
+        .eq('user_id', id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      return NextResponse.json({
+        profile: { ...profile, last_sign_in_at },
+        stats: {
+          orders_count: 0,
+          total_spent: 0,
+          ltv_score: null,
+          device_tokens_count: tc[id] || 0,
+          notifications_received_count: nc[id] || 0,
+          reorder_rate: 0,
+          avg_basket: 0,
+          delivered_count: 0,
+        },
+        bigdata: null,
+        orders: [],
+        payments: [],
+        device_tokens: tokens || [],
+        activities: activities || [],
+        sessions: sessions || [],
+        role_audit_samples: roleAudits || [],
+        user_behaviors: [],
+      });
+    }
 
     const { orderCount, spent } = await loadOrderAggregatesForUsers(sb, [id]);
     const tc = await loadTokenCounts(sb, [id]);
@@ -113,14 +213,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       if (t === 'favorite_add' || t === 'fav_add') return 'wishlist';
       return t || 'view';
     };
-
-    let last_sign_in_at: string | null = null;
-    try {
-      const { data: au } = await sb.auth.admin.getUserById(id);
-      last_sign_in_at = au.user?.last_sign_in_at ?? null;
-    } catch {
-      /* ignore */
-    }
 
     const yearAgo = new Date(Date.now() - 365 * 86400000).toISOString();
     const { data: ordersYear } = await sb
@@ -203,7 +295,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('users', 'update');
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;

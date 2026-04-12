@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireAdminPermission } from '@/app/api/_lib/admin-permission';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { fetchActorRole, writeAuditLog } from '@/lib/audit/server-audit';
 import {
@@ -36,7 +36,7 @@ function parseNum(s: string | null): number | undefined {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('users', 'read');
   if (!auth.ok) return auth.response;
 
   let sb: ReturnType<typeof getServiceSupabase>;
@@ -393,7 +393,7 @@ type CreateUserBody = {
 };
 
 export async function POST(req: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminPermission('users', 'create');
   if (!auth.ok) return auth.response;
 
   let body: CreateUserBody;

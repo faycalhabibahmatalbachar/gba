@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import { KeyRound, UserPlus } from 'lucide-react';
@@ -22,7 +24,16 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-type AdminRow = Record<string, unknown> & { id: string; email?: string; first_name?: string; last_name?: string; role?: string };
+type AdminRow = Record<string, unknown> & {
+  id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  is_suspended?: boolean | null;
+  last_seen_at?: string | null;
+  is_online?: boolean | null;
+};
 
 const SECTIONS = ['products', 'orders', 'users', 'drivers', 'reports', 'settings', 'audit', 'notifications'] as const;
 const ACTIONS = ['read', 'create', 'update', 'delete'] as const;
@@ -36,6 +47,7 @@ function randomPassword() {
 
 export function UsersAdminSection() {
   const qc = useQueryClient();
+  const [adminFilter, setAdminFilter] = React.useState<'all' | 'suspended' | 'active'>('all');
   const [open, setOpen] = React.useState(false);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -85,6 +97,13 @@ export function UsersAdminSection() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const filteredAdmins = React.useMemo(() => {
+    const list = q.data?.admins || [];
+    if (adminFilter === 'suspended') return list.filter((a) => a.is_suspended);
+    if (adminFilter === 'active') return list.filter((a) => !a.is_suspended);
+    return list;
+  }, [q.data?.admins, adminFilter]);
+
   const columns = React.useMemo<ColumnDef<AdminRow>[]>(
     () => [
       {
@@ -105,6 +124,31 @@ export function UsersAdminSection() {
       },
       { id: 'em', header: 'Email', cell: ({ row }) => <span className="text-xs">{String(row.original.email)}</span> },
       { id: 'r', header: 'Rôle', cell: ({ row }) => <StatusBadge status={String(row.original.role || '')} /> },
+      {
+        id: 'st',
+        header: 'Statut',
+        cell: ({ row }) => (
+          <div className="flex flex-wrap gap-1">
+            {row.original.is_suspended ? <StatusBadge status="suspended" /> : <StatusBadge status="active" />}
+            {row.original.is_online ? (
+              <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-700">
+                En ligne
+              </span>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        id: 'seen',
+        header: 'Dernière activité',
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {row.original.last_seen_at
+              ? formatDistanceToNow(new Date(String(row.original.last_seen_at)), { addSuffix: true, locale: fr })
+              : '—'}
+          </span>
+        ),
+      },
     ],
     [],
   );
@@ -118,7 +162,20 @@ export function UsersAdminSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Filtre :</span>
+          <Select value={adminFilter} onValueChange={(v) => setAdminFilter((v as typeof adminFilter) ?? 'all')}>
+            <SelectTrigger className="h-8 w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les administrateurs</SelectItem>
+              <SelectItem value="active">Comptes actifs</SelectItem>
+              <SelectItem value="suspended">Suspendus</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <Button size="sm" onClick={() => { setPassword(randomPassword()); setOpen(true); }}>
           <UserPlus className="h-3.5 w-3.5 mr-1" />
           Créer admin
@@ -127,7 +184,7 @@ export function UsersAdminSection() {
       <Card className="p-0 overflow-hidden border-border">
         <DataTable
           columns={columns}
-          data={q.data?.admins || []}
+          data={filteredAdmins}
           isLoading={q.isLoading}
           emptyTitle="Aucun admin listé"
           emptyDescription="Créez un compte administrateur."
