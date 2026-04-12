@@ -284,44 +284,96 @@ export async function GET(req: Request) {
     return filtered.order(sortBy, { ascending }).range(offset, offset + pageSize - 1);
   };
 
+  const logOrdersStep = (step: string, err: { message?: string; code?: string } | null) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+      body: JSON.stringify({
+        sessionId: '789a98',
+        location: 'api/orders/route.ts:GET',
+        message: `orders select step: ${step}`,
+        data: {
+          hypothesisId: 'H2',
+          step,
+          supabaseMessage: String(err?.message ?? '').slice(0, 500),
+          supabaseCode: String(err?.code ?? ''),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  };
+
   let res = await runSelect(SELECT_FULL, true);
   if (res.error) {
+    logOrdersStep('after_SELECT_FULL_meta_true', res.error);
     const msg = String(res.error.message || '');
     if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
       res = await runSelect(SELECT_FULL, false);
     }
   }
   if (res.error) {
+    logOrdersStep('after_SELECT_FULL_retry', res.error);
     const msg = String(res.error.message || '');
     if (msg.includes('driver_profile') || msg.includes('orders_driver_id_fkey') || msg.includes('Could not find')) {
       res = await runSelect(SELECT_NO_DRIVER, true);
     }
   }
   if (res.error) {
+    logOrdersStep('after_SELECT_FULL_embed_items', res.error);
     const msg = String(res.error.message || '');
-    if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
-      res = await runSelect(SELECT_NO_DRIVER, false);
-    }
-  }
-  if (res.error) {
-    const msg = String(res.error.message || '');
-    if (msg.includes('products') || msg.includes('relationship')) {
+    if (
+      msg.includes('products') ||
+      msg.includes('relationship') ||
+      msg.includes('order_items') ||
+      msg.includes('product_name')
+    ) {
       res = await runSelect(SELECT_NO_PRODUCTS, true);
     }
   }
   if (res.error) {
+    logOrdersStep('after_SELECT_NO_PRODUCTS_post_full', res.error);
     const msg = String(res.error.message || '');
     if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
       res = await runSelect(SELECT_NO_PRODUCTS, false);
     }
   }
   if (res.error) {
+    logOrdersStep('after_SELECT_NO_DRIVER_meta_true', res.error);
+    const msg = String(res.error.message || '');
+    if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
+      res = await runSelect(SELECT_NO_DRIVER, false);
+    }
+  }
+  if (res.error) {
+    logOrdersStep('after_SELECT_NO_DRIVER_retry', res.error);
+    const msg = String(res.error.message || '');
+    if (
+      msg.includes('products') ||
+      msg.includes('relationship') ||
+      msg.includes('order_items') ||
+      msg.includes('product_name')
+    ) {
+      res = await runSelect(SELECT_NO_PRODUCTS, true);
+    }
+  }
+  if (res.error) {
+    logOrdersStep('after_SELECT_NO_PRODUCTS_meta_true', res.error);
+    const msg = String(res.error.message || '');
+    if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
+      res = await runSelect(SELECT_NO_PRODUCTS, false);
+    }
+  }
+  if (res.error) {
+    logOrdersStep('after_SELECT_NO_PRODUCTS_retry', res.error);
     const msg = String(res.error.message || '');
     if (msg.includes('metadata') || msg.includes('column orders.metadata does not exist')) {
       res = await runSelect(SELECT_MIN_SAFE, true);
     }
   }
   if (res.error) {
+    logOrdersStep('after_SELECT_MIN_SAFE_meta_true', res.error);
     const msg = String(res.error.message || '');
     if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
       res = await runSelect(SELECT_MIN_SAFE, false);
@@ -354,7 +406,27 @@ export async function GET(req: Request) {
   }
 
   const rows = (res.data ?? []) as unknown as OrderEmbedRow[];
-  const mapped = rows.map(mapOrderRow);
+  let mapped: ReturnType<typeof mapOrderRow>[];
+  try {
+    mapped = rows.map(mapOrderRow);
+  } catch (mapErr) {
+    const m = mapErr instanceof Error ? mapErr.message : String(mapErr);
+    console.error('[/api/orders] mapOrderRow:', m);
+    // #region agent log
+    fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+      body: JSON.stringify({
+        sessionId: '789a98',
+        location: 'api/orders/route.ts:GET:map',
+        message: 'mapOrderRow threw',
+        data: { hypothesisId: 'H4', errMsg: m.slice(0, 400), rowCount: rows.length },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    return NextResponse.json({ error: 'Erreur lors du formatage des commandes' }, { status: 500 });
+  }
 
   return NextResponse.json({
     data: mapped,

@@ -8,6 +8,17 @@ export const dynamic = 'force-dynamic';
 
 const PAGE = 40;
 
+/** Schéma étendu (migrations admin). Si colonnes absentes en base → repli DRIVER_SELECT_MIN. */
+const DRIVER_SELECT_FULL =
+  'id, user_id, name, phone, is_active, is_online, is_available, vehicle_type, vehicle_plate, vehicle_color, current_lat, current_lng, last_location_at, rating_avg, total_deliveries, total_earnings, documents, created_at, updated_at';
+
+const DRIVER_SELECT_MIN = 'id, user_id, name, phone, is_active, created_at, updated_at';
+
+const DRIVER_SELECT_AVAILABLE_FULL =
+  'id, user_id, vehicle_type, vehicle_plate, rating_avg, is_online, is_available, current_lat, current_lng, last_location_at';
+
+const DRIVER_SELECT_AVAILABLE_MIN = 'id, user_id, is_online, is_available';
+
 function decodeCursor(s: string | null): { c: string; i: string } | null {
   if (!s) return null;
   try {
@@ -76,15 +87,25 @@ export async function GET(req: Request) {
 
   if (availableOnly && simpleLimit) {
     const lim = Math.min(100, Math.max(1, parseInt(simpleLimit, 10) || 50));
-    const { data: drows, error: derr } = await sb
+    let dres = await sb
       .from('drivers')
-      .select(
-        'id, user_id, vehicle_type, vehicle_plate, rating_avg, is_online, is_available, current_lat, current_lng, last_location_at',
-      )
+      .select(DRIVER_SELECT_AVAILABLE_FULL)
       .eq('is_available', true)
       .eq('is_online', true)
       .order('rating_avg', { ascending: false })
       .limit(lim);
+    if (dres.error) {
+      console.error('[api/drivers] available list full:', dres.error.message);
+      dres = (await sb
+        .from('drivers')
+        .select(DRIVER_SELECT_AVAILABLE_MIN)
+        .eq('is_available', true)
+        .eq('is_online', true)
+        .order('created_at', { ascending: false })
+        .limit(lim)) as typeof dres;
+    }
+    const derr = dres.error;
+    const drows = dres.data;
     if (derr) {
       return NextResponse.json({ drivers: [], total: 0, error: derr.message }, { status: 500 });
     }
@@ -137,28 +158,32 @@ export async function GET(req: Request) {
   try {
     const searchMode = Boolean(q);
 
-    let query = sb
-      .from('drivers')
-      .select(
-        'id, user_id, name, phone, is_active, is_online, is_available, vehicle_type, vehicle_plate, vehicle_color, current_lat, current_lng, last_location_at, rating_avg, total_deliveries, total_earnings, documents, created_at, updated_at',
-        searchMode ? undefined : { count: 'exact' },
-      )
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false });
-
-    if (searchMode) {
-      query = query.limit(300);
-    } else {
-      query = query.limit(PAGE + 1);
-      if (cursor) {
-        query = query.or(`created_at.lt.${cursor.c},and(created_at.eq.${cursor.c},id.lt.${cursor.i})`);
+    const buildListQuery = (selectStr: string) => {
+      let q = sb
+        .from('drivers')
+        .select(selectStr, searchMode ? undefined : { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
+      if (searchMode) {
+        q = q.limit(300);
+      } else {
+        q = q.limit(PAGE + 1);
+        if (cursor) {
+          q = q.or(`created_at.lt.${cursor.c},and(created_at.eq.${cursor.c},id.lt.${cursor.i})`);
+        }
       }
-    }
+      return q;
+    };
 
-    const { data: rows, error, count } = await query;
+    let listRes = await buildListQuery(DRIVER_SELECT_FULL);
+    if (listRes.error) {
+      console.error('[api/drivers] list full:', listRes.error.message);
+      listRes = (await buildListQuery(DRIVER_SELECT_MIN)) as typeof listRes;
+    }
+    const { data: rows, error, count } = listRes;
     if (error) throw error;
 
-    let list = rows || [];
+    let list = (rows ? (rows as unknown as Record<string, unknown>[]) : []) as Record<string, unknown>[];
     const hasMore = !searchMode && list.length > PAGE;
     if (hasMore) list = list.slice(0, PAGE);
 
@@ -170,7 +195,6 @@ export async function GET(req: Request) {
         email: string | null;
         first_name: string | null;
         last_name: string | null;
-        full_name: string | null;
         phone: string | null;
         avatar_url: string | null;
         city: string | null;
@@ -179,10 +203,20 @@ export async function GET(req: Request) {
     > = {};
 
     if (userIds.length) {
-      const { data: profs, error: pe } = await sb
+      // Pas de full_name ici : colonne absente sur plusieurs déploiements (schéma = first_name/last_name).
+      let pres = await sb
         .from('profiles')
-        .select('id, email, first_name, last_name, full_name, phone, avatar_url, city, country')
+        .select('id, email, first_name, last_name, phone, avatar_url, city, country')
         .in('id', userIds);
+      if (pres.error) {
+        console.error('[api/drivers] profiles full:', pres.error.message);
+        pres = (await sb.from('profiles').select('id, email, first_name, last_name, avatar_url').in('id', userIds)) as typeof pres;
+      }
+      if (pres.error) {
+        console.error('[api/drivers] profiles mid:', pres.error.message);
+        pres = (await sb.from('profiles').select('id, first_name, last_name').in('id', userIds)) as typeof pres;
+      }
+      const { data: profs, error: pe } = pres;
       if (pe) throw pe;
       for (const p of profs || []) {
         const r = p as Record<string, unknown>;
@@ -190,7 +224,6 @@ export async function GET(req: Request) {
           email: (r.email as string) ?? null,
           first_name: (r.first_name as string) ?? null,
           last_name: (r.last_name as string) ?? null,
-          full_name: (r.full_name as string) ?? null,
           phone: (r.phone as string) ?? null,
           avatar_url: (r.avatar_url as string) ?? null,
           city: (r.city as string) ?? null,
@@ -228,14 +261,33 @@ export async function GET(req: Request) {
       }
       spentMonth[did] = (spentMonth[did] || 0) + amt;
     }
-    const { data: locRows } = driverIds.length
+    let locPack = driverIds.length
       ? await sb
           .from('driver_locations')
           .select('driver_id, lat, lng, created_at, captured_at, recorded_at')
           .in('driver_id', driverIds)
           .order('captured_at', { ascending: false })
           .limit(500)
-      : { data: [] as Record<string, unknown>[] };
+      : { data: [] as Record<string, unknown>[], error: null as { message: string } | null };
+    if (locPack.error) {
+      console.error('[api/drivers] driver_locations captured_at:', locPack.error.message);
+      locPack = (await sb
+        .from('driver_locations')
+        .select('driver_id, lat, lng, created_at, recorded_at')
+        .in('driver_id', driverIds)
+        .order('recorded_at', { ascending: false })
+        .limit(500)) as typeof locPack;
+    }
+    if (locPack.error) {
+      console.error('[api/drivers] driver_locations recorded_at:', locPack.error.message);
+      locPack = (await sb
+        .from('driver_locations')
+        .select('driver_id, lat, lng, created_at')
+        .in('driver_id', driverIds)
+        .order('created_at', { ascending: false })
+        .limit(500)) as typeof locPack;
+    }
+    const locRows = (locPack.error ? [] : locPack.data) as Record<string, unknown>[];
 
     const latestLoc: Record<string, { lat: number; lng: number; at: string }> = {};
     for (const L of locRows || []) {
@@ -256,7 +308,6 @@ export async function GET(req: Request) {
       const pk = String(d.id);
       const p = uid ? profMap[uid] : undefined;
       const display =
-        p?.full_name?.trim() ||
         [p?.first_name, p?.last_name].filter(Boolean).join(' ').trim() ||
         (d.name as string) ||
         '—';
@@ -287,10 +338,11 @@ export async function GET(req: Request) {
     if (searchMode) {
       const qq = q.toLowerCase();
       const filtered = enriched.filter((row) => {
+        const r = row as Record<string, unknown>;
         const nm = String(row.profile?.display_name || '').toLowerCase();
         const em = String(row.profile?.email || '').toLowerCase();
-        const ph = String(row.profile?.phone || row.phone || '').toLowerCase();
-        const pl = String(row.vehicle_plate || '').toLowerCase();
+        const ph = String(row.profile?.phone || r.phone || '').toLowerCase();
+        const pl = String(r.vehicle_plate || '').toLowerCase();
         return nm.includes(qq) || em.includes(qq) || ph.includes(qq) || pl.includes(qq);
       });
       return NextResponse.json({
@@ -314,6 +366,24 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur';
+    console.error('[api/drivers] GET catch:', msg);
+    // #region agent log
+    fetch('http://127.0.0.1:7316/ingest/cbc4d87d-0063-4626-a2b8-cd3c21b6e6d2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '789a98' },
+      body: JSON.stringify({
+        sessionId: '789a98',
+        location: 'api/drivers/route.ts:GET:catch',
+        message: 'drivers GET error',
+        data: {
+          hypothesisId: 'H1',
+          errMsg: msg.slice(0, 400),
+          code: e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code) : '',
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
