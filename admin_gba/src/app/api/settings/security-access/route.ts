@@ -35,9 +35,13 @@ export async function GET() {
     enforce_ip_allowlist: false,
   };
   const v = (data?.value as Record<string, unknown>) || {};
+  const rawBc = Array.isArray(v.blocked_countries) ? (v.blocked_countries as string[]) : defaults.blocked_countries;
+  /** Affichage : si aucun pays stocké, proposer RU/CN/KP comme base (à enregistrer explicitement si besoin). */
+  const blocked_countries =
+    rawBc.length > 0 ? rawBc.map((x) => String(x).trim().toUpperCase()).filter(Boolean) : ['RU', 'CN', 'KP'];
   return NextResponse.json({
     data: {
-      blocked_countries: Array.isArray(v.blocked_countries) ? v.blocked_countries : defaults.blocked_countries,
+      blocked_countries,
       max_admin_connections_per_hour: Number(v.max_admin_connections_per_hour ?? defaults.max_admin_connections_per_hour),
       enforce_country_block: Boolean(v.enforce_country_block ?? defaults.enforce_country_block),
       enforce_ip_allowlist: Boolean(v.enforce_ip_allowlist ?? defaults.enforce_ip_allowlist),

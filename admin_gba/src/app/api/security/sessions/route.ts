@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { UAParser } from 'ua-parser-js';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { lookupGeoIp } from '@/lib/geoip/lookup';
 
@@ -39,7 +39,7 @@ async function geoBatch(ips: string[]): Promise<Map<string, { country?: string; 
 }
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requireSuperAdmin();
   if (!auth.ok) return auth.response;
 
   let sb: ReturnType<typeof getServiceSupabase>;

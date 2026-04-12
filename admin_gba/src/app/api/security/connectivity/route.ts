@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ const schema = z.object({
 
 /** Teste la connectivité HTTP(S) vers des URLs (diagnostic réseau admin). */
 export async function POST(req: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireSuperAdmin();
   if (!auth.ok) return auth.response;
 
   let body: unknown;

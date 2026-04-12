@@ -24,7 +24,7 @@ import {
   Send,
 } from 'lucide-react';
 
-import { PageHeader } from '@/components/ui/custom/PageHeader';
+import { AdminDrawer } from '@/components/ui/custom/AdminDrawer';
 import { MapWrapper } from '@/components/ui/custom/MapWrapper';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -36,6 +36,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { ConfirmModal } from '@/components/shared/ConfirmModal';
 import { cn } from '@/lib/utils';
 import { parseApiJson } from '@/lib/fetch-api-json';
+import { formatSecurityRelativeFr, formatSecurityShortFr } from '@/lib/security/security-time';
+import { humanizeAuditEvent } from '@/lib/security/humanize-audit-event';
+import { humanizeLoginResult } from '@/lib/security/humanize-login-attempt';
+import { labelIpKind } from '@/lib/security/ip-present';
+import { SecuritySideNav } from './SecuritySideNav';
 import { SecurityAccessSection } from './SecurityAccessSection';
 import { SecurityChartsBlock } from './SecurityChartsBlock';
 import { SecurityAuditRealtime, type LiveAuditRow } from './SecurityAuditRealtime';
@@ -45,12 +50,16 @@ type Overview = {
   active_sessions?: number;
   failed_24h?: number;
   blocked_ips?: number;
+  whitelist_count?: number;
   coverage_2fa?: number;
   admins_without_2fa?: number;
   tokens_expired_hint?: number;
+  security_score?: number;
+  score_level?: 'secure' | 'warning' | 'critical';
+  score_details?: { id: string; label: string; points_max: number; points_earned: number; fix_hint: string }[];
+  active_alerts?: { level: string; text: string; action: string }[];
+  recent_events?: { id: string; created_at?: string; human_label?: string; action_type?: string }[];
 };
-
-type ScoreRes = { score: number; level: 'secure' | 'warning' | 'critical'; breakdown?: Record<string, number> };
 
 type SessionRow = {
   id: string;
@@ -89,6 +98,14 @@ type GeoPoint = {
   geo_source?: string | null;
 };
 
+type AnomalyRow = {
+  type: string;
+  admin_id: string;
+  email?: string | null;
+  description: string;
+  severity: string;
+};
+
 async function j<T>(r: Response): Promise<T> {
   const x = (await parseApiJson<T & { error?: string }>(r)) as T & { error?: string };
   if (!r.ok) throw new Error(typeof x.error === 'string' ? x.error : r.statusText);
@@ -119,6 +136,9 @@ export function SecurityCommandCenter() {
     country: '',
     send_chat_broadcast: true,
   });
+  const [kpiDrawer, setKpiDrawer] = React.useState<
+    null | 'sessions' | 'failures' | 'blacklist' | 'twofa' | 'whitelist'
+  >(null);
 
   const appendLive = React.useCallback((row: LiveAuditRow) => {
     setLiveAudit((prev) => [...prev.slice(-60), row]);
@@ -127,12 +147,6 @@ export function SecurityCommandCenter() {
   const overviewQ = useQuery({
     queryKey: ['security-overview'],
     queryFn: async () => j<Overview>(await fetch('/api/security/overview', { credentials: 'include' })),
-    refetchInterval: 30_000,
-  });
-
-  const scoreQ = useQuery({
-    queryKey: ['security-score'],
-    queryFn: async () => j<ScoreRes>(await fetch('/api/security/score', { credentials: 'include' })),
     refetchInterval: 30_000,
   });
 
@@ -181,14 +195,24 @@ export function SecurityCommandCenter() {
   });
 
   const auditFeedQ = useQuery({
-    queryKey: ['security-audit-feed'],
+    queryKey: ['security-events-stream'],
     queryFn: async () => {
-      const r = await fetch('/api/audit?limit=40', { credentials: 'include' });
-      const x = (await r.json()) as { logs?: Record<string, unknown>[] };
-      if (!r.ok) throw new Error('Audit');
-      return x.logs ?? [];
+      const r = await fetch('/api/security/events/stream', { credentials: 'include' });
+      const x = (await r.json()) as { data?: Record<string, unknown>[]; error?: string };
+      if (!r.ok) throw new Error(x.error || 'Flux sécurité');
+      return x.data ?? [];
     },
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
+  });
+
+  const anomaliesQ = useQuery({
+    queryKey: ['security-anomalies'],
+    queryFn: async () => {
+      const r = await fetch('/api/security/anomalies', { credentials: 'include' });
+      const x = await j<{ data?: AnomalyRow[] }>(r);
+      return x.data ?? [];
+    },
+    refetchInterval: 120_000,
   });
 
   const suspiciousQ = useQuery({
@@ -210,17 +234,6 @@ export function SecurityCommandCenter() {
       return r.json() as { isSuperAdmin?: boolean };
     },
     staleTime: 60_000,
-  });
-
-  const behaviorQ = useQuery({
-    queryKey: ['security-behavior-insights'],
-    queryFn: async () => {
-      const r = await fetch('/api/security/behavior-insights', { credentials: 'include' });
-      const x = (await r.json()) as { data?: Record<string, unknown>; error?: string };
-      if (!r.ok) throw new Error(x.error || 'Insights');
-      return x.data ?? {};
-    },
-    staleTime: 120_000,
   });
 
   const secretsMetaQ = useQuery({
@@ -328,6 +341,13 @@ export function SecurityCommandCenter() {
       user_email: e.user_email,
       metadata: e.metadata,
       status: e.status,
+      human_label: humanizeAuditEvent({
+        action_type: e.action_type || 'view',
+        entity_type: 'profile',
+        user_email: e.user_email ?? null,
+        status: e.status ?? null,
+        created_at: e.created_at ?? null,
+      }),
     }));
     const seen = new Set<string>();
     const out: Record<string, unknown>[] = [];
@@ -427,7 +447,9 @@ export function SecurityCommandCenter() {
   });
 
   const emergencyMut = useMutation({
-    mutationFn: async (action: 'lockdown_flag' | 'revoke_sessions_all' | 'full_lockdown' | 'rotate_tokens_emergency') => {
+    mutationFn: async (
+      action: 'lockdown_flag' | 'unlock_lockdown' | 'revoke_sessions_all' | 'full_lockdown' | 'rotate_tokens_emergency',
+    ) => {
       const r = await fetch('/api/security/emergency', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -456,7 +478,8 @@ export function SecurityCommandCenter() {
 
   const ov = overviewQ.data;
   const isSuperAdmin = meQ.data?.isSuperAdmin === true;
-  const level = scoreQ.data?.level || 'secure';
+  const level = ov?.score_level || 'secure';
+  const scoreDisplay = ov?.security_score ?? 0;
   const barClass =
     level === 'secure'
       ? 'bg-emerald-600'
@@ -475,16 +498,6 @@ export function SecurityCommandCenter() {
     }));
   }, [geoQ.data, mapFilter]);
 
-  const behaviorActionCounts = React.useMemo(() => {
-    const sample = (behaviorQ.data as { user_behavior_sample?: { action?: string }[] })?.user_behavior_sample ?? [];
-    const m: Record<string, number> = {};
-    for (const row of sample) {
-      const a = String(row.action || 'autre');
-      m[a] = (m[a] || 0) + 1;
-    }
-    return m;
-  }, [behaviorQ.data]);
-
   function renderAuditIcon(action: string, status: string) {
     if (status === 'failed') return <Ban className="h-3.5 w-3.5 text-red-500" />;
     if (action.includes('permission')) return <Shield className="h-3.5 w-3.5 text-violet-500" />;
@@ -493,66 +506,82 @@ export function SecurityCommandCenter() {
     return <Sparkles className="h-3.5 w-3.5 text-slate-500" />;
   }
 
-  const alerts: { level: string; text: string; action: string }[] = [];
-  if ((ov?.failed_24h ?? 0) > 5) {
-    alerts.push({
-      level: 'critique',
-      text: `${ov?.failed_24h} échecs de connexion sur 24h`,
-      action: 'Consulter tentatives / audit',
-    });
+  const alerts: { level: string; text: string; action: string }[] =
+    ov?.active_alerts && ov.active_alerts.length > 0
+      ? ov.active_alerts.map((a) => ({ level: a.level, text: a.text, action: a.action }))
+      : [];
+  if (!alerts.length) {
+    if ((ov?.failed_24h ?? 0) > 5) {
+      alerts.push({
+        level: 'critique',
+        text: `${ov?.failed_24h} échecs de connexion sur 24h`,
+        action: 'Consulter tentatives / audit',
+      });
+    }
+    if ((ov?.admins_without_2fa ?? 0) > 0) {
+      alerts.push({
+        level: 'attention',
+        text: `${ov?.admins_without_2fa} admin(s) sans 2FA`,
+        action: 'Forcer adoption 2FA (process interne)',
+      });
+    }
+    if ((ov?.blocked_ips ?? 0) > 0) {
+      alerts.push({
+        level: 'info',
+        text: `${ov?.blocked_ips} entrée(s) sur liste noire IP`,
+        action: 'Voir table ip_blacklist',
+      });
+    }
   }
-  if ((ov?.admins_without_2fa ?? 0) > 0) {
-    alerts.push({
-      level: 'attention',
-      text: `${ov?.admins_without_2fa} admin(s) sans 2FA`,
-      action: 'Forcer adoption 2FA (process interne)',
-    });
-  }
-  if ((ov?.blocked_ips ?? 0) > 0) {
-    alerts.push({
-      level: 'info',
-      text: `${ov?.blocked_ips} entrée(s) sur liste noire IP`,
-      action: 'Voir table ip_blacklist',
-    });
-  }
+
+  const navBadges: Partial<Record<string, number>> = {
+    'section-overview': alerts.length,
+    'section-alerts': alerts.length,
+  };
 
   return (
     <div className="space-y-6 pb-10">
       <SecurityAuditRealtime onEvent={appendLive} />
-      <PageHeader
-        title="Centre de sécurité"
-        subtitle="Vue opérationnelle : alertes, sessions, politique, carte connexions, actions d’urgence (superadmin)."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/audit"
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
-            >
-              <Shield className="h-3.5 w-3.5" /> Audit
-            </Link>
-            <a
-              href="/api/security/report-pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
-            >
-              <FileDown className="h-3.5 w-3.5" /> PDF urgence
-            </a>
-            <Link
-              href="/notifications?tab=composer&src=security"
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
-            >
-              <Bell className="h-3.5 w-3.5" /> Notifier
-            </Link>
-            <Button variant="outline" size="sm" type="button" onClick={() => void qc.invalidateQueries()}>
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
+      <div className="lg:grid lg:grid-cols-[220px_1fr] lg:gap-8 lg:items-start">
+        <SecuritySideNav alertCountBySection={navBadges} />
+        <div className="min-w-0 space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
+            <div>
+              <h1 className="text-[22px] font-semibold tracking-tight font-heading">Centre de Sécurité</h1>
+              <p className="text-sm text-muted-foreground">
+                Poste de commande — mis à jour {overviewQ.dataUpdatedAt ? formatSecurityRelativeFr(new Date(overviewQ.dataUpdatedAt).toISOString()) : '—'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/audit"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
+              >
+                <Shield className="h-3.5 w-3.5" /> Audit
+              </Link>
+              <a
+                href="/api/security/report-pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
+              >
+                <FileDown className="h-3.5 w-3.5" /> PDF
+              </a>
+              <Link
+                href="/notifications?tab=composer&src=security"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
+              >
+                <Bell className="h-3.5 w-3.5" /> Notifier
+              </Link>
+              <Button variant="outline" size="sm" type="button" onClick={() => void qc.invalidateQueries()} title="Actualiser">
+                <RefreshCw className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
-        }
-      />
 
       {/* SECTION 1 — Centre d’alertes */}
       <div
+        id="section-overview"
         className={cn(
           'sticky top-0 z-30 flex flex-col gap-2 rounded-xl border px-4 py-3 shadow-sm backdrop-blur-md',
           level === 'secure' && 'border-emerald-500/40 bg-emerald-500/10',
@@ -574,24 +603,25 @@ export function SecurityCommandCenter() {
             {level === 'critical' && '🔴 ALERTE CRITIQUE'}
           </span>
           <span className="text-muted-foreground font-normal">
-            Score {scoreQ.data?.score ?? '—'}/100 · polling 30s
+            Score {scoreDisplay}/100 · polling 30s
           </span>
           <div className="ml-auto h-2 w-32 overflow-hidden rounded-full bg-background/80">
-            <div className={cn('h-full transition-all', barClass)} style={{ width: `${scoreQ.data?.score ?? 0}%` }} />
+            <div className={cn('h-full transition-all', barClass)} style={{ width: `${Math.min(100, Math.max(0, scoreDisplay))}%` }} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-7 text-xs">
-          <Metric label="Sessions actives 24h" value={ov?.active_sessions} />
+          <Metric label="Sessions actives 24h" value={ov?.active_sessions} onOpen={() => setKpiDrawer('sessions')} />
           <Metric
             label="Échecs login 24h"
             value={ov?.failed_24h}
             danger={(ov?.failed_24h ?? 0) > 5}
+            onOpen={() => setKpiDrawer('failures')}
           />
-          <Metric label="IPs blacklist" value={ov?.blocked_ips} />
+          <Metric label="IPs blacklist" value={ov?.blocked_ips} onOpen={() => setKpiDrawer('blacklist')} />
           <Metric label="Couverture 2FA" value={ov?.coverage_2fa != null ? `${ov.coverage_2fa}%` : undefined} />
-          <Metric label="Admins sans 2FA" value={ov?.admins_without_2fa} />
+          <Metric label="Admins sans 2FA" value={ov?.admins_without_2fa} onOpen={() => setKpiDrawer('twofa')} />
           <Metric label="Tokens exp. (hint)" value={ov?.tokens_expired_hint} />
-          <Metric label="Whitelist IPs" value={scoreQ.data?.breakdown?.whitelist_size} />
+          <Metric label="Whitelist IPs" value={ov?.whitelist_count} onOpen={() => setKpiDrawer('whitelist')} />
         </div>
       </div>
 
@@ -630,7 +660,7 @@ export function SecurityCommandCenter() {
             {(suspiciousQ.data || []).map((x) => (
               <li key={x.ip}>
                 {x.ip} — {x.failures} échecs —{' '}
-                <Link href="/security#blacklist-ip" className="underline text-primary">
+                <Link href="/security#section-access" className="underline text-primary">
                   bloquer
                 </Link>
               </li>
@@ -640,7 +670,7 @@ export function SecurityCommandCenter() {
       ) : null}
 
       {/* SECTION 2 — Authentification */}
-      <section className="space-y-3">
+      <section id="section-auth" className="space-y-3 scroll-mt-24">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Lock className="h-5 w-5" /> Authentification & sessions
         </h2>
@@ -672,13 +702,18 @@ export function SecurityCommandCenter() {
                   : (sessionsQ.data || []).map((s) => (
                       <tr key={s.id}>
                         <td className="px-3 py-2 whitespace-nowrap text-[10px]">
-                          {s.started_at || s.last_active_at ? String(s.started_at || s.last_active_at).slice(0, 19) : '—'}
+                          {formatSecurityShortFr(s.started_at || s.last_active_at || null)}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-[10px]">
-                          {s.last_active_at ? String(s.last_active_at).slice(0, 19) : '—'}
+                          {formatSecurityShortFr(s.last_active_at || null)}
                         </td>
                         <td className="px-3 py-2">{s.email || s.user_id?.slice(0, 8)}</td>
-                        <td className="px-3 py-2 font-mono text-[10px]">{s.ip_address || '—'}</td>
+                        <td className="px-3 py-2 font-mono text-[10px]">
+                          {s.ip_address || '—'}
+                          {s.ip_address ? (
+                            <span className="ml-1 text-muted-foreground normal-case">({labelIpKind(s.ip_address).label})</span>
+                          ) : null}
+                        </td>
                         <td className="px-3 py-2 text-[10px]">
                           {s.country || '—'}
                           {s.city ? <span className="text-muted-foreground"> · {s.city}</span> : null}
@@ -790,10 +825,16 @@ export function SecurityCommandCenter() {
               <tbody>
                 {(loginsQ.data || []).map((l, i) => (
                   <tr key={i} className="border-b border-border/50">
-                    <td className="py-1 pr-2 whitespace-nowrap">{l.created_at ? String(l.created_at).slice(0, 19) : '—'}</td>
+                    <td className="py-1 pr-2 whitespace-nowrap">{formatSecurityShortFr(l.created_at ?? null)}</td>
                     <td className="py-1 pr-2">{l.email || '—'}</td>
                     <td className="py-1 pr-2 font-mono">{l.ip_address || l.ip || '—'}</td>
-                    <td className="py-1">{l.success === false ? <span className="text-red-600">Échec</span> : 'OK'}</td>
+                    <td className="py-1">
+                      {l.success === true
+                        ? humanizeLoginResult(true)
+                        : l.success === false
+                          ? humanizeLoginResult(false)
+                          : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -806,12 +847,127 @@ export function SecurityCommandCenter() {
       </section>
 
       {/* SECTION 3 — Contrôle d’accès */}
-      <section className="space-y-3" id="blacklist-ip">
-        <h2 className="text-lg font-semibold">Contrôle d’accès</h2>
+      <section id="section-access" className="space-y-3 scroll-mt-24">
+        <h2 className="text-lg font-semibold" id="blacklist-ip">
+          Contrôle d’accès
+        </h2>
         <SecurityAccessSection />
       </section>
 
-      <section className="space-y-3">
+      <section id="section-anomalies" className="space-y-3 scroll-mt-24">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5" /> Anomalies administrateurs
+        </h2>
+        <Card className="p-4 space-y-3 text-xs">
+          <p className="text-muted-foreground">
+            Heuristique volume d’audit (24 h). Pour le comportement clients et les recommandations, ouvrir{' '}
+            <Link href="/analytics" className="font-medium text-primary underline">
+              Analytics
+            </Link>
+            .
+          </p>
+          {anomaliesQ.isLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (anomaliesQ.data || []).length === 0 ? (
+            <p className="text-muted-foreground">Aucune anomalie détectée sur la fenêtre actuelle.</p>
+          ) : (
+            <ul className="space-y-2">
+              {(anomaliesQ.data || []).map((a) => (
+                <li key={a.admin_id} className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-medium">{a.email || `${a.admin_id.slice(0, 8)}…`}</span>
+                    <span className="text-[10px] uppercase text-muted-foreground">{a.severity}</span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">{a.description}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </section>
+
+      {/* SECTION 4 — Surveillance */}
+      <section id="section-realtime" className="space-y-3 scroll-mt-24">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Video className="h-5 w-5" /> Surveillance temps réel
+        </h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="p-4 overflow-hidden">
+            <h3 className="text-sm font-semibold mb-2">Carte connexions admin (24 h)</h3>
+            {geoQ.isLoading ? (
+              <Skeleton className="h-[280px] w-full min-h-[280px] min-w-0" />
+            ) : (
+              <div className="h-[280px] w-full min-h-[280px] min-w-0">
+                <MapWrapper height={280} markers={mapMarkers} />
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+              {(
+                [
+                  { id: 'all' as const, label: 'Tous', dot: 'bg-slate-400' },
+                  { id: 'normal' as const, label: 'Normal', dot: 'bg-emerald-500' },
+                  { id: 'blocked' as const, label: 'Bloqué (échec)', dot: 'bg-red-500' },
+                  { id: 'unusual' as const, label: 'Inhabituel', dot: 'bg-orange-500' },
+                ] as const
+              ).map((x) => (
+                <button
+                  key={x.id}
+                  type="button"
+                  onClick={() => setMapFilter(x.id)}
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 transition-colors',
+                    mapFilter === x.id
+                      ? 'border-primary bg-primary/10 text-foreground ring-1 ring-primary/30'
+                      : 'border-border text-muted-foreground hover:bg-muted/60',
+                  )}
+                >
+                  <span className={cn('h-2 w-2 rounded-full', x.dot)} />
+                  {x.label}
+                </button>
+              ))}
+            </div>
+          </Card>
+          <Card className="p-4">
+            <h3 className="text-sm font-semibold mb-2">Flux sécurité (polling + Realtime si activé)</h3>
+            <div ref={auditFeedRef} className="max-h-[280px] space-y-2 overflow-y-auto text-xs">
+              {mergedAuditFeed.map((log) => {
+                const m = (log.metadata || {}) as Record<string, unknown>;
+                const ip = String(m.ip || m.ip_address || '');
+                const action = String(log.action_type || log.action || '');
+                const status = String(log.status || 'success');
+                const human =
+                  typeof log.human_label === 'string' && log.human_label.trim()
+                    ? log.human_label
+                    : humanizeAuditEvent({
+                        action_type: action || 'view',
+                        entity_type: 'profile',
+                        user_email: (log.user_email as string | null | undefined) ?? null,
+                        status: status === 'failed' ? 'failed' : null,
+                        created_at: (log.created_at as string | null | undefined) ?? null,
+                      });
+                return (
+                  <div key={String(log.id)} className="rounded border border-border/60 bg-muted/20 px-2 py-1.5">
+                    <div className="flex items-start gap-2">
+                      {renderAuditIcon(action, status)}
+                      <span className="font-medium leading-snug">{human}</span>
+                      <span className={cn('ml-auto shrink-0 text-[10px]', status === 'failed' ? 'text-red-500' : 'text-emerald-600')}>
+                        {status === 'failed' ? 'échec' : 'réussi'}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[10px] text-muted-foreground font-mono">
+                      {formatSecurityShortFr((log.created_at as string | null | undefined) ?? null)}
+                      {ip ? <span className="text-blue-600 dark:text-blue-400"> · {ip}</span> : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+        <SecurityChartsBlock />
+      </section>
+
+      <section id="section-alerts" className="space-y-3 scroll-mt-24">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Bell className="h-5 w-5" /> Alertes broadcast sécurité (premium)
         </h2>
@@ -931,157 +1087,8 @@ export function SecurityCommandCenter() {
         </Card>
       </section>
 
-      {/* SECTION 4 — Surveillance */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Video className="h-5 w-5" /> Surveillance temps réel
-        </h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="p-4 overflow-hidden">
-            <h3 className="text-sm font-semibold mb-2">Carte connexions admin (24 h)</h3>
-            {geoQ.isLoading ? (
-              <Skeleton className="h-[280px] w-full min-h-[280px] min-w-0" />
-            ) : (
-              <div className="h-[280px] w-full min-h-[280px] min-w-0">
-                <MapWrapper height={280} markers={mapMarkers} />
-              </div>
-            )}
-            <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
-              {(
-                [
-                  { id: 'all' as const, label: 'Tous', dot: 'bg-slate-400' },
-                  { id: 'normal' as const, label: 'Normal', dot: 'bg-emerald-500' },
-                  { id: 'blocked' as const, label: 'Bloqué (échec)', dot: 'bg-red-500' },
-                  { id: 'unusual' as const, label: 'Inhabituel', dot: 'bg-orange-500' },
-                ] as const
-              ).map((x) => (
-                <button
-                  key={x.id}
-                  type="button"
-                  onClick={() => setMapFilter(x.id)}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 transition-colors',
-                    mapFilter === x.id
-                      ? 'border-primary bg-primary/10 text-foreground ring-1 ring-primary/30'
-                      : 'border-border text-muted-foreground hover:bg-muted/60',
-                  )}
-                >
-                  <span className={cn('h-2 w-2 rounded-full', x.dot)} />
-                  {x.label}
-                </button>
-              ))}
-            </div>
-          </Card>
-          <Card className="p-4">
-            <h3 className="text-sm font-semibold mb-2">Flux sécurité (polling + Realtime si activé)</h3>
-            <div ref={auditFeedRef} className="max-h-[280px] space-y-2 overflow-y-auto text-xs font-mono">
-              {mergedAuditFeed.map((log) => {
-                const m = (log.metadata || {}) as Record<string, unknown>;
-                const ip = String(m.ip || m.ip_address || '');
-                const action = String(log.action_type || log.action || '');
-                const status = String(log.status || 'success');
-                const desc =
-                  action === 'permission_change'
-                    ? 'Changement de permission'
-                    : action === 'status_change'
-                      ? 'Changement de statut'
-                      : action === 'login'
-                        ? 'Tentative de connexion'
-                        : action || 'Événement';
-                return (
-                  <div key={String(log.id)} className="rounded border border-border/60 bg-muted/20 px-2 py-1.5">
-                    <div className="flex items-center gap-2">
-                      {renderAuditIcon(action, status)}
-                      <span className="font-medium">{desc}</span>
-                      <span className={cn('ml-auto text-[10px]', status === 'failed' ? 'text-red-500' : 'text-emerald-600')}>
-                        {status === 'failed' ? 'échec' : 'ok'}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-[10px] text-muted-foreground">
-                      {String(log.created_at || '').slice(0, 19)}
-                      {ip ? <span className="text-blue-600 dark:text-blue-400"> · {ip}</span> : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-        <SecurityChartsBlock />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Médias & Documents de sécurité</h2>
-        <SecurityMediaSection />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Shield className="h-5 w-5" /> Comportement & recommandations (aperçu)
-        </h2>
-        <Card className="p-4 space-y-4 text-xs">
-          {behaviorQ.isLoading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : (
-            <>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm font-medium">
-                  Événements <span className="font-mono">user_behavior</span> (7 j) :{' '}
-                  <span className="text-foreground tabular-nums">
-                    {Number((behaviorQ.data as { user_behavior_last_7d_count?: number })?.user_behavior_last_7d_count ?? 0)}
-                  </span>
-                </p>
-                {(behaviorQ.data as { recommendation_settings?: { algorithm?: string; is_active?: boolean } | null })
-                  ?.recommendation_settings ? (
-                  <span className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[10px]">
-                    Algo :{' '}
-                    {String(
-                      (behaviorQ.data as { recommendation_settings?: { algorithm?: string } }).recommendation_settings
-                        ?.algorithm || '—',
-                    )}{' '}
-                    ·{' '}
-                    {(behaviorQ.data as { recommendation_settings?: { is_active?: boolean } }).recommendation_settings
-                      ?.is_active
-                      ? 'actif'
-                      : 'inactif'}
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-muted-foreground">
-                Aperçu sur l’échantillon récent (12 lignes). Sans envoi depuis l’app, les totaux restent bas.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {(['view', 'add_to_cart', 'purchase', 'wishlist'] as const).map((act) => {
-                  const n = behaviorActionCounts[act] ?? 0;
-                  const max = Math.max(1, ...Object.values(behaviorActionCounts));
-                  const pct = Math.round((n / max) * 100);
-                  const labels: Record<string, string> = {
-                    view: 'Vues',
-                    add_to_cart: 'Panier',
-                    purchase: 'Achats',
-                    wishlist: 'Favoris',
-                  };
-                  return (
-                    <div key={act} className="rounded-lg border border-border/80 bg-muted/20 p-2">
-                      <div className="text-[10px] text-muted-foreground">{labels[act]}</div>
-                      <div className="text-lg font-semibold tabular-nums">{n}</div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Ingestion : POST REST <span className="font-mono">/rest/v1/user_behavior</span> avec JWT utilisateur (voir doc
-                mobile / Edge Function).
-              </p>
-            </>
-          )}
-        </Card>
-      </section>
-
-      <section className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
+        <section id="section-api" className="scroll-mt-24">
         <Card className="p-4 text-sm space-y-3">
           <div className="flex items-center gap-2 font-semibold">
             <KeyRound className="h-4 w-4" /> API & tokens (statut)
@@ -1143,6 +1150,8 @@ export function SecurityCommandCenter() {
             <p className="text-[10px] text-amber-700 dark:text-amber-400">Déclaration de rotation : superadmin uniquement.</p>
           )}
         </Card>
+        </section>
+        <section id="section-policy" className="scroll-mt-24">
         <Card className="p-4 text-sm space-y-3">
           <div className="flex items-center gap-2 font-semibold">
             <Shield className="h-4 w-4" /> Politique MDP (settings.password_policy)
@@ -1213,10 +1222,16 @@ export function SecurityCommandCenter() {
             </Button>
           ) : null}
         </Card>
+        </section>
+      </div>
+
+      <section id="section-media" className="space-y-3 scroll-mt-24">
+        <h2 className="text-lg font-semibold">Médias & Documents de sécurité</h2>
+        <SecurityMediaSection />
       </section>
 
       {isSuperAdmin ? (
-        <section className="space-y-3">
+        <section id="section-emergency" className="space-y-3 scroll-mt-24">
           <h2 className="text-lg font-semibold flex items-center gap-2 text-red-700 dark:text-red-400">
             <Skull className="h-5 w-5" /> Actions d’urgence (superadmin)
           </h2>
@@ -1233,6 +1248,9 @@ export function SecurityCommandCenter() {
               <Button variant="destructive" size="sm" type="button" onClick={() => emergencyMut.mutate('full_lockdown')}>
                 VERROUILLAGE D'URGENCE
               </Button>
+              <Button variant="outline" size="sm" type="button" onClick={() => emergencyMut.mutate('unlock_lockdown')}>
+                Lever le verrouillage
+              </Button>
               <Button variant="destructive" size="sm" type="button" onClick={() => setRevokeAllOpen(true)}>
                 RÉVOQUER TOUTES LES SESSIONS
               </Button>
@@ -1247,7 +1265,7 @@ export function SecurityCommandCenter() {
           </Card>
         </section>
       ) : (
-        <section className="rounded-lg border border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground">
+        <section id="section-emergency" className="rounded-lg border border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground scroll-mt-24">
           <div className="flex flex-wrap items-center gap-2">
             <ShieldOff className="h-4 w-4 text-amber-600" />
             Actions d’urgence (lockdown, révocation sessions) : réservées aux super-administrateurs.
@@ -1263,6 +1281,125 @@ export function SecurityCommandCenter() {
           </Button>
         </section>
       )}
+
+      <AdminDrawer
+        open={kpiDrawer !== null}
+        onOpenChange={(o) => {
+          if (!o) setKpiDrawer(null);
+        }}
+        title={
+          kpiDrawer === 'sessions'
+            ? 'Sessions applicatives'
+            : kpiDrawer === 'failures'
+              ? 'Échecs de connexion (extrait)'
+              : kpiDrawer === 'blacklist'
+                ? 'Liste noire IP'
+                : kpiDrawer === 'twofa'
+                  ? 'Couverture 2FA'
+                  : kpiDrawer === 'whitelist'
+                    ? 'Liste blanche IP'
+                    : 'Détail'
+        }
+        description={
+          kpiDrawer === 'blacklist' || kpiDrawer === 'whitelist' || kpiDrawer === 'twofa'
+            ? 'Gestion complète dans la section Contrôle d’accès ou Authentification ci-dessous.'
+            : undefined
+        }
+      >
+        {kpiDrawer === 'sessions' ? (
+          <div className="space-y-2 text-xs">
+            {sessionsQ.isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : (
+              <div className="max-h-[55vh] overflow-auto rounded-md border border-border">
+                <table className="w-full text-left">
+                  <thead className="bg-muted/50 sticky top-0">
+                    <tr>
+                      <th className="p-2">Activité</th>
+                      <th className="p-2">Email</th>
+                      <th className="p-2">IP</th>
+                      <th className="p-2">État</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(sessionsQ.data || []).slice(0, 40).map((s) => (
+                      <tr key={s.id} className="border-t border-border/60">
+                        <td className="p-2 whitespace-nowrap">{formatSecurityShortFr(s.last_active_at || null)}</td>
+                        <td className="p-2">{s.email || '—'}</td>
+                        <td className="p-2 font-mono text-[10px]">{s.ip_address || '—'}</td>
+                        <td className="p-2">{s.is_active ? 'Actif' : 'Inactif'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!sessionsQ.data?.length ? <p className="p-4 text-muted-foreground">Aucune session.</p> : null}
+              </div>
+            )}
+            <Link href="#section-auth" className="inline-block text-primary underline text-sm" onClick={() => setKpiDrawer(null)}>
+              Ouvrir la section Authentification
+            </Link>
+          </div>
+        ) : null}
+        {kpiDrawer === 'failures' ? (
+          <div className="space-y-2 text-xs">
+            <div className="max-h-[55vh] overflow-auto rounded-md border border-border">
+              <table className="w-full text-left">
+                <thead className="bg-muted/50 sticky top-0">
+                  <tr>
+                    <th className="p-2">Date</th>
+                    <th className="p-2">Email</th>
+                    <th className="p-2">IP</th>
+                    <th className="p-2">Résultat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(loginsQ.data || [])
+                    .filter((l) => l.success === false)
+                    .slice(0, 60)
+                    .map((l, i) => (
+                      <tr key={i} className="border-t border-border/60">
+                        <td className="p-2 whitespace-nowrap">{formatSecurityShortFr(l.created_at ?? null)}</td>
+                        <td className="p-2">{l.email || '—'}</td>
+                        <td className="p-2 font-mono">{l.ip_address || l.ip || '—'}</td>
+                        <td className="p-2 text-red-600">{humanizeLoginResult(false)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {!loginsQ.data?.filter((l) => l.success === false).length ? (
+                <p className="p-4 text-muted-foreground">Aucun échec listé sur l’extrait actuel.</p>
+              ) : null}
+            </div>
+            <Link href="#section-auth" className="inline-block text-primary underline text-sm" onClick={() => setKpiDrawer(null)}>
+              Tentatives complètes dans Authentification
+            </Link>
+          </div>
+        ) : null}
+        {kpiDrawer === 'blacklist' ? (
+          <p className="text-sm text-muted-foreground">
+            {ov?.blocked_ips ?? 0} entrée(s) sur liste noire. Gérez les blocages dans{' '}
+            <Link href="#section-access" className="text-primary underline" onClick={() => setKpiDrawer(null)}>
+              Contrôle d’accès
+            </Link>
+            .
+          </p>
+        ) : null}
+        {kpiDrawer === 'twofa' ? (
+          <p className="text-sm text-muted-foreground">
+            {ov?.admins_without_2fa ?? 0} administrateur(s) sans 2FA (couverture {ov?.coverage_2fa ?? '—'} %). Renforcez la
+            politique depuis les paramètres équipe / sécurité.
+          </p>
+        ) : null}
+        {kpiDrawer === 'whitelist' ? (
+          <p className="text-sm text-muted-foreground">
+            {ov?.whitelist_count ?? 0} adresse(s) en liste blanche. Ajoutez ou retirez des entrées dans{' '}
+            <Link href="#section-access" className="text-primary underline" onClick={() => setKpiDrawer(null)}>
+              Contrôle d’accès
+            </Link>
+            .
+          </p>
+        ) : null}
+      </AdminDrawer>
 
       <ConfirmModal
         open={emergencyOpen}
@@ -1284,17 +1421,48 @@ export function SecurityCommandCenter() {
         onConfirm={() => emergencyMut.mutate('revoke_sessions_all')}
         variant="destructive"
       />
+        </div>
+      </div>
     </div>
   );
 }
 
-function Metric({ label, value, danger }: { label: string; value?: string | number | null; danger?: boolean }) {
-  return (
-    <div className={cn('rounded-lg border border-border/60 bg-background/60 px-2 py-1.5', danger && 'border-red-500/50')}>
-      <div className="text-[10px] text-muted-foreground leading-tight">{label}</div>
+function Metric({
+  label,
+  value,
+  danger,
+  onOpen,
+}: {
+  label: string;
+  value?: string | number | null;
+  danger?: boolean;
+  onOpen?: () => void;
+}) {
+  const inner = (
+    <div
+      className={cn(
+        'rounded-lg border border-border/60 bg-background/60 px-2 py-1.5',
+        danger && 'border-red-500/50',
+        onOpen && 'group-hover:border-primary/35',
+      )}
+    >
+      <div className="text-[10px] text-muted-foreground leading-tight flex items-center justify-between gap-1">
+        <span>{label}</span>
+        {onOpen ? <span className="text-[9px] opacity-70">Détails</span> : null}
+      </div>
       <div className={cn('text-sm font-semibold tabular-nums', danger && 'text-red-600')}>
         {value === undefined || value === null ? '—' : value}
       </div>
     </div>
+  );
+  if (!onOpen) return inner;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group block w-full text-left rounded-lg transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {inner}
+    </button>
   );
 }

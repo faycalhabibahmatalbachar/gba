@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
@@ -13,7 +13,7 @@ function extractIp(req: Request): string | null {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireSuperAdmin();
   if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(req.url);

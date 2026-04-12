@@ -9,7 +9,14 @@ import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
-  action: z.enum(['lockdown_flag', 'revoke_sessions_all', 'full_lockdown', 'rotate_tokens_emergency', 'log_only']),
+  action: z.enum([
+    'lockdown_flag',
+    'unlock_lockdown',
+    'revoke_sessions_all',
+    'full_lockdown',
+    'rotate_tokens_emergency',
+    'log_only',
+  ]),
   reason: z.string().min(3).max(500),
 });
 
@@ -50,6 +57,16 @@ export async function POST(req: Request) {
         {
           key: 'security_emergency_lockdown',
           value: { active: true, at: now, reason: parsed.data.reason, by: auth.userId },
+        },
+        { onConflict: 'key' },
+      );
+    }
+
+    if (parsed.data.action === 'unlock_lockdown') {
+      await sb.from('settings').upsert(
+        {
+          key: 'security_emergency_lockdown',
+          value: { active: false, at: now, reason: parsed.data.reason, by: auth.userId },
         },
         { onConflict: 'key' },
       );
@@ -163,13 +180,15 @@ export async function POST(req: Request) {
       message:
         parsed.data.action === 'lockdown_flag'
           ? 'Drapeau lockdown enregistré (settings.security_emergency_lockdown). Le middleware Next.js refuse désormais l’accès aux non super-admins.'
-          : parsed.data.action === 'revoke_sessions_all'
-            ? 'Sessions applicatives (user_sessions) clôturées. Les refresh tokens Supabase Auth ne sont pas révoqués automatiquement.'
-            : parsed.data.action === 'full_lockdown'
-              ? `Verrouillage total exécuté: lockdown actif, sessions clôturées, admins suspendus, liste blanche urgence (IP appelant) fusionnée. ${fullLockdownEmailNote || ''}`
-              : parsed.data.action === 'rotate_tokens_emergency'
-                ? 'Rotation d’urgence journalisée. Régénérez les clés depuis Supabase/Firebase puis redéployez.'
-            : 'Événement journalisé.',
+          : parsed.data.action === 'unlock_lockdown'
+            ? 'Verrouillage d’urgence désactivé (security_emergency_lockdown.active = false).'
+            : parsed.data.action === 'revoke_sessions_all'
+              ? 'Sessions applicatives (user_sessions) clôturées. Les refresh tokens Supabase Auth ne sont pas révoqués automatiquement.'
+              : parsed.data.action === 'full_lockdown'
+                ? `Verrouillage total exécuté: lockdown actif, sessions clôturées, admins suspendus, liste blanche urgence (IP appelant) fusionnée. ${fullLockdownEmailNote || ''}`
+                : parsed.data.action === 'rotate_tokens_emergency'
+                  ? 'Rotation d’urgence journalisée. Régénérez les clés depuis Supabase/Firebase puis redéployez.'
+                  : 'Événement journalisé.',
     });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });

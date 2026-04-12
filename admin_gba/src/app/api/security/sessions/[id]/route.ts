@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { writeAuditLog } from '@/lib/audit/server-audit';
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /** Clôture les sessions applicatives (user_sessions). Les refresh tokens Supabase Auth restent gérés côté hébergeur. */
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireSuperAdmin();
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;

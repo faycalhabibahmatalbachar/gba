@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { subHours } from 'date-fns';
-import { requireAdmin } from '@/app/api/_lib/require-admin';
+import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { lookupGeoIp } from '@/lib/geoip/lookup';
 
@@ -24,7 +24,7 @@ async function resolveBatch(ips: string[], concurrency: number) {
 
 /** Connexions admin 24h : IP depuis metadata audit + GeoIP (ipwho.is) avec repli hachage si échec / IP privée. */
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requireSuperAdmin();
   if (!auth.ok) return auth.response;
 
   let sb: ReturnType<typeof getServiceSupabase>;
