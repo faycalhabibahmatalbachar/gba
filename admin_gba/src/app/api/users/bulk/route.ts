@@ -92,12 +92,27 @@ export async function POST(req: Request) {
         if (error) throw error;
         ok += 1;
       } else {
+        {
+          const detach = await sb.from('orders').update({ user_id: null }).eq('user_id', id);
+          if (detach.error) {
+            /* ignore */
+          }
+        }
         const { error: delErr } = await sb.auth.admin.deleteUser(id);
-        if (delErr) throw new Error(delErr.message);
+        if (delErr) {
+          const raw = String(delErr.message || '');
+          if (/database error deleting user/i.test(raw)) {
+            throw new Error(
+              'Suppression impossible — des données sont encore liées à ce compte (ex. commandes, avis). Utilisez la désactivation ou nettoyez les références.',
+            );
+          }
+          throw new Error(raw);
+        }
         ok += 1;
       }
     } catch (e) {
-      errors.push(`${id}: ${(e as Error).message}`);
+      const msg = (e as Error).message;
+      errors.push(`${id}: ${msg}`);
     }
   }
 

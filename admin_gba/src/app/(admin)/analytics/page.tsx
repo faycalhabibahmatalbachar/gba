@@ -1,13 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/custom/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { toast } from 'sonner';
+import { formatXofCompact, orderStatusLabel } from '@/lib/format-xof-compact';
 
 type AnalyticsPayload = {
   periodDays: number;
@@ -29,10 +38,6 @@ async function fetchAnalytics(days: number) {
   return r.json() as Promise<AnalyticsPayload>;
 }
 
-function fmtCurrency(n: number) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(n);
-}
-
 export default function AnalyticsPage() {
   const [days, setDays] = useState(30);
   const q = useQuery({
@@ -46,6 +51,15 @@ export default function AnalyticsPage() {
   }, [q.isError, q.error]);
 
   const d = q.data;
+
+  const ordersByStatusFr = useMemo(
+    () =>
+      (d?.ordersByStatus ?? []).map((row) => ({
+        ...row,
+        statusLabel: orderStatusLabel(row.status),
+      })),
+    [d?.ordersByStatus],
+  );
 
   return (
     <div className="space-y-6">
@@ -78,7 +92,7 @@ export default function AnalyticsPage() {
             <>
               <Card className="p-4">
                 <div className="text-xs text-muted-foreground">Revenus</div>
-                <div className="text-xl font-bold">{fmtCurrency(d?.revenue ?? 0)}</div>
+                <div className="text-xl font-bold">{formatXofCompact(d?.revenue ?? 0)}</div>
               </Card>
               <Card className="p-4">
                 <div className="text-xs text-muted-foreground">Commandes</div>
@@ -89,8 +103,8 @@ export default function AnalyticsPage() {
                 <div className="text-xl font-bold">{d?.newUsers ?? 0}</div>
               </Card>
               <Card className="p-4">
-                <div className="text-xs text-muted-foreground">ARPU (acheteurs)</div>
-                <div className="text-xl font-bold">{fmtCurrency(d?.arpu ?? 0)}</div>
+                <div className="text-xs text-muted-foreground">Revenu moyen par acheteur</div>
+                <div className="text-xl font-bold">{formatXofCompact(d?.arpu ?? 0)}</div>
               </Card>
             </>
           )}
@@ -100,47 +114,64 @@ export default function AnalyticsPage() {
       <section id="comportement" className="scroll-mt-24 space-y-6">
         <h2 className="sr-only">Comportement et volumes</h2>
         <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="text-sm">Commandes par statut</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64 min-w-0">
-            {q.isLoading ? (
-              <Skeleton className="h-full w-full" />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <BarChart data={d?.ordersByStatus || []}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="status" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} width={32} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-sm">Commandes par statut</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[256px] min-h-[256px] w-full min-w-0 p-4 pt-0">
+              {q.isLoading ? (
+                <Skeleton className="h-full w-full min-h-[240px]" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
+                  <BarChart data={ordersByStatusFr}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="statusLabel" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={56} />
+                    <YAxis tick={{ fontSize: 10 }} width={32} />
+                    <Tooltip
+                      formatter={(value) => [String(value ?? ''), 'Commandes']}
+                      labelFormatter={(_l, p) => String((p?.[0]?.payload as { statusLabel?: string })?.statusLabel ?? '')}
+                      contentStyle={{
+                        borderRadius: 10,
+                        border: '1px solid hsl(var(--border))',
+                        background: 'hsl(var(--background))',
+                        fontSize: 12,
+                      }}
+                    />
+                    <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle className="text-sm">Volume commandes (8 derniers jours)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64 min-w-0">
-            {q.isLoading ? (
-              <Skeleton className="h-full w-full" />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <BarChart data={d?.ordersLast8d || []}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} width={28} />
-                  <Tooltip />
-                  <Bar dataKey="orders" fill="#10B981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-sm">Volume commandes (8 derniers jours)</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[256px] min-h-[256px] w-full min-w-0 p-4 pt-0">
+              {q.isLoading ? (
+                <Skeleton className="h-full w-full min-h-[240px]" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
+                  <BarChart data={d?.ordersLast8d || []}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} width={28} />
+                    <Tooltip
+                      formatter={(value) => [String(value ?? ''), 'Commandes']}
+                      contentStyle={{
+                        borderRadius: 10,
+                        border: '1px solid hsl(var(--border))',
+                        background: 'hsl(var(--background))',
+                        fontSize: 12,
+                      }}
+                    />
+                    <Bar dataKey="orders" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -153,8 +184,8 @@ export default function AnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Agrégation sur la période sélectionnée. Pour la matrice de rétention détaillée, voir le
-            tableau « Rétention clients » dans le dashboard (section Intelligence business).
+            Agrégation sur la période sélectionnée. La matrice de rétention détaillée est disponible sur la page Utilisateurs
+            (section Intelligence).
           </CardContent>
         </Card>
       </section>
@@ -165,7 +196,7 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent className="text-xs space-y-1 max-h-48 overflow-y-auto">
           {(d?.topProductsByStockRisk || []).map((p) => (
-            <div key={p.name} className="flex justify-between border-b border-border py-1">
+            <div key={`${p.name}-${p.quantity}`} className="flex justify-between border-b border-border py-1">
               <span className="truncate pr-2">{p.name}</span>
               <span className="tabular-nums shrink-0">{p.quantity ?? 0}</span>
             </div>

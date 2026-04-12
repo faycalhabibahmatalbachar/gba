@@ -24,6 +24,7 @@ import {
 import {
   Download,
   KeyRound,
+  LayoutGrid,
   Lock,
   LogOut,
   Mail,
@@ -71,6 +72,8 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { formatApiError } from '@/lib/format-api-error';
 import { formatOutboundEmailError } from '@/lib/email/format-outbound-error';
@@ -167,6 +170,11 @@ export default function UsersBigDataPage() {
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [bulkDeleteOpen, setBulkDeleteOpen] = React.useState(false);
   const [singleDeleteRow, setSingleDeleteRow] = React.useState<Row | null>(null);
+  const [showUserKpis, setShowUserKpis] = React.useState(true);
+  const [showChartSignup, setShowChartSignup] = React.useState(true);
+  const [showChartCountries, setShowChartCountries] = React.useState(true);
+  const [showChartSpend, setShowChartSpend] = React.useState(true);
+  const [showChartCohort, setShowChartCohort] = React.useState(true);
 
   const meQ = useQuery({
     queryKey: ['admin-me'],
@@ -320,22 +328,58 @@ export default function UsersBigDataPage() {
 
   const bulkMut = useMutation({
     mutationFn: async (action: 'suspend' | 'reactivate' | 'delete') => {
-      const user_ids = Object.keys(rowSelection).filter((id) => rowSelection[id]);
-      if (!user_ids.length) throw new Error('Sélectionnez au moins un compte');
+      const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+      if (!selectedIds.length) throw new Error('Sélectionnez au moins un compte');
+
+      let user_ids = selectedIds;
+      if (action === 'delete') {
+        user_ids = selectedIds.filter((id) => {
+          const row = flat.find((r) => r.id === id);
+          if (!row) return false;
+          const rr = String(row.role || '').toLowerCase();
+          return !['admin', 'superadmin', 'super_admin'].includes(rr);
+        });
+        if (user_ids.length === 0) {
+          throw new Error(
+            'Aucun compte supprimable : les administrateurs doivent être gérés depuis l’onglet Admins.',
+          );
+        }
+        const skipped = selectedIds.length - user_ids.length;
+        if (skipped > 0) {
+          toast.message(`${skipped} compte(s) administrateur(s) ignoré(s).`);
+        }
+      }
+
       const r = await fetch('/api/users/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ user_ids, action }),
       });
-      const j = (await r.json()) as { error?: string; processed?: number; errors?: string[] };
+      const j = (await r.json()) as { error?: string; processed?: number; failed?: number; errors?: string[] };
       if (!r.ok) throw new Error(formatApiError(j, 'Action lot échouée'));
       return j;
     },
     onSuccess: (data, action) => {
       const n = data.processed ?? 0;
-      toast.success(action === 'delete' ? `${n} compte(s) supprimé(s)` : `${n} compte(s) mis à jour`);
-      if (data.errors?.length) toast.message(data.errors.slice(0, 3).join(' · '));
+      const failed = data.failed ?? 0;
+      if (action === 'delete') {
+        if (n > 0) toast.success(`${n} compte(s) supprimé(s)`);
+        else if (failed > 0) {
+          toast.error(
+            'Aucun compte supprimé. Vérifiez les contraintes (données liées) ou réessayez après désactivation.',
+          );
+        }
+      } else if (n > 0) {
+        toast.success(`${n} compte(s) mis à jour`);
+      }
+      if (data.errors?.length) {
+        const short = data.errors
+          .slice(0, 2)
+          .map((line) => line.replace(/^[0-9a-f-]{36}:\s*/i, '').slice(0, 140))
+          .join(' · ');
+        toast.message(short + (data.errors.length > 2 ? '…' : ''));
+      }
       setRowSelection({});
       setBulkDeleteOpen(false);
       void inf.refetch();
@@ -593,6 +637,35 @@ export default function UsersBigDataPage() {
               <MessageSquare className="h-3.5 w-3.5 mr-1" />
               Broadcast In-App
             </Button>
+            <Popover>
+              <PopoverTrigger className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1')}>
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Affichage
+              </PopoverTrigger>
+              <PopoverContent className="w-72 space-y-3" align="end">
+                <p className="text-xs font-medium text-muted-foreground">Sections visibles</p>
+                <label className="flex items-center justify-between gap-2 text-sm">
+                  <span>KPI (cartes)</span>
+                  <Switch checked={showUserKpis} onCheckedChange={setShowUserKpis} />
+                </label>
+                <label className="flex items-center justify-between gap-2 text-sm">
+                  <span>Graph. inscriptions 30j</span>
+                  <Switch checked={showChartSignup} onCheckedChange={setShowChartSignup} />
+                </label>
+                <label className="flex items-center justify-between gap-2 text-sm">
+                  <span>Graph. pays</span>
+                  <Switch checked={showChartCountries} onCheckedChange={setShowChartCountries} />
+                </label>
+                <label className="flex items-center justify-between gap-2 text-sm">
+                  <span>Histogramme dépenses</span>
+                  <Switch checked={showChartSpend} onCheckedChange={setShowChartSpend} />
+                </label>
+                <label className="flex items-center justify-between gap-2 text-sm">
+                  <span>Rétention cohortes</span>
+                  <Switch checked={showChartCohort} onCheckedChange={setShowChartCohort} />
+                </label>
+              </PopoverContent>
+            </Popover>
             <Button variant="outline" size="sm" type="button" onClick={() => setShowRolePie((v) => !v)}>
               <PieChartIcon className="h-3.5 w-3.5 mr-1" />
               {showRolePie ? 'Masquer rôles' : 'Répartition rôles'}
@@ -618,6 +691,7 @@ export default function UsersBigDataPage() {
           {meQ.data?.isSuperAdmin ? <UsersAdminSection /> : null}
         </TabsContent>
         <TabsContent value="users" className="space-y-6 pt-4">
+          {showUserKpis ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <KPICard
               label="Total utilisateurs"
@@ -666,6 +740,7 @@ export default function UsersBigDataPage() {
               loading={loading}
             />
           </div>
+          ) : null}
 
           <FilterBar
             searchPlaceholder="Recherche email, nom, téléphone…"
@@ -768,6 +843,7 @@ export default function UsersBigDataPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
             >
+              {showChartSignup ? (
               <ChartWrapper title="Nouveaux utilisateurs / jour (30j)" isLoading={loading}>
                 <div className="h-[220px] w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -781,6 +857,8 @@ export default function UsersBigDataPage() {
                   </ResponsiveContainer>
                 </div>
               </ChartWrapper>
+              ) : null}
+              {showChartCountries ? (
               <ChartWrapper title="Top 10 pays" isLoading={loading}>
                 <div className="h-[220px] w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -794,9 +872,11 @@ export default function UsersBigDataPage() {
                   </ResponsiveContainer>
                 </div>
               </ChartWrapper>
+              ) : null}
+              {showChartSpend ? (
               <ChartWrapper title="Histogramme dépenses (échantillon)" isLoading={loading}>
                 <div className="h-[220px] w-full min-h-[220px] min-w-0">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <BarChart data={charts.spend_histogram}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                       <XAxis dataKey="range" tick={{ fontSize: 10 }} />
@@ -807,10 +887,11 @@ export default function UsersBigDataPage() {
                   </ResponsiveContainer>
                 </div>
               </ChartWrapper>
+              ) : null}
               {showRolePie ? (
                 <ChartWrapper title="Répartition des rôles (échantillon liste)" isLoading={loading}>
                   <div className="h-[220px] w-full min-h-[220px] min-w-0">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <PieChart>
                         <Pie
                           data={rolePieData}
@@ -831,7 +912,8 @@ export default function UsersBigDataPage() {
                     </ResponsiveContainer>
                   </div>
                 </ChartWrapper>
-              ) : (
+              ) : null}
+              {showChartCohort && !showRolePie ? (
                 <ChartWrapper title="Rétention par cohorte (commandes)" isLoading={loading}>
                   <p className="text-[11px] text-muted-foreground mb-2">
                     Lignes : semaine de la première commande (UTC). Colonnes : semaines suivantes (S+0 = même semaine). Pourcentage
@@ -879,8 +961,8 @@ export default function UsersBigDataPage() {
                     </table>
                   </div>
                 </ChartWrapper>
-              )}
-              {showRolePie ? (
+              ) : null}
+              {showChartCohort && showRolePie ? (
                 <ChartWrapper title="Rétention par cohorte (commandes)" isLoading={loading} className="md:col-span-2">
                   <p className="text-[11px] text-muted-foreground mb-2">
                     Lignes : semaine de la première commande (UTC). Colonnes : semaines suivantes (S+0 = même semaine). Pourcentage
@@ -942,8 +1024,12 @@ export default function UsersBigDataPage() {
           ) : (
             <>
               {selectedCount > 0 ? (
-                <Card className="flex flex-wrap items-center gap-2 border-[var(--gba-brand)]/25 bg-[color-mix(in_srgb,var(--gba-brand)_6%,transparent)] p-3">
-                  <span className="text-sm font-medium">{selectedCount} sélectionné(s)</span>
+                <div
+                  className="pointer-events-auto fixed bottom-6 left-1/2 z-50 flex w-[min(560px,calc(100vw-1.5rem))] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/80 bg-background/95 px-4 py-3 shadow-2xl shadow-black/20 backdrop-blur-md"
+                  role="dialog"
+                  aria-label="Actions sur la sélection"
+                >
+                  <span className="text-sm font-medium tabular-nums">{selectedCount} sélectionné(s)</span>
                   <Button size="sm" variant="secondary" disabled={bulkMut.isPending} onClick={() => bulkMut.mutate('suspend')}>
                     Suspendre
                   </Button>
@@ -958,7 +1044,7 @@ export default function UsersBigDataPage() {
                   <Button size="sm" variant="ghost" onClick={() => setRowSelection({})}>
                     Effacer la sélection
                   </Button>
-                </Card>
+                </div>
               ) : null}
               <DataTable
                 columns={columns}

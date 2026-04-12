@@ -438,9 +438,26 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     );
   }
 
+  {
+    const detach = await sb.from('orders').update({ user_id: null }).eq('user_id', id);
+    if (detach.error) {
+      /* ignore — NOT NULL ou schéma différent */
+    }
+  }
+
   const { error: delErr } = await sb.auth.admin.deleteUser(id);
   if (delErr) {
-    return NextResponse.json({ error: delErr.message }, { status: 400 });
+    const raw = String(delErr.message || '');
+    if (/database error deleting user/i.test(raw) || /foreign key/i.test(raw)) {
+      return NextResponse.json(
+        {
+          error:
+            'Suppression impossible : des données sont encore liées à ce compte (commandes, messages, avis, etc.). Désactivez le compte ou supprimez/anonymisez les références côté base.',
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: raw }, { status: 400 });
   }
 
   const role = await fetchActorRole(sup.userId);

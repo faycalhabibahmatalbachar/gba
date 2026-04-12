@@ -60,12 +60,18 @@ export function CreateUserWizard({ open, onOpenChange, onSuccess }: Props) {
   const isAdminLike = role === 'admin' || role === 'superadmin';
   const isDriver = role === 'driver';
 
-  const steps = React.useMemo(() => {
-    const base = ['Profil & rôle', 'Contact & accès', 'Spécifique', 'Récapitulatif'];
-    return base;
-  }, []);
-
-  const lastStepIndex = 3;
+  const { labels: stepLabels, maxStep } = React.useMemo(() => {
+    if (isAdminLike) {
+      return {
+        labels: ['Profil & rôle', 'Contact & accès', 'Spécifique', 'Récapitulatif'] as const,
+        maxStep: 3,
+      };
+    }
+    if (isDriver) {
+      return { labels: ['Profil & véhicule', 'Contact & accès', 'Récapitulatif'] as const, maxStep: 2 };
+    }
+    return { labels: ['Profil & rôle', 'Contact & accès', 'Récapitulatif'] as const, maxStep: 2 };
+  }, [isAdminLike, isDriver]);
 
   React.useEffect(() => {
     if (!open) {
@@ -133,9 +139,9 @@ export function CreateUserWizard({ open, onOpenChange, onSuccess }: Props) {
   }
 
   const canNext =
-    (step === 0 && firstName.trim()) ||
-    (step === 1 && email.trim()) ||
-    (step === 2 && (isDriver ? true : isAdminLike ? true : true));
+    (step === 0 && Boolean(firstName.trim())) ||
+    (step === 1 && Boolean(email.trim())) ||
+    (step === 2 && isAdminLike);
 
   function stepBody() {
     if (step === 0) {
@@ -168,6 +174,28 @@ export function CreateUserWizard({ open, onOpenChange, onSuccess }: Props) {
               <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Nom" />
             </div>
           </div>
+          {isDriver ? (
+            <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-3">
+              <p className="text-xs font-medium text-foreground">Véhicule</p>
+              <div className="space-y-2">
+                <Label>Type véhicule</Label>
+                <Select value={vehicleType} onValueChange={(v) => v && setVehicleType(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="moto">Moto</SelectItem>
+                    <SelectItem value="voiture">Voiture</SelectItem>
+                    <SelectItem value="vélo">Vélo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Plaque</Label>
+                <Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} placeholder="Plaque" />
+              </div>
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -203,82 +231,49 @@ export function CreateUserWizard({ open, onOpenChange, onSuccess }: Props) {
         </div>
       );
     }
-    if (step === 2) {
-      if (isDriver) {
-        return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Type véhicule</Label>
-              <Select value={vehicleType} onValueChange={(v) => v && setVehicleType(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="moto">Moto</SelectItem>
-                  <SelectItem value="voiture">Voiture</SelectItem>
-                  <SelectItem value="vélo">Vélo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Plaque</Label>
-              <Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} />
-            </div>
-          </div>
-        );
-      }
-      if (isAdminLike) {
-        return (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Matrice stockée dans <span className="font-mono">settings.admin_permissions_&lt;user_id&gt;</span>. Le respect
-              effectif dépend du garde-fou route (à durcir progressivement).
+    if (step === 2 && isAdminLike) {
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Matrice stockée dans <span className="font-mono">settings.admin_permissions_&lt;user_id&gt;</span>. Le respect effectif
+            dépend du garde-fou route (à durcir progressivement).
+          </p>
+          {role === 'superadmin' ? (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Superadmin : accès complet par défaut côté produit ; la grille sert de documentation / future policy.
             </p>
-            {role === 'superadmin' ? (
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Superadmin : accès complet par défaut côté produit ; la grille sert de documentation / future policy.
-              </p>
-            ) : null}
-            <div className="max-h-[min(52vh,420px)] overflow-auto rounded-md border">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-muted/80 backdrop-blur">
-                  <tr className="border-b text-left">
-                    <th className="p-2">Module</th>
+          ) : null}
+          <div className="max-h-[min(52vh,420px)] overflow-auto rounded-md border">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-muted/80 backdrop-blur">
+                <tr className="border-b text-left">
+                  <th className="p-2">Module</th>
+                  {ACTIONS.map((a) => (
+                    <th key={a} className="p-2 capitalize">
+                      {a}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {SECTIONS.map((s) => (
+                  <tr key={s.id} className="border-b border-border/50">
+                    <td className="p-2 font-medium">{s.label}</td>
                     {ACTIONS.map((a) => (
-                      <th key={a} className="p-2 capitalize">
-                        {a}
-                      </th>
+                      <td key={a} className="p-2">
+                        <Switch checked={Boolean(perms[s.id]?.[a])} onCheckedChange={(c) => togglePerm(s.id, a, c)} />
+                      </td>
                     ))}
                   </tr>
-                </thead>
-                <tbody>
-                  {SECTIONS.map((s) => (
-                    <tr key={s.id} className="border-b border-border/50">
-                      <td className="p-2 font-medium">{s.label}</td>
-                      {ACTIONS.map((a) => (
-                        <td key={a} className="p-2">
-                          <Switch
-                            checked={Boolean(perms[s.id]?.[a])}
-                            onCheckedChange={(c) => togglePerm(s.id, a, c)}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-        );
-      }
-      return (
-        <p className="text-sm text-muted-foreground">
-          Aucune étape supplémentaire pour le rôle client. Passez au récapitulatif.
-        </p>
+        </div>
       );
     }
     return (
-      <div className="rounded-lg border bg-muted/20 p-4 text-sm space-y-2">
+      <div className="rounded-xl border border-border/80 bg-gradient-to-br from-muted/40 to-muted/10 p-5 text-sm space-y-2 shadow-inner">
         <p>
           <span className="text-muted-foreground">Identité :</span> {firstName} {lastName}
         </p>
@@ -295,8 +290,8 @@ export function CreateUserWizard({ open, onOpenChange, onSuccess }: Props) {
         ) : null}
         {isAdminLike ? (
           <p className="text-xs text-muted-foreground">
-            Permissions : {Object.keys(perms).filter((k) => perms[k]?.edit || perms[k]?.export).length} module(s) avec droits
-            étendus (hors vue seule).
+            Permissions : {Object.keys(perms).filter((k) => perms[k]?.edit || perms[k]?.export).length} module(s) avec droits étendus
+            (hors vue seule).
           </p>
         ) : null}
       </div>
@@ -305,21 +300,31 @@ export function CreateUserWizard({ open, onOpenChange, onSuccess }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-[880px] sm:w-[min(880px,100%)]">
-        <SheetHeader className="space-y-1 text-left">
-          <SheetTitle>Créer un utilisateur</SheetTitle>
-          <SheetDescription>Assistant multi-étapes — client, livreur, admin ou superadmin avec droits avancés.</SheetDescription>
+      <SheetContent
+        className={cn(
+          'flex w-full flex-col overflow-hidden border-l border-border/60 bg-background/95 backdrop-blur-sm',
+          'sm:max-w-[min(1024px,calc(100vw-1.5rem))] sm:w-[min(1024px,calc(100vw-1.5rem))]',
+          'shadow-2xl shadow-primary/10',
+        )}
+      >
+        <SheetHeader className="space-y-2 text-left border-b border-border/50 pb-4">
+          <SheetTitle className="text-xl tracking-tight">Créer un utilisateur</SheetTitle>
+          <SheetDescription className="text-sm leading-relaxed">
+            Assistant multi-étapes — client, livreur, admin ou superadmin avec droits avancés.
+          </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 flex flex-wrap gap-2 border-b border-border pb-3">
-          {steps.map((label, i) => (
+        <div className="mt-4 flex flex-wrap gap-2 border-b border-border/60 pb-3">
+          {stepLabels.map((label, i) => (
             <button
               key={label}
               type="button"
               onClick={() => setStep(i)}
               className={cn(
-                'rounded-full border px-3 py-1 text-xs transition-colors',
-                i === step ? 'border-primary bg-primary/10 font-semibold' : 'border-transparent text-muted-foreground hover:bg-muted',
+                'rounded-full border px-3 py-1.5 text-xs transition-colors',
+                i === step
+                  ? 'border-primary bg-primary/10 font-semibold text-foreground shadow-sm'
+                  : 'border-transparent text-muted-foreground hover:bg-muted/80',
               )}
             >
               {i + 1}. {label}
@@ -329,13 +334,13 @@ export function CreateUserWizard({ open, onOpenChange, onSuccess }: Props) {
 
         <div className="min-h-0 flex-1 overflow-y-auto py-4">{stepBody()}</div>
 
-        <div className="mt-auto flex gap-2 border-t border-border pt-4">
+        <div className="mt-auto flex gap-2 border-t border-border/60 pt-4">
           {step > 0 ? (
             <Button type="button" variant="outline" className="flex-1" onClick={() => setStep((s) => s - 1)}>
               Retour
             </Button>
           ) : null}
-          {step < lastStepIndex ? (
+          {step < maxStep ? (
             <Button type="button" className="flex-1" disabled={!canNext} onClick={() => setStep((s) => s + 1)}>
               Suivant
             </Button>

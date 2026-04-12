@@ -45,6 +45,8 @@ type OrderEmbedRow = {
   notes?: string | null;
   metadata?: Record<string, unknown> | null;
   driver_id?: string | null;
+  /** Dénormalisé sur `orders` (préféré — l’embed profiles!orders_driver_id est souvent invalide si driver_id pointe vers auth.users). */
+  driver_name?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
   order_items?: OrderItemEmbed[] | null;
@@ -116,9 +118,10 @@ function mapOrderRow(order: OrderEmbedRow) {
   const itemCount = items.length;
 
   const dp = unwrapOne(order.driver_profile);
-  const driverName = dp
-    ? `${dp.first_name ?? ''} ${dp.last_name ?? ''}`.trim() || null
-    : null;
+  const driverName =
+    (order.driver_name && String(order.driver_name).trim()) ||
+    (dp ? `${dp.first_name ?? ''} ${dp.last_name ?? ''}`.trim() : '') ||
+    null;
   const specialPayload = parseSpecialPayload(order.notes || order.metadata);
   const isSpecialMobile = detectSpecialMobile(order, specialPayload);
   const quoteStatus = deriveQuoteStatus(specialPayload);
@@ -145,35 +148,8 @@ function mapOrderRow(order: OrderEmbedRow) {
   };
 }
 
+/** Liste riche sans embed livreur → profiles (souvent cassé : FK orders.driver_id → auth.users, pas profiles). */
 const SELECT_FULL = `
-  id,
-  order_number,
-  created_at,
-  updated_at,
-  status,
-  payment_status,
-  payment_method,
-  total_amount,
-  shipping_address,
-  notes,
-  metadata,
-  driver_id,
-  customer_name,
-  customer_phone,
-  driver_profile:profiles!orders_driver_id_fkey(first_name, last_name),
-  order_items(
-    id,
-    quantity,
-    unit_price,
-    total_price,
-    product_id,
-    product_name,
-    product_image,
-    products(id, name, main_image, sku)
-  )
-`;
-
-const SELECT_NO_DRIVER = `
   id,
   order_number,
   created_at,
@@ -316,8 +292,14 @@ export async function GET(req: Request) {
   if (res.error) {
     logOrdersStep('after_SELECT_FULL_retry', res.error);
     const msg = String(res.error.message || '');
-    if (msg.includes('driver_profile') || msg.includes('orders_driver_id_fkey') || msg.includes('Could not find')) {
-      res = await runSelect(SELECT_NO_DRIVER, true);
+    if (
+      msg.includes('products') ||
+      msg.includes('relationship') ||
+      msg.includes('order_items') ||
+      msg.includes('product_name') ||
+      msg.includes('Could not find')
+    ) {
+      res = await runSelect(SELECT_NO_PRODUCTS, true);
     }
   }
   if (res.error) {
@@ -340,14 +322,14 @@ export async function GET(req: Request) {
     }
   }
   if (res.error) {
-    logOrdersStep('after_SELECT_NO_DRIVER_meta_true', res.error);
+    logOrdersStep('after_SELECT_NO_PRODUCTS_meta_chain', res.error);
     const msg = String(res.error.message || '');
     if (msg.includes('metadata') || msg.includes('column orders.metadata')) {
-      res = await runSelect(SELECT_NO_DRIVER, false);
+      res = await runSelect(SELECT_NO_PRODUCTS, false);
     }
   }
   if (res.error) {
-    logOrdersStep('after_SELECT_NO_DRIVER_retry', res.error);
+    logOrdersStep('after_SELECT_NO_PRODUCTS_retry', res.error);
     const msg = String(res.error.message || '');
     if (
       msg.includes('products') ||

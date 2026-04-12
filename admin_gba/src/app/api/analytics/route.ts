@@ -1,9 +1,23 @@
 import { NextResponse } from 'next/server';
-import { subDays, startOfDay } from 'date-fns';
+import { subDays, startOfDay, endOfDay, format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { requireAdmin } from '@/app/api/_lib/require-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 
 export const dynamic = 'force-dynamic';
+
+function stockLevel(p: { quantity?: number | null; stock_quantity?: number | null }) {
+  const n = p.stock_quantity ?? p.quantity ?? 0;
+  return Number(n);
+}
+
+function productDisplayName(p: { name?: string | null; sku?: string | null }) {
+  const name = String(p.name || '').trim();
+  if (name) return name;
+  const sku = String(p.sku || '').trim();
+  if (sku) return sku;
+  return 'Produit';
+}
 
 export async function GET(req: Request) {
   const auth = await requireAdmin();
@@ -24,7 +38,10 @@ export async function GET(req: Request) {
     const [ordersRes, profilesRes, productsRes, reviewsRes] = await Promise.all([
       sb.from('orders').select('id, total_amount, status, created_at, user_id').gte('created_at', from).limit(12000),
       sb.from('profiles').select('id, created_at, role').gte('created_at', from).limit(5000),
-      sb.from('products').select('id, name, price, quantity, reviews_count, rating').limit(2000),
+      sb
+        .from('products')
+        .select('id, name, sku, quantity, stock_quantity, reviews_count, rating')
+        .limit(2000),
       sb.from('reviews').select('id, rating, created_at').gte('created_at', from).limit(5000),
     ]);
 
@@ -50,15 +67,36 @@ export async function GET(req: Request) {
       reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
 
     const day0 = startOfDay(new Date());
-    const retentionBuckets = [0, 1, 2, 3, 4, 5, 6, 7].map((d) => {
-      const dayStart = subDays(day0, d);
-      const dayEnd = subDays(day0, d - 1);
+    const ordersLast8d: { label: string; orders: number }[] = [];
+    for (let i = 7; i >= 0; i--) {
+      const day = subDays(day0, i);
+      const ds = startOfDay(day).getTime();
+      const de = endOfDay(day).getTime();
       const cnt = orders.filter((o) => {
         const t = new Date(o.created_at).getTime();
-        return t >= dayStart.getTime() && t < dayEnd.getTime();
+        return t >= ds && t <= de;
       }).length;
-      return { label: `J-${d}`, orders: cnt };
-    });
+      ordersLast8d.push({
+        label: format(day, 'd MMM', { locale: fr }),
+        orders: cnt,
+      });
+    }
+
+    const productsRaw = (productsRes.data || []) as {
+      name: string | null;
+      sku: string | null;
+      quantity: number | null;
+      stock_quantity: number | null;
+    }[];
+
+    const topProductsByStockRisk = productsRaw
+      .map((p) => ({
+        name: productDisplayName(p),
+        quantity: stockLevel(p),
+      }))
+      .filter((p) => p.quantity < 10)
+      .sort((a, b) => a.quantity - b.quantity)
+      .slice(0, 15);
 
     return NextResponse.json({
       periodDays: days,
@@ -70,10 +108,8 @@ export async function GET(req: Request) {
       ordersByStatus: Object.entries(byStatus).map(([status, count]) => ({ status, count })),
       avgReviewRating: Math.round(avgReview * 100) / 100,
       reviewCount: reviews.length,
-      topProductsByStockRisk: ((productsRes.data || []) as { name: string; quantity: number | null }[])
-        .filter((p) => (p.quantity ?? 0) < 10)
-        .slice(0, 15),
-      ordersLast8d: retentionBuckets,
+      topProductsByStockRisk,
+      ordersLast8d,
     });
   } catch (e) {
     return NextResponse.json({ error: String((e as Error).message) }, { status: 500 });
