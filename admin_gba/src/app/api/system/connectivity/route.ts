@@ -34,6 +34,9 @@ export async function GET() {
       has_supabase_service_key: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
       has_resend_key: Boolean(process.env.RESEND_API_KEY),
       has_smtp: Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS),
+      enable_outbound_email: String(process.env.ENABLE_OUTBOUND_EMAIL || '')
+        .trim()
+        .toLowerCase() === 'true',
     },
     checks: [] as Record<string, unknown>[],
   };

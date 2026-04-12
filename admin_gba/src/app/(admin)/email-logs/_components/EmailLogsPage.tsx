@@ -3,8 +3,9 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Activity, BookOpen, Mail, Sliders } from 'lucide-react';
+import { Activity, BookOpen, Check, Mail, Sliders, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -193,46 +194,58 @@ export function EmailLogsPage() {
   const resendReachable = connectivity.isFetched ? (resendNet ? !!resendNet.ok : null) : null;
 
   return (
-    <div className="space-y-6 pb-10 max-w-[1600px]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border/60 pb-4">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight font-heading">Centre notifications emails</h1>
-          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Journal des envois, routage Resend / SMTP et contrôle de connectivité.
-          </p>
+    <div className="space-y-6 pb-10 max-w-[1600px] mx-auto">
+      <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-muted/40 via-muted/15 to-background p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-tight font-heading">Centre notifications emails</h1>
+            <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
+              Journal des envois, routage Resend / SMTP et contrôle de connectivité.
+            </p>
+          </div>
+          <Link
+            href="/settings"
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5 shrink-0 inline-flex shadow-sm')}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            Paramètres
+          </Link>
         </div>
-        <Link
-          href="/settings"
-          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5 shrink-0 inline-flex')}
-        >
-          <BookOpen className="h-3.5 w-3.5" />
-          Paramètres
-        </Link>
-      </div>
 
-      <div className="flex flex-wrap gap-2 p-1 rounded-xl bg-muted/40 border border-border/60">
-        {(
-          [
-            { id: 'journal' as const, label: 'Journal', icon: Mail },
-            { id: 'politiques' as const, label: 'Politiques', icon: Sliders },
-            { id: 'plateforme' as const, label: 'Plateforme', icon: Activity },
-          ] as const
-        ).map((t) => {
-          const Icon = t.icon;
-          return (
-            <Button
-              key={t.id}
-              type="button"
-              size="sm"
-              variant={tab === t.id ? 'default' : 'ghost'}
-              className="gap-1.5 rounded-lg"
-              onClick={() => setTab(t.id)}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {t.label}
-            </Button>
-          );
-        })}
+        <div
+          className="mt-5 flex flex-wrap gap-1 p-1 rounded-xl bg-background/60 border border-border/50 shadow-inner"
+          role="tablist"
+          aria-label="Sections email"
+        >
+          {(
+            [
+              { id: 'journal' as const, label: 'Journal', icon: Mail },
+              { id: 'politiques' as const, label: 'Politiques', icon: Sliders },
+              { id: 'plateforme' as const, label: 'Plateforme', icon: Activity },
+            ] as const
+          ).map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.id;
+            return (
+              <Button
+                key={t.id}
+                type="button"
+                size="sm"
+                variant={active ? 'default' : 'ghost'}
+                className={cn(
+                  'gap-1.5 rounded-lg flex-1 min-w-[7rem] sm:flex-initial focus-visible:ring-2 focus-visible:ring-ring',
+                  active && 'shadow-sm',
+                )}
+                onClick={() => setTab(t.id)}
+                role="tab"
+                aria-selected={active}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {t.label}
+              </Button>
+            );
+          })}
+        </div>
       </div>
 
       {tab === 'journal' ? (
@@ -240,6 +253,10 @@ export function EmailLogsPage() {
           <EmailLogsChannelStatus
             emailSvc={emailSvc}
             hasResendKey={Boolean(envChecks.has_resend_key)}
+            hasSmtp={Boolean(envChecks.has_smtp)}
+            enableOutboundEmail={
+              connectivity.isSuccess ? Boolean((envChecks as Record<string, boolean>).enable_outbound_email) : true
+            }
             resendReachable={resendReachable}
             onSendTest={() => sendTest.mutate()}
             sendTestPending={sendTest.isPending}
@@ -318,7 +335,7 @@ export function EmailLogsPage() {
 
       {tab === 'politiques' ? (
         <div className="grid gap-4 md:grid-cols-2">
-          <Card className="p-5 border-border/80">
+          <Card className="p-5 border-border/60 shadow-sm bg-card/90 backdrop-blur-sm">
             <h2 className="text-sm font-semibold mb-3">Routage fournisseur</h2>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">{EMAIL_ROUTING_SUMMARY}</p>
             <p className="text-xs text-muted-foreground mb-4">
@@ -329,64 +346,82 @@ export function EmailLogsPage() {
               Ouvrir les paramètres
             </Link>
           </Card>
-          <Card className="p-5 border-border/80">
+          <Card className="p-5 border-border/60 shadow-sm bg-card/90 backdrop-blur-sm">
             <h2 className="text-sm font-semibold mb-3">Traçabilité</h2>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">{EMAIL_TRACEBILITY_SHORT}</p>
-            <Link
+            <a
               href="/docs/email-logs-features.md"
               target="_blank"
               rel="noopener noreferrer"
               className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'inline-flex')}
             >
               Documentation (repo)
-            </Link>
+            </a>
           </Card>
         </div>
       ) : null}
 
       {tab === 'plateforme' ? (
-        <Card className="p-5 space-y-6 border-border/80">
+        <Card className="p-5 sm:p-6 space-y-6 border-border/60 shadow-sm bg-card/90 backdrop-blur-sm">
           <div>
-            <h2 className="text-sm font-semibold">Variables d&apos;environnement</h2>
-            <p className="text-xs text-muted-foreground mt-1">Indicateurs booléens — aucune clé exposée au navigateur.</p>
+            <h2 className="text-base font-semibold tracking-tight">Variables d&apos;environnement</h2>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+              Indicateurs booléens — aucune clé exposée au navigateur.
+            </p>
           </div>
           {connectivity.isLoading ? (
-            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full rounded-xl" />
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 text-xs">
               {Object.entries(envChecks).map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-                  <span className="font-mono text-[10px] text-muted-foreground truncate" title={k}>
+                <div
+                  key={k}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/15 px-3 py-2.5"
+                >
+                  <span className="font-mono text-[11px] text-muted-foreground truncate min-w-0" title={k}>
                     {k}
                   </span>
-                  <span className={v ? 'text-emerald-600 font-medium shrink-0' : 'text-destructive font-medium shrink-0'}>
+                  <Badge
+                    variant={v ? 'default' : 'destructive'}
+                    className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2"
+                  >
                     {v ? 'oui' : 'non'}
-                  </span>
+                  </Badge>
                 </div>
               ))}
             </div>
           )}
           <div>
-            <h2 className="text-sm font-semibold mb-2">Tests réseau (HEAD, ~5 s)</h2>
-            <div className="overflow-x-auto rounded-lg border border-border/60">
+            <h2 className="text-base font-semibold tracking-tight mb-2">Tests réseau (HEAD, ~5 s)</h2>
+            <div className="overflow-x-auto rounded-xl border border-border/60 bg-muted/10">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="py-2 px-3">Cible</th>
-                    <th className="py-2 px-3">Résultat</th>
-                    <th className="py-2 px-3">Temps</th>
-                    <th className="py-2 px-3">Erreur</th>
+                  <tr className="border-b bg-muted/35 text-left text-muted-foreground font-medium">
+                    <th className="py-2.5 px-3">Cible</th>
+                    <th className="py-2.5 px-3">Résultat</th>
+                    <th className="py-2.5 px-3">Temps</th>
+                    <th className="py-2.5 px-3">Erreur</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {netChecks.map((c) => (
-                    <tr key={String(c.target)} className="border-b border-border/50 last:border-0">
-                      <td className="py-2 px-3 font-mono">{String(c.target)}</td>
-                      <td className="py-2 px-3">
-                        {c.ok ? <span className="text-emerald-600 font-medium">OK</span> : <span className="text-destructive font-medium">KO</span>}
+                  {netChecks.map((c, i) => (
+                    <tr key={String(c.target)} className={cn('border-b border-border/40 last:border-0', i % 2 === 1 && 'bg-muted/15')}>
+                      <td className="py-2.5 px-3 font-mono text-[11px]">{String(c.target)}</td>
+                      <td className="py-2.5 px-3">
+                        {c.ok ? (
+                          <span className="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
+                            <Check className="h-3.5 w-3.5" aria-hidden />
+                            OK
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-destructive font-medium">
+                            <X className="h-3.5 w-3.5" aria-hidden />
+                            KO
+                          </span>
+                        )}
                       </td>
-                      <td className="py-2 px-3 tabular-nums">{c.ms ?? '—'} ms</td>
-                      <td className="py-2 px-3 text-muted-foreground max-w-[200px] truncate" title={c.error || ''}>
+                      <td className="py-2.5 px-3 tabular-nums text-muted-foreground">{c.ms ?? '—'} ms</td>
+                      <td className="py-2.5 px-3 text-muted-foreground max-w-[220px] truncate text-[11px]" title={c.error || ''}>
                         {c.error || '—'}
                       </td>
                     </tr>

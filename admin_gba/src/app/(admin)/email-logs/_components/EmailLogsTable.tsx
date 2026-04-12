@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Mail } from 'lucide-react';
+import { CheckCircle2, Mail, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,11 +60,11 @@ type Props = {
 
 export function EmailLogsTable({ rows, isLoading, onOpenDetail, onResend, resendPending }: Props) {
   return (
-    <div className="rounded-xl border border-border/80 overflow-hidden bg-card">
+    <div className="rounded-xl border border-border/60 overflow-hidden bg-card/90 backdrop-blur-[2px] shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/35 text-left text-xs font-medium text-muted-foreground">
+            <tr className="border-b bg-muted/40 text-left text-xs font-semibold tracking-wide text-muted-foreground">
               <th className="px-3 py-2.5 whitespace-nowrap">Date</th>
               <th className="px-3 py-2.5 whitespace-nowrap">Type</th>
               <th className="px-3 py-2.5 min-w-[140px]">Destinataire</th>
@@ -75,7 +75,7 @@ export function EmailLogsTable({ rows, isLoading, onOpenDetail, onResend, resend
               <th className="px-3 py-2.5 text-right whitespace-nowrap">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/60">
+          <tbody>
             {isLoading
               ? [...Array(6)].map((_, i) => (
                   <tr key={i}>
@@ -84,8 +84,14 @@ export function EmailLogsTable({ rows, isLoading, onOpenDetail, onResend, resend
                     </td>
                   </tr>
                 ))
-              : rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-muted/25 transition-colors">
+              : rows.map((r, idx) => (
+                  <tr
+                    key={r.id}
+                    className={cn(
+                      'border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors',
+                      idx % 2 === 1 && 'bg-muted/10',
+                    )}
+                  >
                     <td className="px-3 py-2 align-top text-xs tabular-nums text-muted-foreground whitespace-nowrap">
                       {formatSecurityShortFr(r.created_at ?? null)}
                     </td>
@@ -119,7 +125,17 @@ export function EmailLogsTable({ rows, isLoading, onOpenDetail, onResend, resend
                       </span>
                     </td>
                     <td className="px-3 py-2 align-top text-xs text-right tabular-nums text-muted-foreground whitespace-nowrap">
-                      {r.latency_ms != null ? `${r.latency_ms} ms` : '—'}
+                      {r.latency_ms != null ? (
+                        <span className="inline-flex items-center justify-end gap-1.5">
+                          <Timer className="h-3 w-3 opacity-60 shrink-0" aria-hidden />
+                          {r.status === 'sent' ? (
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" aria-hidden />
+                          ) : null}
+                          <span>{r.latency_ms} ms</span>
+                        </span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="px-3 py-2 align-top text-right">
                       <div className="inline-flex flex-wrap justify-end gap-1.5">

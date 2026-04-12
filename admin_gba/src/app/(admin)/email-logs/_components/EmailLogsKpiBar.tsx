@@ -23,9 +23,12 @@ export function EmailLogsKpiBar({ isLoading, totalMonth, successRate, failedMont
   ];
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {items.map(({ label, value, emphasize }) => (
-        <Card key={label} className="p-3 relative overflow-hidden border-border/80">
+        <Card
+          key={label}
+          className="p-4 relative overflow-hidden border-border/60 bg-card/80 backdrop-blur-sm shadow-sm"
+        >
           <div className="flex items-start justify-between gap-2">
             <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
             {label === 'Total ce mois' ? (
