@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       const safe = qSubj.replace(/[%*,]/g, '').slice(0, 120);
       if (safe) q = q.or(`subject.ilike.%${safe}%,error_message.ilike.%${safe}%`);
     }
-    if (provider && ['smtp', 'resend'].includes(provider)) {
+    if (provider && ['smtp', 'resend', 'mock'].includes(provider)) {
       q = q.eq('provider', provider);
     }
     if (retryable === 'true') q = q.eq('retryable', true);
