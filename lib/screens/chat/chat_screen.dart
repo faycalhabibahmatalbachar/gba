@@ -331,14 +331,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _onTypingChanged() {
     final hasText = _messageController.text.trim().isNotEmpty;
     if (hasText && !_isTyping) {
-      _isTyping = true;
+      if (mounted) setState(() => _isTyping = true);
       _sendButtonController.forward();
       // Notifier le service que l'utilisateur tape
       if (_conversation != null) {
         context.read<MessagingService>().setTypingIndicator(_conversation!.id, true);
       }
     } else if (!hasText && _isTyping) {
-      _isTyping = false;
+      if (mounted) setState(() => _isTyping = false);
       _sendButtonController.reverse();
       if (_conversation != null) {
         context.read<MessagingService>().setTypingIndicator(_conversation!.id, false);
@@ -1146,6 +1146,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Widget _buildMessageInput() {
     final localizations = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final hasText = _messageController.text.trim().isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1161,19 +1162,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       child: SafeArea(
         child: Row(
           children: [
-            IconButton(
-              icon: Icon(
-                _isRecordingVoice ? Icons.stop_circle : Icons.mic_none_rounded,
-                color: _isRecordingVoice ? Colors.red : Theme.of(context).primaryColor,
-              ),
-              tooltip: _isRecordingVoice ? 'Arrêter et envoyer' : 'Message vocal',
-              onPressed: () => _toggleVoiceRecording(),
-            ),
-            if (_isRecordingVoice)
-              Text(
-                '${(_recordingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_recordingSeconds % 60).toString().padLeft(2, '0')}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red),
-              ),
             IconButton(
               icon: Icon(
                 Icons.attach_file,
@@ -1206,15 +1194,35 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(width: 8),
+            if (_isRecordingVoice)
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.withOpacity(0.35)),
+                ),
+                child: Text(
+                  'REC ${(_recordingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_recordingSeconds % 60).toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.red,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
             AnimatedBuilder(
               animation: _sendButtonAnimation,
               builder: (context, child) {
+                final showSend = _isRecordingVoice || hasText;
                 return Transform.scale(
                   scale: 0.8 + (_sendButtonAnimation.value * 0.2),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: _messageController.text.trim().isNotEmpty
+                      gradient: showSend
                           ? LinearGradient(
                               colors: [
                                 Theme.of(context).primaryColor,
@@ -1222,9 +1230,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                               ],
                             )
                           : null,
-                      color: _messageController.text.trim().isEmpty
-                          ? cs.surfaceContainerHighest
-                          : null,
+                      color: showSend ? null : cs.surfaceContainerHighest,
                     ),
                     child: IconButton(
                       icon: _isSending
@@ -1236,13 +1242,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Icon(
-                              Icons.send,
-                              color: Colors.white,
+                          : Icon(
+                              showSend ? Icons.send : Icons.mic_none_rounded,
+                              color: showSend ? Colors.white : Theme.of(context).primaryColor,
                             ),
-                      onPressed: _messageController.text.trim().isNotEmpty && !_isSending
-                          ? _sendMessage
-                          : null,
+                      onPressed: _isSending
+                          ? null
+                          : showSend
+                              ? (_isRecordingVoice ? _toggleVoiceRecording : _sendMessage)
+                              : _toggleVoiceRecording,
                     ),
                   ),
                 );

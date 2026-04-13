@@ -30,10 +30,8 @@ import {
   Reply,
   Search,
   Send,
-  Square,
   Star,
   Trash2,
-  Volume2,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -72,12 +70,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { AudioPlayer } from '@/components/shared/AudioPlayer';
 import { useMessagesContext } from './MessagesContext';
 import type { ChatMessage } from './types';
 import { TemplatesPicker } from './TemplatesPicker';
 import { msgCopy } from './messagesCopy';
 
 const EMOJIS = ['😀', '😁', '👍', '🙏', '❤️', '🔥', '✅', '📦', '🚚', '💬', '🎉', '⚠️'];
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
+}
 
 function roleLabelFr(role: string | undefined): string {
   const r = String(role || 'user').toLowerCase();
@@ -106,13 +109,13 @@ function mapRowToChatMessage(row: Record<string, unknown>): ChatMessage {
 function micErrorMessage(err: unknown): string {
   const d = err as { name?: string; message?: string };
   if (d?.name === 'NotAllowedError' || d?.name === 'PermissionDeniedError') {
-    return 'Micro refusé : autorisez le micro dans les paramètres du navigateur pour ce site.';
+    return '🎤 Microphone refusé · Autorisez l\'accès dans Paramètres navigateur > Confidentialité > Microphone';
   }
   if (d?.name === 'NotFoundError' || d?.name === 'DevicesNotFoundError') {
-    return 'Aucun micro détecté sur cet appareil.';
+    return '🎤 Aucun microphone détecté sur cet appareil';
   }
   if (d?.name === 'NotReadableError' || d?.name === 'TrackStartError') {
-    return 'Micro déjà utilisé par une autre application.';
+    return '🎤 Microphone utilisé par une autre application. Fermez les autres onglets ou applications audio.';
   }
   if (typeof window !== 'undefined' && !window.isSecureContext && !/^localhost$|^127\./i.test(window.location.hostname)) {
     return 'HTTPS requis : ouvrez l’admin en https:// pour utiliser le micro.';
@@ -124,31 +127,6 @@ function QuotedMessage({ body }: { body: string }) {
   return (
     <div className="mb-1 rounded border-l-2 border-brand/50 bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
       {body.slice(0, 200)}
-    </div>
-  );
-}
-
-function AudioPlayer({ src }: { src: string }) {
-  const ref = React.useRef<HTMLAudioElement>(null);
-  const [prog, setProg] = React.useState(0);
-  return (
-    <div className="flex w-full max-w-[220px] flex-col gap-1">
-      <audio ref={ref} src={src} onTimeUpdate={() => {
-        const a = ref.current;
-        if (!a?.duration) return;
-        setProg((a.currentTime / a.duration) * 100);
-      }} />
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={prog}
-        readOnly
-        className="h-1 w-full accent-brand"
-      />
-      <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => void ref.current?.play()}>
-        Lecture
-      </Button>
     </div>
   );
 }
@@ -309,9 +287,8 @@ function renderMessageContent(
     const url = attachments[0]?.url || body;
     if (!url) return null;
     return (
-      <div className="flex items-center gap-2 bg-muted rounded-lg p-2 max-w-[280px]">
-        <Volume2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <audio controls src={url} className="h-8 flex-1 min-w-0" />
+      <div className="max-w-[320px]">
+        <AudioPlayer src={url} />
       </div>
     );
   }
@@ -343,9 +320,8 @@ function renderMessageContent(
           }
           if (ty.startsWith('audio/') || url.includes('.webm') || url.includes('.ogg')) {
             return (
-              <div key={`${url}-${i}`} className="flex items-center gap-2 bg-muted rounded-lg p-2">
-                <Volume2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <audio controls src={url} className="h-8 flex-1 min-w-0" />
+              <div key={`${url}-${i}`} className="max-w-[320px]">
+                <AudioPlayer src={url} />
               </div>
             );
           }
@@ -451,15 +427,30 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
   const [pendingBelow, setPendingBelow] = React.useState(0);
   const [isRecording, setIsRecording] = React.useState(false);
   const [recordSecs, setRecordSecs] = React.useState(0);
+  const [recordingWarningShown, setRecordingWarningShown] = React.useState(false);
+  const [audioSignalActive, setAudioSignalActive] = React.useState(false);
+  const [recordPreview, setRecordPreview] = React.useState<{
+    blob: Blob;
+    url: string;
+    mimeType: string;
+    durationSec: number;
+  } | null>(null);
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const chunksRef = React.useRef<Blob[]>([]);
   const recordTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const recordStreamRef = React.useRef<MediaStream | null>(null);
+  const audioCtxRef = React.useRef<AudioContext | null>(null);
+  const analyserRef = React.useRef<AnalyserNode | null>(null);
+  const dataArrayRef = React.useRef<number[] | null>(null);
+  const rafRef = React.useRef<number | null>(null);
+  const waveformLevelsRef = React.useRef<number[]>([]);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const imgRef = React.useRef<HTMLInputElement>(null);
-  const uploadFileRef = React.useRef<(file: File) => Promise<void>>(async () => {});
+  const recordingWarningRef = React.useRef(false);
 
-  const uploadFile = React.useCallback(async (file: File) => {
+  const uploadFileAndReturn = React.useCallback(async (file: File) => {
     let toSend = file;
     if (file.type.startsWith('image/') && file.size > 2 * 1024 * 1024) {
       try {
@@ -474,13 +465,17 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
     const j = (await res.json()) as { error?: string; url?: string; name?: string; size?: number; type?: string };
     if (!res.ok) {
       toast.error(typeof j.error === 'string' ? j.error : 'Upload échoué');
-      return;
+      return null;
     }
-    setPendingFiles((p) => [
-      ...p,
-      { url: j.url as string, name: j.name as string, size: j.size as number, type: j.type as string },
-    ]);
+    if (!j.url || !j.type) return null;
+    return { url: j.url, name: j.name ?? file.name, size: j.size ?? file.size, type: j.type };
   }, []);
+
+  const uploadFile = React.useCallback(async (file: File) => {
+    const uploaded = await uploadFileAndReturn(file);
+    if (!uploaded) return;
+    setPendingFiles((p) => [...p, uploaded]);
+  }, [uploadFileAndReturn]);
 
   const canUseMic = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -490,18 +485,34 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
     return hasMedia && secure;
   }, []);
 
-  React.useLayoutEffect(() => {
-    uploadFileRef.current = uploadFile;
-  }, [uploadFile]);
-
-  const stopRecording = React.useCallback(() => {
-    mediaRecorderRef.current?.stop();
-    setIsRecording(false);
+  const cleanupRecordResources = React.useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     if (recordTimerRef.current) {
       clearInterval(recordTimerRef.current);
       recordTimerRef.current = null;
     }
+    if (recordStreamRef.current) {
+      recordStreamRef.current.getTracks().forEach((t) => t.stop());
+      recordStreamRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      void audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    analyserRef.current = null;
+    dataArrayRef.current = null;
+    waveformLevelsRef.current = [];
+    setAudioSignalActive(false);
   }, []);
+
+  const stopRecording = React.useCallback(() => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+    cleanupRecordResources();
+  }, [cleanupRecordResources]);
 
   const startRecording = React.useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -520,6 +531,7 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
           channelCount: 1,
         },
       });
+      recordStreamRef.current = stream;
       const preferred = [
         'audio/webm;codecs=opus',
         'audio/webm',
@@ -538,10 +550,60 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
           mr = new MediaRecorder(stream);
         } catch {
           stream.getTracks().forEach((t) => t.stop());
-          toast.error('Enregistrement audio non supporté sur ce navigateur.');
+          toast.error('⚠️ Votre navigateur ne supporte pas l\'enregistrement audio. Utilisez Chrome ou Firefox.', { duration: 6000 });
           return;
         }
       }
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      audioCtxRef.current = audioCtx;
+      analyserRef.current = analyser;
+      dataArrayRef.current = new Array<number>(analyser.fftSize).fill(128);
+
+      const drawLiveWaveform = () => {
+        const canvas = canvasRef.current;
+        const data = dataArrayRef.current;
+        const analyzerNode = analyserRef.current;
+        if (!canvas || !data || !analyzerNode) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const typed = new Uint8Array(analyzerNode.fftSize);
+        analyzerNode.getByteTimeDomainData(typed);
+        for (let i = 0; i < typed.length; i += 1) data[i] = typed[i] ?? 128;
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 1) {
+          const centered = (data[i] - 128) / 128;
+          sum += centered * centered;
+        }
+        const rms = Math.sqrt(sum / data.length);
+        const levels = waveformLevelsRef.current;
+        levels.push(clamp(rms * 2.6, 0.03, 1));
+        if (levels.length > 80) levels.shift();
+        setAudioSignalActive(rms > 0.02);
+
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        ctx.clearRect(0, 0, width, height);
+        const barW = Math.max(2, Math.floor(width / 80) - 1);
+        const center = height / 2;
+        levels.forEach((lvl, idx) => {
+          const x = width - (levels.length - idx) * (barW + 1);
+          const h = Math.max(4, lvl * height * 0.95);
+          const alpha = clamp(0.2 + (idx / levels.length) * 0.8, 0.2, 1);
+          ctx.fillStyle = `rgba(99,102,241,${alpha})`;
+          ctx.fillRect(x, center - h / 2, barW, h);
+        });
+        rafRef.current = requestAnimationFrame(drawLiveWaveform);
+      };
+      rafRef.current = requestAnimationFrame(drawLiveWaveform);
+
       mediaRecorderRef.current = mr;
       chunksRef.current = [];
       const outType = mr.mimeType || 'audio/webm';
@@ -549,23 +611,38 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       mr.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: outType });
-        const ext = outType.includes('mp4') ? 'm4a' : outType.includes('ogg') ? 'ogg' : 'webm';
-        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: outType });
-        void uploadFileRef.current(file);
+        const objectUrl = URL.createObjectURL(blob);
+        setRecordPreview({ blob, url: objectUrl, mimeType: outType, durationSec: recordSecs });
         setRecordSecs(0);
       };
       mr.start(200);
       setIsRecording(true);
       setRecordSecs(0);
-      recordTimerRef.current = setInterval(() => setRecordSecs((s) => s + 1), 1000);
+      setRecordingWarningShown(false);
+      recordingWarningRef.current = false;
+      recordTimerRef.current = setInterval(() => {
+        setRecordSecs((s) => {
+          const next = s + 1;
+          if (next >= 540 && !recordingWarningRef.current) {
+            recordingWarningRef.current = true;
+            setRecordingWarningShown(true);
+            toast.warning('1 minute restante pour votre message vocal');
+          }
+          if (next >= 600) {
+            stopRecording();
+            return 600;
+          }
+          return next;
+        });
+      }, 1000);
     } catch (e) {
-      toast.error(micErrorMessage(e));
+      toast.error(micErrorMessage(e), { duration: 6000 });
     }
-  }, []);
+  }, [cleanupRecordResources, stopRecording]);
 
   const cancelRecording = React.useCallback(() => {
+    cleanupRecordResources();
     const mr = mediaRecorderRef.current;
     if (mr && isRecording) {
       mr.onstop = null;
@@ -578,11 +655,14 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
     }
     setIsRecording(false);
     setRecordSecs(0);
-    if (recordTimerRef.current) {
-      clearInterval(recordTimerRef.current);
-      recordTimerRef.current = null;
-    }
-  }, [isRecording]);
+  }, [cleanupRecordResources, isRecording]);
+
+  React.useEffect(() => {
+    return () => {
+      cleanupRecordResources();
+      if (recordPreview?.url) URL.revokeObjectURL(recordPreview.url);
+    };
+  }, [cleanupRecordResources, recordPreview?.url]);
 
   const threadQ = useQuery({
     queryKey: ['msg-thread', selectedConversationId],
@@ -721,13 +801,22 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
   const sendMessage = async () => {
     if (!selectedConversationId || !adminUserId) return;
     const text = draft.trim();
-    if (!text && pendingFiles.length === 0) return;
-    let message_type: ChatMessage['message_type'] = 'text';
-    if (pendingFiles.some((f) => f.type.startsWith('image/'))) message_type = 'image';
-    else if (pendingFiles.some((f) => f.type.startsWith('audio/'))) message_type = 'audio';
-    else if (pendingFiles.length) message_type = 'file';
+    if (!text && pendingFiles.length === 0 && !recordPreview) return;
+    const fileAttachments = [...pendingFiles];
+    if (recordPreview) {
+      const ext = recordPreview.mimeType.includes('ogg') ? 'ogg' : recordPreview.mimeType.includes('mp4') ? 'm4a' : 'webm';
+      const voiceFile = new File([recordPreview.blob], `voice-${Date.now()}.${ext}`, { type: recordPreview.mimeType });
+      const uploadedVoice = await uploadFileAndReturn(voiceFile);
+      if (!uploadedVoice) return;
+      fileAttachments.push(uploadedVoice);
+    }
 
-    const attachments = pendingFiles.map((f) => ({ url: f.url, name: f.name, size: f.size, type: f.type }));
+    let message_type: ChatMessage['message_type'] = 'text';
+    if (fileAttachments.some((f) => f.type.startsWith('image/'))) message_type = 'image';
+    else if (fileAttachments.some((f) => f.type.startsWith('audio/'))) message_type = 'audio';
+    else if (fileAttachments.length) message_type = 'file';
+
+    const attachments = fileAttachments.map((f) => ({ url: f.url, name: f.name, size: f.size, type: f.type }));
     const res = await fetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -761,6 +850,8 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
     setDraft('');
     setReplyTo(null);
     setPendingFiles([]);
+    if (recordPreview?.url) URL.revokeObjectURL(recordPreview.url);
+    setRecordPreview(null);
     void threadQ.refetch();
     void qc.invalidateQueries({ queryKey: ['msg-conversations'] });
     toast.success('Message envoyé');
@@ -1251,7 +1342,7 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
                 {f.type.startsWith('audio/') ? (
                   <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center">
                     <span className="max-w-[140px] truncate text-muted-foreground">{f.name}</span>
-                    <audio controls src={f.url} className="h-8 max-w-full flex-1 min-w-[160px]" preload="metadata" />
+                    <AudioPlayer src={f.url} className="max-w-full flex-1 min-w-[180px]" />
                   </div>
                 ) : (
                   <span className="max-w-[180px] truncate">{f.name}</span>
@@ -1268,93 +1359,133 @@ export function MessageThread({ adminUserId }: { adminUserId: string | null }) {
             ))}
           </div>
         ) : null}
-        <div className="flex items-end gap-2">
-          <Popover>
-            <PopoverTrigger
-              render={
-                <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0">
-                  🙂
-                </Button>
-              }
-            />
-            <PopoverContent className="w-56 p-2" align="start">
-              <div className="grid grid-cols-6 gap-1">
-                {EMOJIS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    className="rounded p-1 text-lg hover:bg-muted"
-                    onClick={() => setDraft((d) => d + e)}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <TemplatesPicker onSelect={(t) => setDraft((d) => d + t.body)} />
-          <input ref={fileRef} type="file" className="hidden" onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void uploadFile(f);
-            e.target.value = '';
-          }} />
-          <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void uploadFile(f);
-            e.target.value = '';
-          }} />
-          <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => fileRef.current?.click()}>
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => imgRef.current?.click()}>
-            <ImageIcon className="h-4 w-4" />
-          </Button>
-          {isRecording ? (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1">
-              <span className="text-xs tabular-nums text-destructive font-medium">
-                {Math.floor(recordSecs / 60)}:{String(recordSecs % 60).padStart(2, '0')}
+        {isRecording ? (
+          <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className={cn('h-2 w-2 rounded-full', audioSignalActive ? 'bg-emerald-500' : 'bg-muted-foreground/50')} />
+              <span className={cn('font-mono font-medium', recordSecs >= 540 ? 'text-red-600' : 'text-destructive')}>
+                REC {Math.floor(recordSecs / 60).toString().padStart(2, '0')}:{String(recordSecs % 60).padStart(2, '0')}
               </span>
-              <Button type="button" size="icon" variant="destructive" className="h-8 w-8 shrink-0" onClick={() => stopRecording()} title="Arrêter et joindre">
-                <Square className="h-3 w-3" />
+              <span className="ml-auto">Max 10:00</span>
+            </div>
+            <canvas ref={canvasRef} className="h-12 w-full rounded bg-transparent" />
+            <div className="flex items-center gap-2">
+              <Button type="button" size="sm" variant="destructive" onClick={() => stopRecording()}>
+                ⏹ Arrêter
               </Button>
-              <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => cancelRecording()}>
-                <X className="h-4 w-4" />
+              <Button type="button" size="sm" variant="outline" onClick={() => cancelRecording()}>
+                🗑 Annuler
               </Button>
             </div>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              title={canUseMic ? 'Message vocal' : 'Micro indisponible (utilisez HTTPS ou pièce jointe audio)'}
-              onClick={() => void startRecording()}
-              disabled={!canUseMic}
-            >
-              <Mic className="h-4 w-4" />
+          </div>
+        ) : recordPreview ? (
+          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-xs text-muted-foreground">
+              Message vocal · {Math.floor(recordPreview.durationSec / 60)}:{String(recordPreview.durationSec % 60).padStart(2, '0')}
+            </p>
+            <AudioPlayer src={recordPreview.url} className="max-w-none" />
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (recordPreview.url) URL.revokeObjectURL(recordPreview.url);
+                  setRecordPreview(null);
+                }}
+              >
+                🗑 Recommencer
+              </Button>
+              <Button type="button" size="sm" className="bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90" onClick={() => void sendMessage()}>
+                ✉️ Envoyer
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-end gap-2">
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0">
+                    🙂
+                  </Button>
+                }
+              />
+              <PopoverContent className="w-56 p-2" align="start">
+                <div className="grid grid-cols-6 gap-1">
+                  {EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      className="rounded p-1 text-lg hover:bg-muted"
+                      onClick={() => setDraft((d) => d + e)}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <TemplatesPicker onSelect={(t) => setDraft((d) => d + t.body)} />
+            <input ref={fileRef} type="file" className="hidden" onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadFile(f);
+              e.target.value = '';
+            }} />
+            <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadFile(f);
+              e.target.value = '';
+            }} />
+            <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => fileRef.current?.click()}>
+              <Paperclip className="h-4 w-4" />
             </Button>
-          )}
-          <Textarea
-            placeholder="Écrire un message… (@mention)"
-            value={draft}
-            onChange={(e) => {
-              const v = e.target.value;
-              setDraft(v);
-              setMentionOpen(v.endsWith('@') || v.includes('@'));
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void sendMessage();
-              }
-            }}
-            className="min-h-[40px] max-h-[120px] flex-1 resize-none text-sm"
-            rows={1}
-          />
-          <Button type="button" size="icon" className="h-9 w-9 shrink-0" disabled={!draft.trim() && pendingFiles.length === 0} onClick={() => void sendMessage()}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+            <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => imgRef.current?.click()}>
+              <ImageIcon className="h-4 w-4" />
+            </Button>
+            <Textarea
+              placeholder="Écrire un message… (@mention)"
+              value={draft}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDraft(v);
+                setMentionOpen(v.endsWith('@') || v.includes('@'));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void sendMessage();
+                }
+              }}
+              className="min-h-[40px] max-h-[120px] flex-1 resize-none text-sm"
+              rows={1}
+            />
+            {draft.trim() || pendingFiles.length > 0 ? (
+              <Button
+                type="button"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                disabled={!draft.trim() && pendingFiles.length === 0}
+                onClick={() => void sendMessage()}
+                title="Envoyer"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                title={canUseMic ? 'Message vocal' : 'Micro indisponible (utilisez HTTPS ou pièce jointe audio)'}
+                onClick={() => void startRecording()}
+                disabled={!canUseMic}
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
         {mentionOpen ? (
           <p className="mt-1 text-[10px] text-muted-foreground">Mention : recherche profils disponible dans une prochaine itération.</p>
         ) : null}

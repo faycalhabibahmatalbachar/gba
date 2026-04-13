@@ -576,31 +576,6 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
               child: Icon(Icons.attach_file_rounded, color: _purple, size: 20),
             ),
           ),
-          GestureDetector(
-            onTap: _isSending ? null : _toggleVoiceRecord,
-            child: Container(
-              width: 40,
-              height: 40,
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: _isRecording ? Colors.red.withValues(alpha: 0.15) : _purple.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _isRecording ? Icons.stop_circle : Icons.mic_none_rounded,
-                color: _isRecording ? Colors.red : _purple,
-                size: 20,
-              ),
-            ),
-          ),
-          if (_isRecording)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                '${(_recordingSecs ~/ 60).toString().padLeft(2, '0')}:${(_recordingSecs % 60).toString().padLeft(2, '0')}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red),
-              ),
-            ),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -619,30 +594,56 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _isSending ? null : _sendMessage,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [_purple, _violet]),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _purple.withValues(alpha: 0.4),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+          if (_isRecording)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, right: 4),
+              child: Text(
+                'REC ${(_recordingSecs ~/ 60).toString().padLeft(2, '0')}:${(_recordingSecs % 60).toString().padLeft(2, '0')}',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.red),
               ),
-              child: _isSending
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send, color: Colors.white, size: 20),
             ),
+          const SizedBox(width: 8),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _messageCtrl,
+            builder: (context, value, _) {
+              final hasText = value.text.trim().isNotEmpty;
+              final showSend = _isRecording || hasText;
+              return GestureDetector(
+                onTap: _isSending
+                    ? null
+                    : showSend
+                        ? (_isRecording ? _toggleVoiceRecord : _sendMessage)
+                        : _toggleVoiceRecord,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: showSend ? const LinearGradient(colors: [_purple, _violet]) : null,
+                    color: showSend ? null : _purple.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    boxShadow: showSend
+                        ? [
+                            BoxShadow(
+                              color: _purple.withValues(alpha: 0.4),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: _isSending
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Icon(
+                          showSend ? Icons.send : Icons.mic_none_rounded,
+                          color: showSend ? Colors.white : _purple,
+                          size: 20,
+                        ),
+                ),
+              );
+            },
           ),
         ],
       ),
