@@ -6,6 +6,11 @@ import { isOutboundEmailEnabled, renderEmailTemplate, sendEmail } from '@/lib/em
 
 export const dynamic = 'force-dynamic';
 
+function getRecoveryRedirectTo() {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_ADMIN_URL;
+  return `${String(siteUrl || '').replace(/\/+$/, '')}/auth/confirm?next=/auth/update-password`;
+}
+
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
@@ -34,6 +39,9 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { data, error } = await sb.auth.admin.generateLink({
     type: 'recovery',
     email: profile.email,
+    options: {
+      redirectTo: getRecoveryRedirectTo(),
+    },
   });
 
   if (error) {

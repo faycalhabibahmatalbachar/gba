@@ -51,7 +51,7 @@ export function ForgotPasswordDialog({ open, onOpenChange, initialEmail = '' }: 
     setLoading(true);
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const redirectTo = `${origin}/reset-password`;
+      const redirectTo = `${origin}/auth/confirm?next=/auth/update-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(trimmed, { redirectTo });
       if (error) throw error;
       toast.success(

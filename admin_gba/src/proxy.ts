@@ -83,7 +83,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === LOGIN || pathname.startsWith(`${LOGIN}/`);
-  const isRecoveryPage = pathname === '/reset-password' || pathname.startsWith('/reset-password/');
+  const isRecoveryPage =
+    pathname === '/reset-password' ||
+    pathname.startsWith('/reset-password/') ||
+    pathname === '/auth/update-password' ||
+    pathname.startsWith('/auth/update-password/') ||
+    pathname === '/auth/error' ||
+    pathname.startsWith('/auth/error/');
   const isApi = pathname.startsWith('/api/');
   const isPublic = isLoginPage || isRecoveryPage || pathname.startsWith('/_next') || isApi;
 

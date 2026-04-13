@@ -218,6 +218,16 @@ function OrdersContent() {
   const kpis = kpisQuery.data;
 
   useEffect(() => {
+    if (ordersQuery.error) {
+      console.error('[orders] API error:', ordersQuery.error);
+      return;
+    }
+    if (ordersQuery.data) {
+      console.log('[orders] Data received:', ordersQuery.data.data?.length ?? 0, 'orders');
+    }
+  }, [ordersQuery.error, ordersQuery.data]);
+
+  useEffect(() => {
     if (ordersQuery.isLoading || ordersQuery.isFetching) return;
     if (!listView) return;
     if (total === 0 && page > 1) {
