@@ -44,6 +44,39 @@ create table if not exists public.emergency_actions_log (
   effects_summary text null
 );
 
+-- Ensure required columns also exist when tables pre-exist.
+alter table public.security_alerts add column if not exists level text not null default 'info';
+alter table public.security_alerts add column if not exists title text not null default '';
+alter table public.security_alerts add column if not exists description text not null default '';
+alter table public.security_alerts add column if not exists triggered_by uuid null;
+alter table public.security_alerts add column if not exists triggered_at timestamptz not null default now();
+alter table public.security_alerts add column if not exists resolved_at timestamptz null;
+alter table public.security_alerts add column if not exists is_active boolean not null default true;
+alter table public.security_alerts add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table public.security_alert_rules add column if not exists trigger_type text not null default 'login_failures';
+alter table public.security_alert_rules add column if not exists threshold integer not null default 1;
+alter table public.security_alert_rules add column if not exists level text not null default 'attention';
+alter table public.security_alert_rules add column if not exists auto_action text null;
+alter table public.security_alert_rules add column if not exists is_active boolean not null default true;
+alter table public.security_alert_rules add column if not exists created_by uuid null;
+alter table public.security_alert_rules add column if not exists created_at timestamptz not null default now();
+
+alter table public.ip_geoip_cache add column if not exists country_code text null;
+alter table public.ip_geoip_cache add column if not exists country_name text null;
+alter table public.ip_geoip_cache add column if not exists city text null;
+alter table public.ip_geoip_cache add column if not exists lat double precision null;
+alter table public.ip_geoip_cache add column if not exists lng double precision null;
+alter table public.ip_geoip_cache add column if not exists isp text null;
+alter table public.ip_geoip_cache add column if not exists cached_at timestamptz not null default now();
+
+alter table public.emergency_actions_log add column if not exists action_type text not null default 'unknown';
+alter table public.emergency_actions_log add column if not exists reason text null;
+alter table public.emergency_actions_log add column if not exists performed_by uuid null;
+alter table public.emergency_actions_log add column if not exists performed_at timestamptz not null default now();
+alter table public.emergency_actions_log add column if not exists ip_address text null;
+alter table public.emergency_actions_log add column if not exists effects_summary text null;
+
 alter table public.audit_logs add column if not exists human_description text null;
 alter table public.profiles add column if not exists last_ip_address text null;
 alter table public.profiles add column if not exists last_country_code text null;
