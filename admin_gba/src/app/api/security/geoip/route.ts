@@ -15,10 +15,13 @@ export async function GET(req: Request) {
     return NextResponse.json({
       type: 'local' as const,
       label: kind.label,
+      country_code: null,
+      country_name: null,
+      city: null,
       lat: null,
       lng: null,
-      country: null,
-      city: null,
+      is_local: true,
+      is_vpn: false,
     });
   }
   if (!ip) {
@@ -29,10 +32,13 @@ export async function GET(req: Request) {
   return NextResponse.json({
     type: 'public' as const,
     ip,
+    country_code: null,
+    country_name: g.country ?? null,
     lat: g.lat,
     lng: g.lng,
-    country: g.country ?? null,
     city: g.city ?? null,
     source: g.source,
+    is_local: false,
+    is_vpn: false,
   });
 }

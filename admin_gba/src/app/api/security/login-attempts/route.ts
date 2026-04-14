@@ -3,6 +3,8 @@ import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { emitAdminNotification } from '@/lib/email/notification-dispatcher';
+import { writeAuditLog } from '@/lib/audit/server-audit';
+import { labelIpKind } from '@/lib/security/ip-present';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +61,30 @@ export async function GET(req: Request) {
             };
           });
 
-    return NextResponse.json({ data: rows, source: hist.data?.length ? 'admin_login_history' : 'audit_logs' });
+    const ipSeen = new Set<string>();
+    const humanized = rows.map((r) => {
+      const ip = String((r as { ip_address?: string | null }).ip_address || '');
+      const kind = labelIpKind(ip);
+      const key = ip || 'none';
+      const firstSeen = !ipSeen.has(key);
+      ipSeen.add(key);
+      const success = Boolean((r as { success?: boolean }).success);
+      return {
+        ...r,
+        result_human: success ? '✓ Connexion réussie' : '✗ Identifiants invalides',
+        ip_label: kind.label,
+        ip_is_unusual: firstSeen && kind.kind === 'public',
+      };
+    });
+    await writeAuditLog({
+      actorUserId: auth.userId,
+      actorEmail: auth.email,
+      actionType: 'view',
+      entityType: 'report',
+      entityId: 'security_login_attempts',
+      description: 'Consultation tentatives de connexion',
+    });
+    return NextResponse.json({ data: humanized, source: hist.data?.length ? 'admin_login_history' : 'audit_logs' });
   } catch (e) {
     const msg = String((e as Error).message);
     const isNet = /fetch failed|timeout|timed out|connect/i.test(msg);

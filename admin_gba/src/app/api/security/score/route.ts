@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
+import { writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,10 +49,51 @@ export async function GET() {
   score = Math.max(0, Math.min(100, score));
 
   const level = score >= 75 ? 'secure' : score >= 45 ? 'warning' : 'critical';
+  const criteria = [
+    {
+      id: 'failed_logins_24h',
+      label: 'Échecs de connexion (24h)',
+      ok: failedN <= 5,
+      current: failedN,
+      target: '<= 5',
+      fix_hint: 'Vérifier section Authentification',
+      section: '#section-auth',
+    },
+    {
+      id: 'two_fa_coverage',
+      label: 'Couverture 2FA',
+      ok: Math.round(cov2 * 100) >= 80,
+      current: Math.round(cov2 * 100),
+      target: '>= 80',
+      fix_hint: 'Forcer 2FA pour tous les admins',
+      section: '#section-policy',
+    },
+    {
+      id: 'whitelist_size',
+      label: 'Whitelist IP configurée',
+      ok: (wl.count ?? 0) > 0,
+      current: wl.count ?? 0,
+      target: '> 0',
+      fix_hint: 'Ajouter des IPs autorisées',
+      section: '#section-access',
+    },
+  ];
+
+  await writeAuditLog({
+    actorUserId: auth.userId,
+    actorEmail: auth.email,
+    actionType: 'view',
+    entityType: 'report',
+    entityId: 'security_score',
+    description: 'Consultation score sécurité',
+    status: 'success',
+  });
 
   return NextResponse.json({
     score,
     level,
+    criteria,
+    recommendations: criteria.filter((c) => !c.ok).map((c) => ({ id: c.id, label: c.label, fix_hint: c.fix_hint, section: c.section })),
     breakdown: {
       failed_logins_24h: failedN,
       blacklist_size: blacklist.count ?? 0,

@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { humanizeAuditEvent } from '@/lib/security/humanize-audit-event';
+import { writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
+const CACHE_TTL_MS = 30_000;
+let overviewCache: { expiresAt: number; payload: unknown } | null = null;
 
 function adminRole(u: {
   app_metadata?: Record<string, unknown>;
@@ -111,6 +114,9 @@ function buildScoreDetails(params: {
 export async function GET() {
   const auth = await requireSuperAdmin();
   if (!auth.ok) return auth.response;
+  if (overviewCache && Date.now() < overviewCache.expiresAt) {
+    return NextResponse.json(overviewCache.payload);
+  }
 
   let sb: ReturnType<typeof getServiceSupabase>;
   try {
@@ -240,10 +246,13 @@ export async function GET() {
     });
   }
 
-  return NextResponse.json({
+  const payload = {
     active_sessions: activeSessions,
+    sessions_count: activeSessions,
     failed_24h: failed24,
+    login_failures_24h: failed24,
     blocked_ips: blacklistN,
+    blacklist_count: blacklistN,
     whitelist_count: whitelistN,
     coverage_2fa: coverage2fa,
     total_admins: admins.length,
@@ -252,8 +261,20 @@ export async function GET() {
     security_score: score,
     score_level: level,
     score_details: details,
-    active_alerts: active_alerts.slice(0, 8),
-    recent_events,
+    active_alerts: active_alerts.slice(0, 3),
+    recent_events: recent_events.slice(0, 5),
     generated_at: new Date().toISOString(),
+  };
+
+  overviewCache = { expiresAt: Date.now() + CACHE_TTL_MS, payload };
+  await writeAuditLog({
+    actorUserId: auth.userId,
+    actorEmail: auth.email,
+    actionType: 'view',
+    entityType: 'report',
+    entityId: 'security_overview',
+    description: 'Consultation synthèse sécurité',
+    status: 'success',
   });
+  return NextResponse.json(payload);
 }

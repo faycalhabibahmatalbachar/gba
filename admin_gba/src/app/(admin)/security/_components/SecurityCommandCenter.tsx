@@ -537,44 +537,54 @@ export function SecurityCommandCenter() {
   const navBadges: Partial<Record<string, number>> = {
     'section-overview': alerts.length,
     'section-alerts': alerts.length,
+    'section-auth': Math.max(0, ov?.admins_without_2fa ?? 0),
+    'section-api': Number(!secretsMetaQ.data?.data?.fcm_or_firebase_admin_configured) + Number(!secretsMetaQ.data?.data?.service_role_configured),
   };
 
   return (
     <div className="space-y-6 pb-10">
       <SecurityAuditRealtime onEvent={appendLive} />
-      <div className="lg:grid lg:grid-cols-[220px_1fr] lg:gap-8 lg:items-start">
-        <SecuritySideNav alertCountBySection={navBadges} />
+      <div className="lg:grid lg:grid-cols-[200px_1fr] lg:gap-6 lg:items-start">
+        <SecuritySideNav
+          alertCountBySection={navBadges}
+          pollingLabel="Polling 30s actif"
+          lastUpdatedLabel={overviewQ.dataUpdatedAt ? formatSecurityShortFr(new Date(overviewQ.dataUpdatedAt).toISOString()) : '—'}
+        />
         <div className="min-w-0 space-y-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
-            <div>
-              <h1 className="text-[22px] font-semibold tracking-tight font-heading">Centre de Sécurité</h1>
-              <p className="text-sm text-muted-foreground">
-                Poste de commande — mis à jour {overviewQ.dataUpdatedAt ? formatSecurityRelativeFr(new Date(overviewQ.dataUpdatedAt).toISOString()) : '—'}
+          <div className="flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
+            <div className="min-w-[220px]">
+              <h1 className="text-[20px] font-semibold tracking-tight font-heading">Centre de Sécurité</h1>
+              <p className="text-xs text-muted-foreground">
+                Poste de commande · {overviewQ.dataUpdatedAt ? formatSecurityRelativeFr(new Date(overviewQ.dataUpdatedAt).toISOString()) : '—'}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/audit"
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
-              >
-                <Shield className="h-3.5 w-3.5" /> Audit
-              </Link>
-              <a
-                href="/api/security/report-pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
-              >
-                <FileDown className="h-3.5 w-3.5" /> PDF
+            <span
+              className={cn(
+                'rounded-full px-2 py-1 text-[11px] font-semibold',
+                level === 'secure' && 'bg-emerald-500/15 text-emerald-700',
+                level === 'warning' && 'bg-amber-500/15 text-amber-700',
+                level === 'critical' && 'bg-red-500/15 text-red-700',
+              )}
+            >
+              {level === 'secure' ? 'SÉCURISÉ' : level === 'warning' ? 'ATTENTION' : 'CRITIQUE'}
+            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs font-semibold tabular-nums">{scoreDisplay}/100</span>
+              <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
+                <div className={cn('h-full transition-all', barClass)} style={{ width: `${Math.min(100, Math.max(0, scoreDisplay))}%` }} />
+              </div>
+              <a href="/api/security/report-pdf" target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="icon" className="h-8 w-8" title="Exporter PDF">
+                  <FileDown className="h-4 w-4" />
+                </Button>
               </a>
-              <Link
-                href="/notifications?tab=composer&src=security"
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted"
-              >
-                <Bell className="h-3.5 w-3.5" /> Notifier
+              <Link href="/notifications?tab=composer&src=security">
+                <Button variant="outline" size="icon" className="h-8 w-8" title="Notifier">
+                  <Bell className="h-4 w-4" />
+                </Button>
               </Link>
-              <Button variant="outline" size="sm" type="button" onClick={() => void qc.invalidateQueries()} title="Actualiser">
-                <RefreshCw className="h-3.5 w-3.5" />
+              <Button variant="destructive" size="icon" className="h-8 w-8" type="button" title="Urgence" onClick={() => setEmergencyOpen(true)}>
+                <Skull className="h-4 w-4" />
               </Button>
             </div>
           </div>

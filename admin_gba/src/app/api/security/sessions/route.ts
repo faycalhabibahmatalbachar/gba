@@ -3,6 +3,7 @@ import { UAParser } from 'ua-parser-js';
 import { requireSuperAdmin } from '@/app/api/_lib/require-super-admin';
 import { getServiceSupabase } from '@/lib/supabase/service-role';
 import { lookupGeoIp } from '@/lib/geoip/lookup';
+import { writeAuditLog } from '@/lib/audit/server-audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -129,4 +130,34 @@ export async function GET() {
       active: activeSessions.filter((s) => s.is_active).length,
     },
   });
+}
+
+export async function DELETE() {
+  const auth = await requireSuperAdmin();
+  if (!auth.ok) return auth.response;
+
+  let sb: ReturnType<typeof getServiceSupabase>;
+  try {
+    sb = getServiceSupabase();
+  } catch {
+    return NextResponse.json({ error: 'Service role manquant' }, { status: 503 });
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await sb.from('user_sessions').update({ ended_at: now }).is('ended_at', null);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  await writeAuditLog({
+    actorUserId: auth.userId,
+    actorEmail: auth.email,
+    actionType: 'delete',
+    entityType: 'profile',
+    entityId: 'all',
+    description: 'Révocation globale des sessions applicatives',
+    status: 'success',
+  });
+
+  return NextResponse.json({ ok: true });
 }
